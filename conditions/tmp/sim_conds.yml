@@ -1,0 +1,31 @@
+# 各種初期条件・境界条件の定義
+
+# 流入ガス(NH3)の初期条件
+INFLOW_GAS_COND: {
+  inflow_amt: 0.077,        # 流量 (L/min)
+  temp: 25,                 # 温度 (degC)
+  press: 0.108,             # 圧力 (MPaA)
+  density: 0.750391449,     # 密度 (kg/m3)
+  spec_heat: 2.169389529,   # 比熱 (kJ/kg/K)
+  adsorption_heat: 1700,    # 吸着熱 (kJ/kg)
+  viscosity: 8.16289e-06,   # 粘度
+}
+
+# 充填吸着材条件
+ADSORPTION_COND: {
+  volume: 52.5,             # 体積 (cc)
+  length: 30,               # 容器径 (mm)
+  # cross_sect_area:        # 容器断面積 (m2)
+  # fill_height:            # 充填高さ (m)
+  bulk_density: 0.54,       # かさ密度 (g/cc)
+  # weight:                 # 充填重量 (kg)
+  spec_heat: 0.84,          # 比熱 (kJ/kg/K)
+  # heat_capacity:          # 熱容量 (kJ/K)
+  init_temp: -31.97,        # 初期温度 (degC)
+  porosity: 0.3,            # 空隙率
+  ptcl_size_ave: 0.001,     # 平均粒子径 (m)
+  therm_conduct: 0.2,       # 熱伝導率 (W/m/K)
+  init_pressure: 0.002,     # 初期充填層圧力 (MPaA)
+  # init_adsorp_amt:        # 初期吸着量 (L)
+  init_adsorp_capa: 0.92,   # 初期吸着能計数
+}
