@@ -12,17 +12,17 @@ import matplotlib.pyplot as plt
 import japanize_matplotlib
 from scipy import optimize
 
-from utils import const
+from utils import const, init_functions
 
 import warnings
 warnings.simplefilter('error')
 
 
-class GasAdosorption_Batch_simulator():
+class GasAdosorption_Breakthrough_simulator():
     """ ガス吸着モデル(バッチプロセス)を実行するクラス
     """
 
-    def __init__(self, obs_name, cond_id):
+    def __init__(self, cond_id):
         """ 初期化関数
 
         Args:
@@ -32,22 +32,30 @@ class GasAdosorption_Batch_simulator():
 
         # クラス変数初期化
         self.cond_id = cond_id
-        self.obs_name = obs_name
 
         # 実験条件(conditions)の読み込み
         filepath = const.CONDITIONS_DIR + self.cond_id + "/sim_conds.yml"
         with open(filepath, encoding="utf-8") as f:
-            init_conditions = yaml.safe_load(f)
+            self.common_conds = yaml.safe_load(f)
 
-        self.sim_conds = {}
-        self.sim_conds["inflow_gas"] = init_conditions["INFLOW_GAS_COND"]
-        self.sim_conds["adsorp_cond"] = init_conditions["ADSORPTION_COND"]
-        self.sim_conds["press_loss"] = init_conditions["PRESSURE_LOSS_EVAL"]
-        self.initialize_init_values()
+        # 追加の初期化
+        self.common_conds = init_functions.add_common_conds(self.common_conds)
+        self.num_str = self.common_conds["CELL_SPLIT"]["num_str"]
+        self.num_sec = self.common_conds["CELL_SPLIT"]["num_sec"]
+
+        # stream条件の初期化
+        self.stream_conds = {}
+        for stream in range(1, 1+self.num_str):
+            self.stream_conds[stream] = init_functions.init_stream_conds(
+                self.common_conds, stream, self.stream_conds
+            )
+        self.stream_conds[stream+1] = init_functions.init_drum_wall_conds(
+            self.common_conds, self.stream_conds
+        )
 
         # 観測値(data)の読み込み
-        filepath = const.DATA_DIR + self.obs_name + ".csv"
-        self.df_obs = pd.read_csv(filepath, index_col="timestamp")
+        filepath = const.DATA_DIR + self.common_conds["data_path"]
+        self.df_obs = pd.read_excel(filepath, sheet_name="python実装用_吸着のみ", index_col="time")
 
         # その他初期化
 
