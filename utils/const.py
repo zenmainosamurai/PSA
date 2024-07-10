@@ -8,3 +8,40 @@ DATA_DIR = "data/"
 
 # 出力先ファイル
 OUTPUT_DIR = "output/"
+
+# 英語→日本語
+TRANSLATION = {
+    "temp_reached": "セクション到達温度",
+    "hw1": "壁-層伝熱係数",
+    "Hbb": "下流壁への熱流束",
+    "inflow_fr_co2": "流入CO2流量",
+    "inflow_fr_n2": "流入N2流量",
+    "inflow_mf_co2": "流入CO2分率",
+    "inflow_mf_n2": "流入N2分率",
+    "gas_density": "ガス密度",
+    "gas_cp": "ガス比熱",
+    "adsorp_amt_estimate": "実際のセクション新規吸着量",
+    "accum_adsorp_amt": "時間経過後吸着量",
+    "outflow_fr_co2": "下流流出CO2流量",
+    "outflow_fr_n2": "下流流出N2流量",
+    "outflow_mf_co2": "下流流出CO2分率",
+    "outflow_mf_n2": "下流流出N2分率",
+}
+
+UNIT = {
+    "セクション到達温度": "[℃]",
+    "壁-層伝熱係数": "[W/m2/K]",
+    "下流壁への熱流束": "[J]",
+    "流入CO2流量": "[cm3]",
+    "流入N2流量": "[cm3]",
+    "流入CO2分率": "",
+    "流入N2分率": "",
+    "ガス密度": "[kg/m3]",
+    "ガス比熱": "[kJ/kg/K]",
+    "実際のセクション新規吸着量": "[cm3]",
+    "時間経過後吸着量": "[cm3/g-abs]",
+    "下流流出CO2流量": "[cm3]",
+    "下流流出N2流量": "[cm3]",
+    "下流流出CO2分率": "",
+    "下流流出N2分率": "",
+}

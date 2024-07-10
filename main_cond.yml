@@ -2,23 +2,11 @@
 
 # 実行モードを指定
 mode_list: [
-  # "simulation",
-  "assimilation",
+  "simulation",
+  # "assimilation",
 ]
-
-# 全体可視化
-plot_overcases: False
 
 # 実行したいconditionファイルを指定
 cond_list: [
-  test7
-]
-
-# 実行したい観測データファイルを指定
-obs_list: [
-  "obs_case1",
-  # "obs_case2",
-  # "obs_case3",
-  # "obs_case4",
-  # "obs_case5",
+  tmp
 ]
