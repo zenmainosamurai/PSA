@@ -13,6 +13,7 @@ if __name__ == '__main__':
 
     # 計算実行
     print("計算開始----------------------------------")
-    instance = GasAdosorption_Breakthrough_simulator(main_cond["cond_list"][0])
-    instance.execute_simulation()
+    for cond_id in main_cond["cond_list"]:
+        instance = GasAdosorption_Breakthrough_simulator(cond_id)
+        instance.execute_simulation()
     print("complete!")

@@ -8,5 +8,9 @@ mode_list: [
 
 # 実行したいconditionファイルを指定
 cond_list: [
-  tmp
+  1_01_adsorp_heat_co2,
+  1_02_adsorp_heat_co2,
+  1_03_adsorp_heat_co2,
+  1_04_adsorp_heat_co2,
+  # tmp
 ]
