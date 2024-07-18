@@ -5,7 +5,7 @@ import japanize_matplotlib
 import math
 import glob
 
-def plot_csv_files(tgt_foldapath, unit_dict):
+def plot_csv_files(tgt_foldapath, unit_dict, data_dir):
     # csv読み込み
     filename_list = glob.glob(tgt_foldapath + "csv/*")
     df_dict = {}
@@ -22,6 +22,10 @@ def plot_csv_files(tgt_foldapath, unit_dict):
         "1": "tab:red",
         "2": "tab:blue",
         "3": "tab:green",
+    }
+    color_dict_obs = {
+        "1": "black",
+        "2": "dimgrey",
     }
     linewidth_dict = {
         "1": 3,
@@ -68,3 +72,30 @@ def plot_csv_files(tgt_foldapath, unit_dict):
         plt.legend()
         plt.savefig(output_foldapath + key + ".png", dpi=100)
         plt.close()
+
+    # 可視化（温度）
+    df = df_dict["セクション到達温度"]
+    df_obs = pd.read_excel(data_dir + "20240624_ICTへの提供データ_PSA実験_編集_メイン.xlsx",
+                           sheet_name="python実装用_吸着のみ", index_col="time")
+    plt.rcParams["font.size"] = 14
+    fig = plt.figure(figsize=(16, 5), tight_layout=True)
+    fig.patch.set_facecolor('white')
+    for stream in range(1,3):
+        for section in range(1,4):
+            plt.plot(df[f"temp_reached_{str(stream)}{str(section)}"],
+                    label = f"calc_({str(stream)}, {str(section)})",
+                    linestyle = linestyle_dict[str(section)],
+                    c = color_dict[str(stream)],
+                    )
+    for stream in range(1,3):
+        for section in range(1,4):
+            plt.plot(df_obs[f"temp_{str(stream)}{str(section)}"],
+                     label=f"obs_({str(stream)}, {str(section)})",
+                     linestyle = linestyle_dict[str(section)],
+                     c = color_dict_obs[str(stream)]
+                     )
+    plt.title("セクション到達温度")
+    plt.grid()
+    plt.legend()
+    plt.savefig(output_foldapath + "セクション到達温度_観測値.png", dpi=100)
+    plt.close()

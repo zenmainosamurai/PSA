@@ -160,7 +160,8 @@ class GasAdosorption_Breakthrough_simulator():
         ### ◆(4/4) 可視化 -------------------------------------------------
         print("(3/3) png output...")
         plot_csv.plot_csv_files(tgt_foldapath = output_foldapath + mode + "/",
-                                unit_dict=const.UNIT)
+                                unit_dict=const.UNIT,
+                                data_dir=const.DATA_DIR)
 
     def calc_all_cell_balance(self, variables):
         """全体のマテバラ・熱バラを順次計算する
