@@ -495,7 +495,7 @@ class GasAdosorption_Breakthrough_simulator():
         )
         # 壁-層伝熱係数 [W/m2/K]
         hw1 = Nupw / self.common_conds["PACKED_BED_COND"]["dp"] * kf
-        hw1 *= self.common_conds["DRUM_WALL_COND"]["coef_hw1"]
+        # hw1 *= self.common_conds["DRUM_WALL_COND"]["coef_hw1"]
         # 層伝熱係数 [W/m2/K]
         u1 = 1 / (dlat / ke + 1 / habs)
 

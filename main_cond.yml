@@ -8,9 +8,9 @@ mode_list: [
 
 # 実行したいconditionファイルを指定
 cond_list: [
-  1_05_coef_hw1,
-  1_06_coef_hw1,
-  1_07_coef_hw1,
-  1_08_coef_hw1,
+  1_09_state_var_ks,
+  1_10_state_var_ks,
+  1_11_state_var_ks,
+  1_12_state_var_ks,
   # tmp
 ]
