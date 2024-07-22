@@ -6,6 +6,14 @@ import math
 import glob
 
 def plot_csv_files(tgt_foldapath, unit_dict, data_dir):
+    """ csvファイルを可視化する関数
+        (stream, section) = (2, 3)のときのみ使用
+
+    Args:
+        tgt_foldapath (str): 出力先フォルダパス
+        unit_dict (str): 日本語名と単位のdict
+        data_dir (str): dataフォルダパス
+    """
     # csv読み込み
     filename_list = glob.glob(tgt_foldapath + "csv/*")
     df_dict = {}
@@ -174,5 +182,3 @@ def plot_csv_files(tgt_foldapath, unit_dict, data_dir):
         plt.legend()
         plt.savefig(output_foldapath + key + ".png", dpi=100)
         plt.close()
-
-    # 

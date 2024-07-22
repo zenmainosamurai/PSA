@@ -197,16 +197,16 @@ class GasAdosorption_Breakthrough_simulator():
                                                                section=section,
                                                                variables=variables,
                                                                material_output=mb_dict[stream][section])
-        # 壁面熱バラ（stream = self.num_sec）
-        hb_dict[self.num_sec] = {}
-        hb_dict[self.num_sec][1] = self.calc_cell_heat_wall(section=1,
+        # 壁面熱バラ（stream = self.num_str+1）
+        hb_dict[self.num_str+1] = {}
+        hb_dict[self.num_str+1][1] = self.calc_cell_heat_wall(section=1,
                                                             variables=variables,
-                                                            heat_output=hb_dict[self.num_str-1][1])
+                                                            heat_output=hb_dict[self.num_str][1])
         for section in range(2, 1+self.num_sec):
-            hb_dict[self.num_sec][section] = self.calc_cell_heat_wall(section=section,
+            hb_dict[self.num_str+1][section] = self.calc_cell_heat_wall(section=section,
                                                                       variables=variables,
-                                                                      heat_output=hb_dict[self.num_str-1][section],
-                                                                      heat_wall_output=hb_dict[self.num_sec][section-1])
+                                                                      heat_output=hb_dict[self.num_str][section],
+                                                                      heat_wall_output=hb_dict[self.num_str+1][section-1])
 
         ### 出力
         # 更新後の状態変数
