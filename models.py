@@ -495,7 +495,7 @@ class GasAdosorption_Breakthrough_simulator():
         )
         # 壁-層伝熱係数 [W/m2/K]
         hw1 = Nupw / self.common_conds["PACKED_BED_COND"]["dp"] * kf
-        # hw1 *= self.common_conds["DRUM_WALL_COND"]["coef_hw1"]
+        hw1 *= self.common_conds["DRUM_WALL_COND"]["coef_hw1"]
         # 層伝熱係数 [W/m2/K]
         u1 = 1 / (dlat / ke + 1 / habs)
 
@@ -504,12 +504,12 @@ class GasAdosorption_Breakthrough_simulator():
             Hwin = 0
         else:
             Hwin = u1 * Ain * (temp_inside_cell - temp_now) * self.common_conds["dt"] * 60
-        # 外側境界からの熱流束 [J]
+        # 外側境界への熱流束 [J]
         Hwout = u1 * Aout * (temp_now - temp_outside_cell) * self.common_conds["dt"] * 60
         # 下流セルへの熱流束 [J]
         if section != self.num_sec:
             Hbb = (
-                u1 * Abb * (temp_now - variables["temp"][stream][section])
+                u1 * Abb * (temp_now - temp_below_cell)
                 * self.common_conds["dt"] * 60
             )
         else:
@@ -527,10 +527,20 @@ class GasAdosorption_Breakthrough_simulator():
             "stream": stream,
         }
         temp_reached = optimize.newton(self.__optimize_temp_reached, temp_now, args=args.values())
+        # 流入ガスが受け取る熱 [J]
+        Hgas = gas_cp * Mgas * (temp_reached - temp_now)
 
         output = {
             "temp_reached": temp_reached,
             "hw1": hw1,
+            ### 以下確認用
+            "Habs": Habs, # 発生する吸着熱 [J]
+            "Hgas": Hgas, # 流入ガスが受け取る熱 [J]
+            "Hroof": Hroof, # 上流壁への放熱 [J]
+            "Hwin": Hwin, # 内側境界からの熱流束 [J]
+            "Hwout": Hwout, # 外側境界への熱流束 [J]
+            "Hbb": Hbb, # 下流セルへの熱流束 [J]
+            "u1": u1, # 層伝熱係数 [W/m2/K]
         }
 
         return output
@@ -582,6 +592,11 @@ class GasAdosorption_Breakthrough_simulator():
         output = {
             "Hbb": Hbb,
             "temp_reached": temp_reached,
+            ### 以下記録用
+            "Hroof": Hroof, # 上流壁への熱流束 [J]
+            "Hwin": Hwin, # 内側境界からの熱流束 [J]
+            "Hwout": Hwout, # 外側境界への熱流束 [J]
+            "Hbb": Hbb, # 下流壁への熱流束 [J]
         }
 
         return output

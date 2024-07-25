@@ -87,6 +87,7 @@ def plot_csv_files(tgt_foldapath, unit_dict, data_dir):
         plt.title(key + " " + unit_dict[key])
         plt.grid()
         plt.legend(fontsize=12)
+        plt.xlabel("timestamp")
     plt.savefig(output_foldapath + "all.png", dpi=100)
     plt.close()
 
@@ -117,6 +118,7 @@ def plot_csv_files(tgt_foldapath, unit_dict, data_dir):
                      )
     plt.title("セクション到達温度")
     plt.grid()
+    plt.xlabel("timestamp")
     plt.legend(fontsize=12)
 
     # その他
@@ -134,51 +136,52 @@ def plot_csv_files(tgt_foldapath, unit_dict, data_dir):
         plt.title(key + " " + unit_dict[key])
         plt.grid()
         plt.legend()
+        plt.xlabel("timestamp")
     plt.savefig(output_foldapath + "all_2.png", dpi=100)
     plt.close()
 
     ### 可視化(indivisual) ----------------------------------------------------------------------
-    # 温度
-    df = df_dict["セクション到達温度"]
-    df_obs = pd.read_excel(data_dir + "20240624_ICTへの提供データ_PSA実験_編集_メイン.xlsx",
-                           sheet_name="python実装用_吸着のみ", index_col="time")
-    plt.rcParams["font.size"] = 14
-    fig = plt.figure(figsize=(16, 5), tight_layout=True)
-    fig.patch.set_facecolor('white')
-    for stream in range(1,4):
-        for section in range(1,4):
-            plt.plot(df[f"temp_reached_{str(stream)}{str(section)}"],
-                    label = f"(str,sec) = ({str(stream)}, {str(section)})",
-                    linestyle = linestyle_dict[str(section)],
-                    c = color_dict[str(stream)],
-                    )
-    for stream in range(1,3):
-        for section in range(1,4):
-            plt.plot(df_obs[f"temp_{str(stream)}{str(section)}"],
-                     label=f"(str,sec) = ({str(stream)}, {str(section)})",
-                     linestyle = linestyle_dict[str(section)],
-                     c = color_dict_obs[str(stream)]
-                     )
-    plt.title("セクション到達温度")
-    plt.grid()
-    plt.legend(fontsize=10)
-    plt.savefig(output_foldapath + "セクション到達温度_観測値.png", dpi=100)
-    plt.close()
+    # # 温度
+    # df = df_dict["セクション到達温度"]
+    # df_obs = pd.read_excel(data_dir + "20240624_ICTへの提供データ_PSA実験_編集_メイン.xlsx",
+    #                        sheet_name="python実装用_吸着のみ", index_col="time")
+    # plt.rcParams["font.size"] = 14
+    # fig = plt.figure(figsize=(16, 5), tight_layout=True)
+    # fig.patch.set_facecolor('white')
+    # for stream in range(1,4):
+    #     for section in range(1,4):
+    #         plt.plot(df[f"temp_reached_{str(stream)}{str(section)}"],
+    #                 label = f"(str,sec) = ({str(stream)}, {str(section)})",
+    #                 linestyle = linestyle_dict[str(section)],
+    #                 c = color_dict[str(stream)],
+    #                 )
+    # for stream in range(1,3):
+    #     for section in range(1,4):
+    #         plt.plot(df_obs[f"temp_{str(stream)}{str(section)}"],
+    #                  label=f"(str,sec) = ({str(stream)}, {str(section)})",
+    #                  linestyle = linestyle_dict[str(section)],
+    #                  c = color_dict_obs[str(stream)]
+    #                  )
+    # plt.title("セクション到達温度")
+    # plt.grid()
+    # plt.legend(fontsize=10)
+    # plt.savefig(output_foldapath + "セクション到達温度_観測値.png", dpi=100)
+    # plt.close()
 
-    # その他
-    for i, key in enumerate(tgt_keys):
-        plt.rcParams["font.size"] = 14
-        fig = plt.figure(figsize=(16, 5), tight_layout=True)
-        fig.patch.set_facecolor('white')
-        for col in df_dict[key].columns:
-            plt.plot(df_dict[key][col],
-                    label = f"(str,sec) = ({col[-2]}, {col[-1]})",
-                    linestyle = linestyle_dict[col[-1]],
-                    c = color_dict[col[-2]],
-                    #  linewidth = linewidth_dict[col[-1]]
-                    )
-        plt.title(key + " " + unit_dict[key])
-        plt.grid()
-        plt.legend()
-        plt.savefig(output_foldapath + key + ".png", dpi=100)
-        plt.close()
+    # # その他
+    # for i, key in enumerate(tgt_keys):
+    #     plt.rcParams["font.size"] = 14
+    #     fig = plt.figure(figsize=(16, 5), tight_layout=True)
+    #     fig.patch.set_facecolor('white')
+    #     for col in df_dict[key].columns:
+    #         plt.plot(df_dict[key][col],
+    #                 label = f"(str,sec) = ({col[-2]}, {col[-1]})",
+    #                 linestyle = linestyle_dict[col[-1]],
+    #                 c = color_dict[col[-2]],
+    #                 #  linewidth = linewidth_dict[col[-1]]
+    #                 )
+    #     plt.title(key + " " + unit_dict[key])
+    #     plt.grid()
+    #     plt.legend()
+    #     plt.savefig(output_foldapath + key + ".png", dpi=100)
+    #     plt.close()
