@@ -44,17 +44,17 @@ def plot_csv_files(tgt_foldapath, unit_dict, data_dir):
     os.makedirs(output_foldapath, exist_ok=True)
 
     ### 可視化(all) ----------------------------------------------------------------------
-    num_row = math.ceil(len(df_dict)/3) + 1
+    num_row = math.ceil((len(df_dict) + 2)/3) + 1
     fig = plt.figure(figsize=(8*3, 5.5*num_row), tight_layout=True)
     fig.patch.set_facecolor('white')
 
-    # セクション到達温度
+    # セクション到達温度(吸着層)
     plt.rcParams["font.size"] = 16
     plt.subplot(num_row, 1, 1)
     df = df_dict["セクション到達温度"]
     df_obs = pd.read_excel(data_dir + "20240624_ICTへの提供データ_PSA実験_編集_メイン.xlsx",
                            sheet_name="python実装用_吸着のみ", index_col="time")
-    for stream in range(1,4):
+    for stream in range(1,3):
         for section in range(1,4):
             plt.plot(df[f"temp_reached_{str(stream)}{str(section)}"],
                     label = f"(str,sec) = ({str(stream)}, {str(section)})",
@@ -68,7 +68,29 @@ def plot_csv_files(tgt_foldapath, unit_dict, data_dir):
                      linestyle = linestyle_dict[str(section)],
                      c = color_dict_obs[str(stream)]
                      )
-    plt.title("セクション到達温度")
+    plt.title("セクション到達温度（吸着層）")
+    plt.grid()
+    plt.legend(fontsize=12)
+
+    # セクション到達温度(壁面)
+    plt.rcParams["font.size"] = 16
+    plt.subplot(num_row, 3, 4)
+    for section in range(1,4):
+        plt.plot(df[f"temp_reached_3{str(section)}"],
+                label = f"(sec) = ({str(section)})",
+                linestyle = linestyle_dict[str(section)],
+                c = color_dict["3"],
+                )
+    plt.title("セクション到達温度（壁面）")
+    plt.grid()
+    plt.legend(fontsize=12)
+
+    # セクション到達温度(上下蓋)
+    plt.rcParams["font.size"] = 16
+    plt.subplot(num_row, 3, 5)
+    plt.plot(df[f"temp_reached_up"], label = "up")
+    plt.plot(df[f"temp_reached_dw"], label = "dw")
+    plt.title("セクション到達温度（上下蓋）")
     plt.grid()
     plt.legend(fontsize=12)
 
@@ -76,7 +98,7 @@ def plot_csv_files(tgt_foldapath, unit_dict, data_dir):
     tgt_keys = [key for key in df_dict.keys() if key != "セクション到達温度"]
     for i, key in enumerate(tgt_keys):
         plt.rcParams["font.size"] = 16
-        plt.subplot(num_row,3,i+4)
+        plt.subplot(num_row,3,i+6)
         for col in df_dict[key].columns:
             plt.plot(df_dict[key][col],
                     label = f"(str,sec) = ({col[-2]}, {col[-1]})",
@@ -93,16 +115,17 @@ def plot_csv_files(tgt_foldapath, unit_dict, data_dir):
 
     ### 可視化(all_2) ----------------------------------------------------------------------
     num_row = len(df_dict)
+    num_row += 2 # セクション到達温度を3分割するため
     fig = plt.figure(figsize=(8*2.5, 5.5*num_row), tight_layout=True)
     fig.patch.set_facecolor('white')
 
-    # セクション到達温度
+    # セクション到達温度（吸着層）
     plt.rcParams["font.size"] = 16
     plt.subplot(num_row, 1, 1)
     df = df_dict["セクション到達温度"]
     df_obs = pd.read_excel(data_dir + "20240624_ICTへの提供データ_PSA実験_編集_メイン.xlsx",
                            sheet_name="python実装用_吸着のみ", index_col="time")
-    for stream in range(1,4):
+    for stream in range(1,3):
         for section in range(1,4):
             plt.plot(df[f"temp_reached_{str(stream)}{str(section)}"],
                     label = f"(str,sec) = ({str(stream)}, {str(section)})",
@@ -116,7 +139,31 @@ def plot_csv_files(tgt_foldapath, unit_dict, data_dir):
                      linestyle = linestyle_dict[str(section)],
                      c = color_dict_obs[str(stream)]
                      )
-    plt.title("セクション到達温度")
+    plt.title("セクション到達温度（吸着層）")
+    plt.grid()
+    plt.xlabel("timestamp")
+    plt.legend(fontsize=12)
+
+    # セクション到達温度（壁面）
+    plt.rcParams["font.size"] = 16
+    plt.subplot(num_row, 1, 2)
+    for section in range(1,4):
+        plt.plot(df[f"temp_reached_3{str(section)}"],
+                label = f"(sec) = ({str(section)})",
+                linestyle = linestyle_dict[str(section)],
+                c = color_dict["3"],
+                )
+    plt.title("セクション到達温度（壁面）")
+    plt.grid()
+    plt.xlabel("timestamp")
+    plt.legend(fontsize=12)
+
+    # セクション到達温度（上下蓋）
+    plt.rcParams["font.size"] = 16
+    plt.subplot(num_row, 1, 3)
+    plt.plot(df[f"temp_reached_up"], label="up")
+    plt.plot(df[f"temp_reached_dw"], label="down")
+    plt.title("セクション到達温度（上下蓋）")
     plt.grid()
     plt.xlabel("timestamp")
     plt.legend(fontsize=12)
@@ -125,7 +172,7 @@ def plot_csv_files(tgt_foldapath, unit_dict, data_dir):
     tgt_keys = [key for key in df_dict.keys() if key != "セクション到達温度"]
     for i, key in enumerate(tgt_keys):
         plt.rcParams["font.size"] = 16
-        plt.subplot(num_row,1,i+2)
+        plt.subplot(num_row,1,i+4)
         for col in df_dict[key].columns:
             plt.plot(df_dict[key][col],
                     label = f"(str,sec) = ({col[-2]}, {col[-1]})",

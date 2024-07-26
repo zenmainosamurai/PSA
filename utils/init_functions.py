@@ -28,6 +28,26 @@ def add_common_conds(common_conds):
     drum_wall["Wdrumw"] = drum_wall["Dense_drumw"] * drum_wall["Vdrumw"] * 1e6
     drum_wall["la_drum"] = math.pi * drum_wall["Ddrum"] * drum_wall["Ldrum"]
 
+    # 上下蓋条件
+    lid_cond = common_conds["LID_COND"]
+    for x in ["UP", "DOWN"]:
+        lid_cond[x]["Sflange_up"] = (
+            ((lid_cond[x]["Dflange"] / 2) ** 2 - (lid_cond[x]["PDflange_up"] / 2) ** 2)
+            * math.pi / 1000000
+        )
+        lid_cond[x]["Vflange_up"] = (
+            ((lid_cond[x]["Dflange"] / 2) ** 2 - (lid_cond[x]["PDflange_up"] / 2) ** 2)
+            * math.pi * lid_cond[x]["Tflange"] / 1000
+        )
+        lid_cond[x]["Vflange_dw"] = (
+            ((lid_cond[x]["Dflange"] / 2) ** 2 - (lid_cond[x]["PDflange_dw"] / 2) ** 2)
+            * math.pi * lid_cond[x]["Tflange"] / 1000
+        )
+        lid_cond[x]["Mflange"] = (
+            (lid_cond[x]["Vflange_up"] + lid_cond[x]["Vflange_dw"])
+            * drum_wall["Dense_drumw"]
+        )
+
     # 導入ガス条件
     input_gass = common_conds["INFLOW_GAS_COND"]
     input_gass["fr_all"] = input_gass["fr_co2"] + input_gass["fr_n2"]

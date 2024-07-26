@@ -73,6 +73,10 @@ class GasAdosorption_Breakthrough_simulator():
             for section in range(1, self.num_sec+1):
                 variables["temp"][stream][section] = \
                     self.common_conds["DRUM_WALL_COND"]["temp_outside"]
+        # 上下蓋の温度
+        variables["temp_lid"] = {}
+        for position in ["up", "down"]:
+            variables["temp_lid"][position] = self.common_conds["DRUM_WALL_COND"]["temp_outside"]
 
         return variables
 
@@ -122,6 +126,8 @@ class GasAdosorption_Breakthrough_simulator():
                 for section in range(1, 1+self.num_sec):
                         for key, value in all_output["heat"][stream][section].items():
                             output_flatten[key+"_"+str(stream)+str(section)] = value
+            output_flatten["temp_reached_up"] = all_output["heat_lid"]["up"]["temp_reached"] # 熱バラ（上下蓋）
+            output_flatten["temp_reached_dw"] = all_output["heat_lid"]["down"]["temp_reached"]
             for stream in range(1, 1+self.num_str): # マテバラ
                 for section in range(1, 1+self.num_sec):
                         for key, value in all_output["material"][stream][section].items():
@@ -176,6 +182,7 @@ class GasAdosorption_Breakthrough_simulator():
         ### マテバラ・熱バラ計算
         mb_dict = {}
         hb_dict = {}
+        hb_lid = {}
         for stream in range(1, 1+self.num_str):
             mb_dict[stream] = {}
             hb_dict[stream] = {}
@@ -207,6 +214,11 @@ class GasAdosorption_Breakthrough_simulator():
                                                                       variables=variables,
                                                                       heat_output=hb_dict[self.num_str][section],
                                                                       heat_wall_output=hb_dict[self.num_str+1][section-1])
+        # 上下蓋熱バラ
+        for position in ["up", "down"]:
+            hb_lid[position] = self.calc_cell_heat_lid(position=position,
+                                                       variables=variables,
+                                                       heat_output_dict=hb_dict)
 
         ### 出力
         # 更新後の状態変数
@@ -217,10 +229,14 @@ class GasAdosorption_Breakthrough_simulator():
             new_variables["temp"][stream] = {}
             for section in range(1, 1+self.num_sec):
                 new_variables["temp"][stream][section] = hb_dict[stream][section]["temp_reached"]
+        new_variables["temp_lid"] = {} # 上下蓋の温度
+        for position in ["up", "down"]:
+            new_variables["temp_lid"][position] = hb_lid[position]["temp_reached"]
         # 全出力結果(参考・記録用)
         output = {
             "material": mb_dict,
             "heat": hb_dict,
+            "heat_lid": hb_lid,
         }
 
         return new_variables, output
@@ -292,7 +308,8 @@ class GasAdosorption_Breakthrough_simulator():
         )
         # 理論新規吸着量 [cm3/g-abs]
         adsorp_amt_estimate_abs = (
-            self.common_conds["PACKED_BED_COND"]["ks"] / self.common_conds["PACKED_BED_COND"]["rho_abs"]
+            self.common_conds["PACKED_BED_COND"]["ks"] ** (adsorp_amt_current / adsorp_amt_equilibrium)
+            / self.common_conds["PACKED_BED_COND"]["rho_abs"]
             * 6 * (1 - self.common_conds["PACKED_BED_COND"]["epsilon"]) * self.common_conds["PACKED_BED_COND"]["phi"]
             / self.common_conds["PACKED_BED_COND"]["dp"] * (adsorp_amt_equilibrium - adsorp_amt_current)
             * self.common_conds["dt"] / 1e6 * 60
@@ -495,7 +512,7 @@ class GasAdosorption_Breakthrough_simulator():
         )
         # 壁-層伝熱係数 [W/m2/K]
         hw1 = Nupw / self.common_conds["PACKED_BED_COND"]["dp"] * kf
-        hw1 *= self.common_conds["DRUM_WALL_COND"]["coef_hw1"]
+        # hw1 *= self.common_conds["DRUM_WALL_COND"]["coef_hw1"]
         # 層伝熱係数 [W/m2/K]
         u1 = 1 / (dlat / ke + 1 / habs)
 
@@ -529,10 +546,26 @@ class GasAdosorption_Breakthrough_simulator():
         temp_reached = optimize.newton(self.__optimize_temp_reached, temp_now, args=args.values())
         # 流入ガスが受け取る熱 [J]
         Hgas = gas_cp * Mgas * (temp_reached - temp_now)
+        # 上流(下流)壁への熱流束 [J]
+        if section == 1:
+            Hbot = (
+                hw1 * self.stream_conds[stream]["Sstream"]
+                * (temp_now - variables["temp_lid"]["up"])
+                * self.common_conds["dt"] * 60
+            )
+        elif section == self.num_sec:
+            Hbot = (
+                hw1 * self.stream_conds[stream]["Sstream"]
+                * (temp_now - variables["temp_lid"]["down"])
+                * self.common_conds["dt"] * 60
+            )
+        else:
+            Hbot = 0
 
         output = {
             "temp_reached": temp_reached,
             "hw1": hw1,
+            "Hbot": Hbot,
             ### 以下確認用
             "Habs": Habs, # 発生する吸着熱 [J]
             "Hgas": Hgas, # 流入ガスが受け取る熱 [J]
@@ -546,6 +579,17 @@ class GasAdosorption_Breakthrough_simulator():
         return output
 
     def calc_cell_heat_wall(self, section, variables, heat_output, heat_wall_output=None):
+        """ 壁面の熱バランス計算
+
+        Args:
+            section (int): 対象のセクション番号
+            variables (dict): 各セルの変数
+            heat_output (dict): 隣接セルの熱バラ出力
+            heat_wall_output (dict, optional): 上流セルの壁面熱バラ出力. Defaults to None.
+
+        Returns:
+            dict: 壁面熱バラ出力
+        """
         # セクション現在温度 [℃]
         temp_now = variables["temp"][self.num_str+1][section]
         # 内側セクション温度 [℃]
@@ -556,10 +600,15 @@ class GasAdosorption_Breakthrough_simulator():
         if section != self.num_sec:
             temp_below_cell = variables["temp"][self.num_str+1][section+1]
         # 上流壁への熱流束 [J]
-        if section != 1:
-            Hroof = heat_wall_output["Hbb"]
+        if section == 1:
+            Hroof = (
+                self.common_conds["DRUM_WALL_COND"]["c_drumw"]
+                * self.stream_conds[3]["Sstream"]
+                * (temp_now - variables["temp_lid"]["up"])
+                * self.common_conds["dt"] * 60
+            )
         else:
-            Hroof = 0
+            Hroof = heat_wall_output["Hbb"]
         # 内側境界からの熱流束 [J]
         Hwin = (
             heat_output["hw1"] * self.stream_conds[3]["Ain"] / self.num_sec
@@ -572,13 +621,18 @@ class GasAdosorption_Breakthrough_simulator():
             * self.common_conds["dt"] * 60
         )
         # 下流壁への熱流束 [J]
-        if section != self.num_sec:
+        if section == self.num_sec:
+            Hbb = (
+                self.common_conds["DRUM_WALL_COND"]["c_drumw"]
+                * self.stream_conds[3]["Sstream"]
+                * (temp_now - variables["temp_lid"]["down"])
+                * self.common_conds["dt"] * 60
+            )
+        else:
             Hbb = (
                 self.common_conds["DRUM_WALL_COND"]["c_drumw"] * self.stream_conds[3]["Sstream"]
                 * (temp_now - variables["temp"][3][section+1])
             )
-        else:
-            Hbb = 0
         # セクション到達温度 [℃]
         args = {
             "temp_now": temp_now,
@@ -597,6 +651,60 @@ class GasAdosorption_Breakthrough_simulator():
             "Hwin": Hwin, # 内側境界からの熱流束 [J]
             "Hwout": Hwout, # 外側境界への熱流束 [J]
             "Hbb": Hbb, # 下流壁への熱流束 [J]
+        }
+
+        return output
+
+    def calc_cell_heat_lid(self, position, variables, heat_output_dict):
+        """ 上下蓋の熱バランス計算
+
+        Args:
+            position (str): 上と下のどちらの蓋か
+            variables (dict): 各セルの変数
+            heat_output (dict): 各セルの熱バラ出力
+
+        Returns:
+            dict: 熱バラ出力
+        """
+        # セクション現在温度 [℃]
+        temp_now = variables["temp_lid"][position]
+        # 外気への熱流束 [J]
+        Hout = (
+            self.common_conds["DRUM_WALL_COND"]["coef_outair_heat"]
+            * (temp_now - self.common_conds["DRUM_WALL_COND"]["temp_outside"])
+            * self.common_conds["dt"] * 60
+        )
+        if position == "up":
+            Hout *= self.common_conds["LID_COND"]["DOWN"]["Sflange_up"]
+        elif position == "down":
+            Hout *= self.common_conds["LID_COND"]["UP"]["Sflange_up"]
+        # 底が受け取る熱(熱収支基準)
+        if position == "up":
+            Hlidall_heat = (
+                heat_output_dict[2][1]["Hbot"] - heat_output_dict[1][1]["Hbot"]
+                - Hout - heat_output_dict[1+self.num_str][1]["Hroof"]
+            )
+        else:
+            Hlidall_heat = (
+                heat_output_dict[2][self.num_sec]["Hbot"] - heat_output_dict[1][self.num_sec]["Hbot"]
+                - Hout - heat_output_dict[1+self.num_str][self.num_sec]["Hbb"]
+            )
+        # セクション到達温度 [℃]
+        args = {
+            "temp_now": temp_now,
+            "Hlidall_heat": Hlidall_heat,
+            "position": position,
+        }
+        temp_reached = optimize.newton(self.__optimize_temp_reached_lid, temp_now, args=args.values())
+        # 壁が受け取る熱(ΔT基準) [J]
+        Hlid_time = (
+            self.common_conds["DRUM_WALL_COND"]["sh_drumw"] * (temp_reached - temp_now)
+        )
+
+        output = {
+            "temp_reached": temp_reached,
+            # "Hlidall_heat": Hlidall_heat,
+            # "Hlid_time": Hlid_time,
         }
 
         return output
@@ -646,3 +754,26 @@ class GasAdosorption_Breakthrough_simulator():
         )
 
         return Hwall_heat_blc - Hwall_time
+
+    def __optimize_temp_reached_lid(self, temp_reached,
+                                    temp_now, Hlidall_heat, position
+                                    ):
+        """上下蓋の到達温度算出におけるソルバー用関数
+
+        Args:
+            temp_reached (float): セクション到達温度
+            args (dict): 充填層が受ける熱を計算するためのパラメータ
+
+        Returns:
+            float: 充填層が受ける熱の熱収支基準と時間基準の差分
+        """
+        # 壁が受け取る熱(ΔT基準) [J]
+        Hlid_time = (
+            self.common_conds["DRUM_WALL_COND"]["sh_drumw"] * (temp_reached - temp_now)
+        )
+        if position == "up":
+            Hlid_time *= self.common_conds["LID_COND"]["UP"]["Mflange"]
+        else:
+            Hlid_time *= self.common_conds["LID_COND"]["DOWN"]["Mflange"]
+
+        return Hlidall_heat - Hlid_time
