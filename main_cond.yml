@@ -20,6 +20,16 @@ cond_list: [
   # 1_10_state_var_ks,
   # 1_11_state_var_ks,
   # 1_12_state_var_ks,
-  2_01_mod_lid_temp
+  # 2_01_mod_lid_temp,
+  # 2_02_rev_mistake,
+  # 2_03_coef_hw1_1e-1,
+  # 2_04_coef_hw1_1e10,
+  # 2_05_coef_hw1_1e100,
+  # 2_06_adsorp_heat_co2_1000,
+  # 2_07_adsorp_heat_co2_700,
+  # 2_08_adsorp_heat_co2_1700,
+  2_09_statever_ks_4e-1,
+  2_10_statever_ks_4e-2,
+  2_11_statever_ks_4e2,
   # tmp
 ]

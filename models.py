@@ -203,7 +203,8 @@ class GasAdosorption_Breakthrough_simulator():
                 hb_dict[stream][section] = self.calc_cell_heat(stream=stream,
                                                                section=section,
                                                                variables=variables,
-                                                               material_output=mb_dict[stream][section])
+                                                               material_output=mb_dict[stream][section],
+                                                               heat_output=hb_dict[stream][section-1],)
         # 壁面熱バラ（stream = self.num_str+1）
         hb_dict[self.num_str+1] = {}
         hb_dict[self.num_str+1][1] = self.calc_cell_heat_wall(section=1,
@@ -348,7 +349,7 @@ class GasAdosorption_Breakthrough_simulator():
 
         return output
 
-    def calc_cell_heat(self, stream, section, variables, material_output):
+    def calc_cell_heat(self, stream, section, variables, material_output, heat_output=None):
         """ 対象セルの熱バランスを計算する
 
         Args:
@@ -356,6 +357,7 @@ class GasAdosorption_Breakthrough_simulator():
             section (int): 対象セルのsection番号
             variables (dict): 状態変数
             material_output (dict): 対象セルのマテバラ出力
+            heat_output (dict): 上流セクションの熱バラ出力
 
         Returns:
             dict: 対象セルの熱バラ出力
@@ -387,8 +389,6 @@ class GasAdosorption_Breakthrough_simulator():
         )
         # 流入ガス比熱 [J/g/K]
         gas_cp = material_output["gas_cp"]
-        # 上流壁への放熱 [J]
-        Hroof = 0
         # 内側境界面積 [m2]
         Ain = self.stream_conds[stream]["Ain"] / self.num_sec
         # 外側境界面積 [m2]
@@ -426,7 +426,7 @@ class GasAdosorption_Breakthrough_simulator():
         # Yagi-Kunii式 5
         hrp = (
             0.227 * self.common_conds["PACKED_BED_COND"]["epsilon_p"]
-            / (2 - self.common_conds["PACKED_BED_COND"]["lambda_col"])
+            / (2 - self.common_conds["PACKED_BED_COND"]["epsilon_p"])
             * ((temp_now + 273.15) / 100)**3
         )
         # Yagi-Kunii式 6
@@ -512,7 +512,7 @@ class GasAdosorption_Breakthrough_simulator():
         )
         # 壁-層伝熱係数 [W/m2/K]
         hw1 = Nupw / self.common_conds["PACKED_BED_COND"]["dp"] * kf
-        # hw1 *= self.common_conds["DRUM_WALL_COND"]["coef_hw1"]
+        hw1 *= self.common_conds["DRUM_WALL_COND"]["coef_hw1"]
         # 層伝熱係数 [W/m2/K]
         u1 = 1 / (dlat / ke + 1 / habs)
 
@@ -522,15 +522,31 @@ class GasAdosorption_Breakthrough_simulator():
         else:
             Hwin = u1 * Ain * (temp_inside_cell - temp_now) * self.common_conds["dt"] * 60
         # 外側境界への熱流束 [J]
-        Hwout = u1 * Aout * (temp_now - temp_outside_cell) * self.common_conds["dt"] * 60
+        if stream == self.num_str:
+            Hwout = hw1 * Aout * (temp_now - temp_outside_cell) * self.common_conds["dt"] * 60
+        else :
+            Hwout = u1 * Aout * (temp_now - temp_outside_cell) * self.common_conds["dt"] * 60
         # 下流セルへの熱流束 [J]
         if section != self.num_sec:
-            Hbb = (
+            Hbb = ( # 下流セルへの熱流束
                 u1 * Abb * (temp_now - temp_below_cell)
                 * self.common_conds["dt"] * 60
             )
         else:
-            Hbb = 0
+            Hbb = ( # 下蓋への熱流束
+                hw1 * self.stream_conds[stream]["Sstream"]
+                * (temp_now - variables["temp_lid"]["down"])
+                * self.common_conds["dt"] * 60
+            )
+        # 上流セルヘの熱流束 [J]
+        if section == 1: # 上蓋からの熱流束
+            Hroof = (
+                hw1 * self.stream_conds[stream]["Sstream"]
+                * (temp_now - variables["temp_lid"]["up"])
+                * self.common_conds["dt"] * 60
+            )
+        else: # 上流セルヘの熱流束 = -1 * 上流セルの「下流セルへの熱流束」
+            Hroof = - heat_output["Hbb"]
         # セクション到達温度 [℃]
         args = {
             "gas_cp": gas_cp,
@@ -546,33 +562,17 @@ class GasAdosorption_Breakthrough_simulator():
         temp_reached = optimize.newton(self.__optimize_temp_reached, temp_now, args=args.values())
         # 流入ガスが受け取る熱 [J]
         Hgas = gas_cp * Mgas * (temp_reached - temp_now)
-        # 上流(下流)壁への熱流束 [J]
-        if section == 1:
-            Hbot = (
-                hw1 * self.stream_conds[stream]["Sstream"]
-                * (temp_now - variables["temp_lid"]["up"])
-                * self.common_conds["dt"] * 60
-            )
-        elif section == self.num_sec:
-            Hbot = (
-                hw1 * self.stream_conds[stream]["Sstream"]
-                * (temp_now - variables["temp_lid"]["down"])
-                * self.common_conds["dt"] * 60
-            )
-        else:
-            Hbot = 0
 
         output = {
             "temp_reached": temp_reached,
             "hw1": hw1,
-            "Hbot": Hbot,
+            "Hroof": Hroof,
+            "Hbb": Hbb, # 下流セルへの熱流束 [J]
             ### 以下確認用
             "Habs": Habs, # 発生する吸着熱 [J]
             "Hgas": Hgas, # 流入ガスが受け取る熱 [J]
-            "Hroof": Hroof, # 上流壁への放熱 [J]
             "Hwin": Hwin, # 内側境界からの熱流束 [J]
             "Hwout": Hwout, # 外側境界への熱流束 [J]
-            "Hbb": Hbb, # 下流セルへの熱流束 [J]
             "u1": u1, # 層伝熱係数 [W/m2/K]
         }
 
@@ -646,8 +646,8 @@ class GasAdosorption_Breakthrough_simulator():
         output = {
             "Hbb": Hbb,
             "temp_reached": temp_reached,
-            ### 以下記録用
             "Hroof": Hroof, # 上流壁への熱流束 [J]
+            ### 以下記録用
             "Hwin": Hwin, # 内側境界からの熱流束 [J]
             "Hwout": Hwout, # 外側境界への熱流束 [J]
             "Hbb": Hbb, # 下流壁への熱流束 [J]
@@ -681,12 +681,12 @@ class GasAdosorption_Breakthrough_simulator():
         # 底が受け取る熱(熱収支基準)
         if position == "up":
             Hlidall_heat = (
-                heat_output_dict[2][1]["Hbot"] - heat_output_dict[1][1]["Hbot"]
+                heat_output_dict[2][1]["Hroof"] - heat_output_dict[1][1]["Hroof"]
                 - Hout - heat_output_dict[1+self.num_str][1]["Hroof"]
             )
         else:
             Hlidall_heat = (
-                heat_output_dict[2][self.num_sec]["Hbot"] - heat_output_dict[1][self.num_sec]["Hbot"]
+                heat_output_dict[2][self.num_sec]["Hroof"] - heat_output_dict[1][self.num_sec]["Hroof"]
                 - Hout - heat_output_dict[1+self.num_str][self.num_sec]["Hbb"]
             )
         # セクション到達温度 [℃]
