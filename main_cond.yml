@@ -28,8 +28,9 @@ cond_list: [
   # 2_06_adsorp_heat_co2_1000,
   # 2_07_adsorp_heat_co2_700,
   # 2_08_adsorp_heat_co2_1700,
-  2_09_statever_ks_4e-1,
-  2_10_statever_ks_4e-2,
-  2_11_statever_ks_4e2,
+  # 2_09_statever_ks_4e-1,
+  # 2_10_statever_ks_4e-2,
+  # 2_11_statever_ks_4e2,
+  2_20_mod_num_section,
   # tmp
 ]

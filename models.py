@@ -125,13 +125,13 @@ class GasAdosorption_Breakthrough_simulator():
             for stream in range(1, 2+self.num_str): # 熱バラ
                 for section in range(1, 1+self.num_sec):
                         for key, value in all_output["heat"][stream][section].items():
-                            output_flatten[key+"_"+str(stream)+str(section)] = value
+                            output_flatten[key+"_"+str(stream).zfill(3)+"_"+str(section).zfill(3)] = value
             output_flatten["temp_reached_up"] = all_output["heat_lid"]["up"]["temp_reached"] # 熱バラ（上下蓋）
             output_flatten["temp_reached_dw"] = all_output["heat_lid"]["down"]["temp_reached"]
             for stream in range(1, 1+self.num_str): # マテバラ
                 for section in range(1, 1+self.num_sec):
                         for key, value in all_output["material"][stream][section].items():
-                            output_flatten[key+"_"+str(stream)+str(section)] = value
+                            output_flatten[key+"_"+str(stream).zfill(3)+"_"+str(section).zfill(3)] = value
             # 記録
             record_dict["timestamp"].append(timestamp)
             record_dict["all_output"].append(output_flatten)
@@ -150,8 +150,9 @@ class GasAdosorption_Breakthrough_simulator():
 
         # DataFrameを細分化
         df_dict = {}
-        tgt_items = [x[:-3] for x in record_dict["all_output"][0].keys()] # 記録対象
+        tgt_items = ["_".join(x.split("_")[:-2]) for x in record_dict["all_output"][0].keys()] # 記録対象
         tgt_items = set(tgt_items) # 重複削除
+        tgt_items.remove("temp") # 上下蓋の到達温度による重複の除去
         for item in tgt_items: # 細分化
             tgt_col = [col for col in df.columns if item in col]
             df_dict[item] = df[tgt_col]
@@ -165,9 +166,20 @@ class GasAdosorption_Breakthrough_simulator():
 
         ### ◆(4/4) 可視化 -------------------------------------------------
         print("(3/3) png output...")
+        # 可視化対象のセルを算出
+        plot_target_sec = []
+        loc_cells = np.arange(0, self.common_conds["PACKED_BED_COND"]["Lbed"],
+                              self.common_conds["PACKED_BED_COND"]["Lbed"] / self.num_sec) # 各セルの位置
+        loc_cells += self.common_conds["PACKED_BED_COND"]["Lbed"] / self.num_sec / 2 # セルの半径を加算
+        # 温度計に最も近いセルを算出
+        for value in self.common_conds["LOC_CENCER"].values():
+            plot_target_sec.append(1 + np.argmin(np.abs(loc_cells - value)))
+
         plot_csv.plot_csv_files(tgt_foldapath = output_foldapath + mode + "/",
                                 unit_dict=const.UNIT,
-                                data_dir=const.DATA_DIR)
+                                data_dir=const.DATA_DIR,
+                                tgt_sections=plot_target_sec
+                                )
 
     def calc_all_cell_balance(self, variables):
         """全体のマテバラ・熱バラを順次計算する
