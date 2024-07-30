@@ -31,6 +31,7 @@ cond_list: [
   # 2_09_statever_ks_4e-1,
   # 2_10_statever_ks_4e-2,
   # 2_11_statever_ks_4e2,
-  2_20_mod_num_section,
+  # 2_20_mod_num_section,
+  2_21_mod_adsorp_amt,
   # tmp
 ]

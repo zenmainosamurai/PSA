@@ -77,6 +77,19 @@ class GasAdosorption_Breakthrough_simulator():
         variables["temp_lid"] = {}
         for position in ["up", "down"]:
             variables["temp_lid"][position] = self.common_conds["DRUM_WALL_COND"]["temp_outside"]
+        # 吸着量
+        variables["adsorp_amt"] = {}
+        for stream in range(1, self.num_str+1):
+            variables["adsorp_amt"][stream] = {}
+            for section in range(1, self.num_sec+1):
+                variables["adsorp_amt"][stream][section] = (
+                    (0.0000021*self.common_conds["PACKED_BED_COND"]["vp"]**2-0.0003385
+                    *self.common_conds["PACKED_BED_COND"]["vp"]+0.0145345)*(variables["temp"][stream][section]+273.15)**2
+                    +(-0.0012701*self.common_conds["PACKED_BED_COND"]["vp"]**2+0.2091781
+                    *self.common_conds["PACKED_BED_COND"]["vp"]-9.9261428)*(variables["temp"][stream][section]+273.15)
+                    +0.1828984*self.common_conds["PACKED_BED_COND"]["vp"]**2
+                    -30.8594655*self.common_conds["PACKED_BED_COND"]["vp"]+1700.5767712
+                )
 
         return variables
 
@@ -245,6 +258,12 @@ class GasAdosorption_Breakthrough_simulator():
         new_variables["temp_lid"] = {} # 上下蓋の温度
         for position in ["up", "down"]:
             new_variables["temp_lid"][position] = hb_lid[position]["temp_reached"]
+        # 既存吸着量
+        new_variables["adsorp_amt"] = {}
+        for stream in range(1, 1+self.num_str): # 壁面考慮
+            new_variables["adsorp_amt"][stream] = {}
+            for section in range(1, 1+self.num_sec):
+                new_variables["adsorp_amt"][stream][section] = mb_dict[stream][section]["accum_adsorp_amt"]
         # 全出力結果(参考・記録用)
         output = {
             "material": mb_dict,
@@ -311,14 +330,7 @@ class GasAdosorption_Breakthrough_simulator():
             +0.1828984*(press*1000)**2-30.8594655*(press*1000)+1700.5767712
         )
         # 現在の既存吸着量 [cm3/g-abs]
-        adsorp_amt_current = (
-            (0.0000021*self.common_conds["PACKED_BED_COND"]["vp"]**2-0.0003385
-             *self.common_conds["PACKED_BED_COND"]["vp"]+0.0145345)*(temp+273.15)**2
-            +(-0.0012701*self.common_conds["PACKED_BED_COND"]["vp"]**2+0.2091781
-              *self.common_conds["PACKED_BED_COND"]["vp"]-9.9261428)*(temp+273.15)
-            +0.1828984*self.common_conds["PACKED_BED_COND"]["vp"]**2
-            -30.8594655*self.common_conds["PACKED_BED_COND"]["vp"]+1700.5767712
-        )
+        adsorp_amt_current = variables["adsorp_amt"][stream][section]
         # 理論新規吸着量 [cm3/g-abs]
         adsorp_amt_estimate_abs = (
             self.common_conds["PACKED_BED_COND"]["ks"] ** (adsorp_amt_current / adsorp_amt_equilibrium)
@@ -357,6 +369,8 @@ class GasAdosorption_Breakthrough_simulator():
             "outflow_fr_n2": outflow_fr_n2,
             "outflow_mf_co2": outflow_mf_co2,
             "outflow_mf_n2": outflow_mf_n2,
+            "Mabs": Mabs,
+            "adsorp_amt_estimate_abs": adsorp_amt_estimate_abs,
         }
 
         return output
