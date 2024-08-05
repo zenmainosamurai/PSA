@@ -55,7 +55,7 @@ class GasAdosorption_Breakthrough_simulator():
 
         # 観測値(data)の読み込み
         filepath = const.DATA_DIR + self.common_conds["data_path"]
-        self.df_obs = pd.read_excel(filepath, sheet_name="python実装用_吸着のみ", index_col="time")
+        self.df_obs = pd.read_excel(filepath, sheet_name="python実装用_吸着のみ_立ち上がり修正", index_col="time")
 
         # その他初期化
 
@@ -329,6 +329,7 @@ class GasAdosorption_Breakthrough_simulator():
             +(-0.0012701*(press*1000)**2+0.2091781*(press*1000)-9.9261428)*(temp+273.15)
             +0.1828984*(press*1000)**2-30.8594655*(press*1000)+1700.5767712
         )
+        # adsorp_amt_equilibrium *= self.common_conds["DRUM_WALL_COND"]["coef_equilibrium"]
         # 現在の既存吸着量 [cm3/g-abs]
         adsorp_amt_current = variables["adsorp_amt"][stream][section]
         # 理論新規吸着量 [cm3/g-abs]

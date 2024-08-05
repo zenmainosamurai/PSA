@@ -45,7 +45,7 @@ def plot_csv_files(tgt_foldapath, unit_dict, data_dir, tgt_sections):
     os.makedirs(output_foldapath, exist_ok=True)
 
     ### 可視化(all) ----------------------------------------------------------------------
-    num_row = math.ceil((len(df_dict) + 2)/3) + 1
+    num_row = math.ceil((len(df_dict) + 2)/3)
     fig = plt.figure(figsize=(8*3, 5.5*num_row), tight_layout=True)
     fig.patch.set_facecolor('white')
 
@@ -54,7 +54,7 @@ def plot_csv_files(tgt_foldapath, unit_dict, data_dir, tgt_sections):
     plt.subplot(num_row, 1, 1)
     df = df_dict["セクション到達温度"] # 計算値
     df_obs = pd.read_excel(data_dir + "20240624_ICTへの提供データ_PSA実験_編集_メイン.xlsx", # 観測値
-                           sheet_name="python実装用_吸着のみ", index_col="time")
+                           sheet_name="python実装用_吸着のみ_立ち上がり修正", index_col="time")
     for stream in range(1,3):
         for section in tgt_sections:
             plt.plot(df[f"temp_reached_{str(stream).zfill(3)}_{str(section).zfill(3)}"],
@@ -130,7 +130,7 @@ def plot_csv_files(tgt_foldapath, unit_dict, data_dir, tgt_sections):
     # plt.subplot(num_row, 1, 1)
     # df = df_dict["セクション到達温度"]
     # df_obs = pd.read_excel(data_dir + "20240624_ICTへの提供データ_PSA実験_編集_メイン.xlsx",
-    #                        sheet_name="python実装用_吸着のみ", index_col="time")
+    #                        sheet_name="python実装用_吸着のみ_立ち上がり修正", index_col="time")
     # for stream in range(1,3):
     #     for section in tgt_sections:
     #         plt.plot(df[f"temp_reached_{str(stream).zfill(3)}_{str(section).zfill(3)}"],
@@ -200,7 +200,7 @@ def plot_csv_files(tgt_foldapath, unit_dict, data_dir, tgt_sections):
     # # 温度
     # df = df_dict["セクション到達温度"]
     # df_obs = pd.read_excel(data_dir + "20240624_ICTへの提供データ_PSA実験_編集_メイン.xlsx",
-    #                        sheet_name="python実装用_吸着のみ", index_col="time")
+    #                        sheet_name="python実装用_吸着のみ_立ち上がり修正", index_col="time")
     # plt.rcParams["font.size"] = 14
     # fig = plt.figure(figsize=(16, 5), tight_layout=True)
     # fig.patch.set_facecolor('white')
