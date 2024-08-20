@@ -10,15 +10,7 @@ mode_list: [
 cond_list: [
   # 2_20_mod_num_section,
   # 2_21_mod_adsorp_amt,
-  # 2_22_inflow_gas_9e-1,
-  # 2_23_inflow_gas_8e-1,
-  # 2_24_inflow_gas_7e-1,
-  # 2_25_inflow_gas_6e-1,
-  # 2_26_inflow_gas_5e-1,
-  # 2_27_inflow_gas_4e-1,
-  # 2_28_inflow_gas_3e-1,
-  # 2_29_inflow_gas_2e-1,
-  # 2_30_inflow_gas_1e-1,
-  opt,
+  # opt,
+  opt2
   # tmp
 ]

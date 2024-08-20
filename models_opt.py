@@ -1,10 +1,4 @@
 import os
-import sys
-import datetime
-import yaml
-import math
-import copy
-import logging
 
 import numpy as np
 import pandas as pd
@@ -13,6 +7,10 @@ import japanize_matplotlib
 from scipy import optimize
 from sklearn.metrics import mean_squared_error
 import optuna
+from optuna.samplers import TPESampler
+import sqlite3
+import multiprocessing
+from contextlib import redirect_stdout
 
 from utils import const, init_functions, plot_csv
 from models import GasAdosorption_Breakthrough_simulator
@@ -34,48 +32,67 @@ class GasAdosorption_for_Optimize(GasAdosorption_Breakthrough_simulator):
         """
         self.cond_id = cond_id
         super().__init__(self.cond_id)
+        self.n_processes = 8
+        self.max_trial = 1000 / self.n_processes
+        self.max_trial = round(self.max_trial)
+        self.num_trial = 0
 
     def optimize_params(self):
         # 最適化の実施
         print("最適化実施中 ...")
-        n_trials = 1000
-        study_dict = {}
         optuna.logging.set_verbosity(optuna.logging.WARNING)
-        study = optuna.create_study()
-        study.optimize(self.objective, n_trials=n_trials)
+        storage_path = const.OUTPUT_DIR + self.cond_id + "/simulation/"
+        os.makedirs(storage_path, exist_ok=True)
+        storage = optuna.storages.RDBStorage(url=f'sqlite:///{storage_path}/optimize.db')
+        self.study = optuna.create_study(study_name="GasAdsorption", direction="minimize",
+                                    storage=storage, sampler=TPESampler(), load_if_exists=True)
+        processes = []
+        for i in range(self.n_processes): # 並列化
+            p = multiprocessing.Process(target=self.run_optimization)
+            p.start()
+            processes.append(p)
+        for i, p in enumerate(processes): # 全プロセスが完了するまで待機
+            p.join()
+        print("")
 
         # テキスト出力
         params_dict = {
             "INFLOW_GAS_COND": {
-                "fr_co2": 22 * study.best_params["fr"],
-                "fr_n2": 28 * study.best_params["fr"],
-                "adsorp_heat_co2": 1363.6 * study.best_params["adsorp_heat"],
+                "fr_co2": 22 * self.study.best_params["fr"],
+                "fr_n2": 28 * self.study.best_params["fr"],
+                "adsorp_heat_co2": 1363.6 * self.study.best_params["adsorp_heat"],
             },
             "PACKED_BED_COND": {
-                "ks": 4 * study.best_params["ks"],
+                "Mabs": 10800 * self.study.best_params["Mabs"],
+                "ks": 4 * self.study.best_params["ks"],
             },
-            # "DRUM_WALL_COND": {
-            #     "coef_hw1": 1 * study.best_params["coef_hw1"],
-            # }
+            "DRUM_WALL_COND": {
+                "coef_hw1": 1 * self.study.best_params["coef_hw1"],
+            }
         }
         try:
             txt_filepath = const.OUTPUT_DIR + self.cond_id + "/simulation/best_params.txt"
             with open(txt_filepath, mode="w") as f:
-                f.write(study.best_params)
+                f.write(str(self.study.best_params))
         except:
             print("失敗")
         print("最適化結果 ---------------")
         print(params_dict)
-        print(study.best_value)
+        print(self.study.best_value)
         # 再シミュレーション
         for cond_category, cond_dict in params_dict.items():
             for cond_name, value in cond_dict.items():
                 self.common_conds[cond_category][cond_name] = value
         self.execute_simulation()
 
+    def run_optimization(self):
+        optuna.logging.set_verbosity(optuna.logging.WARNING)
+        self.study.optimize(self.objective, n_trials=self.max_trial)
+
     def objective(self, trial):
         """ 最適化条件の設定
         """
+        self.num_trial += 1
         # 最適化条件
         params_dict = {
             "INFLOW_GAS_COND": {
@@ -84,11 +101,12 @@ class GasAdosorption_for_Optimize(GasAdosorption_Breakthrough_simulator):
                 "adsorp_heat_co2": 1363.6 * trial.suggest_loguniform("adsorp_heat", 0.1, 10),
             },
             "PACKED_BED_COND": {
-                "ks": 4 * trial.suggest_loguniform("ks", 0.01, 100),
+                "Mabs": 10800 * trial.suggest_loguniform("Mabs", 0.1, 10),
+                "ks": 4 * trial.suggest_loguniform("ks", 0.1, 10),
             },
-            # "DRUM_WALL_COND": {
-            #     "coef_hw1": 1 * trial.suggest_loguniform("coef_hw1", 0.1, 1),
-            # }
+            "DRUM_WALL_COND": {
+                "coef_hw1": 1 * trial.suggest_loguniform("coef_hw1", 0.1, 1),
+            }
         }
         # パラメータ置換
         for cond_category, cond_dict in params_dict.items():
@@ -96,6 +114,7 @@ class GasAdosorption_for_Optimize(GasAdosorption_Breakthrough_simulator):
                 self.common_conds[cond_category][cond_name] = value
         # rmse計算
         rmse = self.calc_rmse()
+        print("\r" + f"trial: {self.num_trial}/{self.max_trial}", end="")
         
         return rmse
 
@@ -165,8 +184,8 @@ class GasAdosorption_for_Optimize(GasAdosorption_Breakthrough_simulator):
             nearest_sec.append(1 + np.argmin(np.abs(loc_cells - value)))
 
         # データ準備
-        tgt_cols = [f"temp_reached_{str(stream).zfill(3)}_{str(section).zfill(3)}" for stream in [1,2] for section in nearest_sec[1:]]
-        rename_cols = [f"temp_{str(stream).zfill(3)}_{str(section).zfill(3)}" for stream in [1,2] for section in [2,3]]
+        tgt_cols = [f"temp_reached_{str(stream).zfill(3)}_{str(section).zfill(3)}" for stream in [1,2] for section in nearest_sec[2:]]
+        rename_cols = [f"temp_{str(stream).zfill(3)}_{str(section).zfill(3)}" for stream in [1,2] for section in [3]]
         df_sim = df[tgt_cols]
         df_sim.columns = rename_cols
         df_obs = pd.read_excel(const.DATA_DIR + "20240624_ICTへの提供データ_PSA実験_編集_メイン.xlsx", # 観測値
