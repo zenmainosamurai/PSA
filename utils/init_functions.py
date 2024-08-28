@@ -1,5 +1,6 @@
 import numpy as np
 import math
+import CoolProp.CoolProp as CP
 
 
 def add_common_conds(common_conds):
@@ -92,10 +93,25 @@ def update_params_by_obs(common_conds):
     input_gass["mf_co2"] = input_gass["fr_co2"] / input_gass["fr_all"]
     input_gass["mf_n2"] = input_gass["fr_n2"] / input_gass["fr_all"]
 
-    # CO2密度 [kg/m3] (暫定、Teamsチャットより)
-    input_gass["dence_co2"] = 18.355 * input_gass["press"]
-    # N2密度 [kg/m3] (暫定、Teamsチャットより)
-    input_gass["dence_n2"] = 11.577 * input_gass["press"]
+    # CropProp関連の物性
+    T_K = input_gass["temp"] + 273.15 # 温度 [K]
+    P = input_gass["press"] * 1e6 # 圧力 [Pa]
+    # CO2密度 [kg/m3]
+    input_gass["dense_co2"] = CP.PropsSI('D', 'T', T_K, 'P', P, "co2")
+    # N2密度 [kg/m3]
+    input_gass["dense_n2"] = CP.PropsSI('D', 'T', T_K, 'P', P, "nitrogen")
+    # CO2熱伝導率 [W/m/K]
+    input_gass["c_co2"] = CP.PropsSI('L', 'T', T_K, 'P', P, "co2")
+    # N2熱伝導率 [W/m/K]
+    input_gass["c_n2"] = CP.PropsSI('L', 'T', T_K, 'P', P, "nitrogen")
+    # CO2粘度 [Pa s]
+    input_gass["vi_co2"] = CP.PropsSI('V', 'T', T_K, 'P', P, "co2") * 1e6
+    # N2粘度 [Pa s]
+    input_gass["vi_n2"] = CP.PropsSI('V', 'T', T_K, 'P', P, "nitrogen") * 1e6
+    # CO2比熱容量
+    input_gass["cp_co2"] = CP.PropsSI('C', 'T', T_K, 'P', P, "co2") / 1000
+    # N2比熱容量
+    input_gass["cp_n2"] = CP.PropsSI('C', 'T', T_K, 'P', P, "nitrogen") / 1000
 
     input_gass["dense_mean"] = (
         input_gass["dense_co2"] * input_gass["mf_co2"]
@@ -117,8 +133,6 @@ def update_params_by_obs(common_conds):
     a2 = input_gass["fr_n2"] / 22.4 * input_gass["mw_n2"] * 60 / 1000
     a3 = a1 + a2
     input_gass["C_per_hour"] = input_gass["cp_mean"] * a3
-
-
 
     return common_conds
 

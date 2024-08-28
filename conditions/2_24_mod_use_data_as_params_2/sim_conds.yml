@@ -2,6 +2,7 @@
 
 # 使用データ
 data_path: 20240624_ICTへの提供データ_PSA実験_編集_メイン.xlsx
+sheet_name: python実装用_吸着のみ
 
 # 計算時間(min)
 dt: 0.01
@@ -85,9 +86,9 @@ LID_COND: {
 # 導入ガス条件
 INFLOW_GAS_COND: {
   mw_co2: 44,               # CO2分子量 [g/mol]
-  fr_co2: 13.023600724806101,               # CO2流量 [L/min]
+  fr_co2: 22,               # CO2流量 [L/min]
   mw_n2: 28,                # N2分子量 [g/mol]
-  fr_n2: 16.5754918315714,                # N2流量 [L/min]
+  fr_n2: 28,                # N2流量 [L/min]
   # fr_all: fr_co2+fr_n2,   # 全流量 [L/min]
   press: 0.103,             # 圧力 [MPaA]
   temp: 18.0,               # 温度 [degC]
@@ -107,6 +108,6 @@ INFLOW_GAS_COND: {
   cp_n2: 1.041366956,       # n2比熱
   # cp_mean: cp_co2*mf_co2+cp_n2+mf_n2, # 平均比熱Cp [kJ/kg/K]
   # C_per_hour: ~~,   # 1h熱容量 [kJ/K/h]
-  adsorp_heat_co2: 702.1368865930004,  # CO2吸着熱 [kJ/kg]
+  adsorp_heat_co2: 1363.6,  # CO2吸着熱 [kJ/kg]
   adsorp_heat_n2: 642.9,    # N2吸着熱 [kJ/kg]
 }

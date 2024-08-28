@@ -5,9 +5,8 @@ import japanize_matplotlib
 import math
 import glob
 
-def plot_csv_files(tgt_foldapath, unit_dict, data_dir, tgt_sections, sheet_name):
-    """ csvファイルを可視化する関数
-        (stream, section) = (2, 3)のときのみ使用
+def plot_csv_outputs(tgt_foldapath, unit_dict, data_dir, tgt_sections, sheet_name):
+    """ モデルで算出されたcsvファイルを可視化する関数
 
     Args:
         tgt_foldapath (str): 出力先フォルダパス
@@ -17,7 +16,7 @@ def plot_csv_files(tgt_foldapath, unit_dict, data_dir, tgt_sections, sheet_name)
         sheet_name (str): 観測値エクセルファイルのシート名
     """
     # csv読み込み
-    filename_list = glob.glob(tgt_foldapath + "csv/*")
+    filename_list = glob.glob(tgt_foldapath + "csv/*.csv")
     df_dict = {}
     for filename in filename_list:
         df_dict[filename[len(tgt_foldapath)+4:-4]] = pd.read_csv(filename, index_col="timestamp")
@@ -242,3 +241,33 @@ def plot_csv_files(tgt_foldapath, unit_dict, data_dir, tgt_sections, sheet_name)
     #     plt.legend()
     #     plt.savefig(output_foldapath + key + ".png", dpi=100)
     #     plt.close()
+
+
+def plot_csv_params(tgt_foldapath, unit_dict):
+    """ パラメータ値のcsvをpng化
+
+    Args:
+        tgt_foldapath (str): 出力先フォルダパス
+        unit_dict (str): 日本語名と単位のdict
+    """
+    # csv読み込み
+    filename_list = glob.glob(tgt_foldapath + "params/*.csv")
+    df_dict = {}
+    for filename in filename_list:
+        df_dict[filename[len(tgt_foldapath)+7:-4]] = pd.read_csv(filename, index_col="timestamp")
+
+    ### 可視化(all) ----------------------------------------------------------------------
+    df = df_dict["inflow_gas"]
+
+    num_row = math.ceil((len(df.columns))/3)
+    fig = plt.figure(figsize=(8*3, 5.5*num_row), tight_layout=True)
+    fig.patch.set_facecolor('white')
+    for i, col in enumerate(df.columns):
+        plt.rcParams["font.size"] = 16
+        plt.subplot(num_row,3,i+1)
+        plt.plot(df[col])
+        plt.title(unit_dict[col])
+        plt.grid()
+        plt.xlabel("timestamp")
+    plt.savefig(tgt_foldapath + "params/inflow_gas.png", dpi=100)
+    plt.close()

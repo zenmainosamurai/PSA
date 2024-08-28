@@ -110,6 +110,7 @@ class GasAdosorption_Breakthrough_simulator():
         record_dict = {
             "timestamp": [],
             "all_output": [],
+            "params": [],
         }
 
         # 出力用フォルダの用意
@@ -136,6 +137,7 @@ class GasAdosorption_Breakthrough_simulator():
             timestamp = round(timestamp, 2)
             # 記録用配列の平坦化
             output_flatten = {}
+            output_flatten_params = []
             for stream in range(1, 2+self.num_str): # 熱バラ
                 for section in range(1, 1+self.num_sec):
                         for key, value in all_output["heat"][stream][section].items():
@@ -146,9 +148,12 @@ class GasAdosorption_Breakthrough_simulator():
                 for section in range(1, 1+self.num_sec):
                         for key, value in all_output["material"][stream][section].items():
                             output_flatten[key+"_"+str(stream).zfill(3)+"_"+str(section).zfill(3)] = value
+            for value in self.common_conds["INFLOW_GAS_COND"].values(): # パラメータ（導入ガス）
+                output_flatten_params.append(value)
             # 記録
             record_dict["timestamp"].append(timestamp)
             record_dict["all_output"].append(output_flatten)
+            record_dict["params"].append(output_flatten_params)
 
         ### ◆(3/4) csv出力 -------------------------------------------------
         print("(2/3) csv output...")
@@ -178,8 +183,21 @@ class GasAdosorption_Breakthrough_simulator():
             os.makedirs(foldapath, exist_ok=True)
             df_dict[item].to_csv(foldapath + const.TRANSLATION[item] + ".csv")
 
+        # パラメータ値のDataFrame化
+        df = pd.DataFrame(record_dict["params"],
+                          columns=self.common_conds["INFLOW_GAS_COND"].keys(),
+                          index=record_dict["timestamp"])
+        df.index.name = "timestamp"
+        df = df.sort_index(axis=1)
+        # パラメータ値のcsv出力
+        foldapath = output_foldapath + f"{mode}/params/"
+        os.makedirs(foldapath, exist_ok=True)
+        df.to_csv(output_foldapath + f"{mode}/params/inflow_gas.csv")
+
         ### ◆(4/4) 可視化 -------------------------------------------------
         print("(3/3) png output...")
+ 
+        # 出力値の可視化
         # 可視化対象のセルを算出
         plot_target_sec = []
         loc_cells = np.arange(0, self.common_conds["PACKED_BED_COND"]["Lbed"],
@@ -188,13 +206,17 @@ class GasAdosorption_Breakthrough_simulator():
         # 温度計に最も近いセルを算出
         for value in self.common_conds["LOC_CENCER"].values():
             plot_target_sec.append(1 + np.argmin(np.abs(loc_cells - value)))
+        # png出力
+        plot_csv.plot_csv_outputs(tgt_foldapath = output_foldapath + mode + "/",
+                                  unit_dict=const.UNIT,
+                                  data_dir=const.DATA_DIR,
+                                  tgt_sections=plot_target_sec,
+                                  sheet_name=self.common_conds["sheet_name"],
+                                  )
 
-        plot_csv.plot_csv_files(tgt_foldapath = output_foldapath + mode + "/",
-                                unit_dict=const.UNIT,
-                                data_dir=const.DATA_DIR,
-                                tgt_sections=plot_target_sec,
-                                sheet_name=self.common_conds["sheet_name"],
-                                )
+        # パラメータ値の可視化
+        plot_csv.plot_csv_params(tgt_foldapath=output_foldapath + mode + "/",
+                                 unit_dict = const.TRANSLATION_PARAMS)
 
     def calc_all_cell_balance(self, variables, timestamp):
         """全体のマテバラ・熱バラを順次計算する

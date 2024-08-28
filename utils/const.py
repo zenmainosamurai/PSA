@@ -11,6 +11,7 @@ OUTPUT_DIR = "output/"
 
 # 英語→日本語
 TRANSLATION = {
+    # 出力値
     "temp_reached": "セクション到達温度",
     "hw1": "壁-層伝熱係数",
     "Hbb": "下流セルへの熱流束",
@@ -34,6 +35,34 @@ TRANSLATION = {
     "u1": "層伝熱係数",
     "Mabs": "セクション吸着材量",
     "adsorp_amt_estimate_abs": "セクション理論新規吸着量",
+}
+TRANSLATION_PARAMS = {
+    # パラメータ
+    "mw_co2": "CO2分子量 [g/mol]",
+    "fr_co2": "CO2流量 [L/min]",
+    "mw_n2": "N2分子量 [g/mol]",
+    "fr_n2": "N2流量 [L/min]",
+    "fr_all": "全流量 [L/min]",
+    "press": "圧力 [MPaA]",
+    "temp": "温度 [degC]",
+    "mf_co2": "CO2分率 [co2]",
+    "mf_n2": "CO2分率 [nitrogen]",
+    "dense_co2": "CO2密度 [kg/m3]",
+    "dense_n2": "N2密度 [kg/m3]",
+    "dense_mean": "平均密度 [kg/m3]",
+    "c_co2": "CO2熱伝導率 [W/m/K]",
+    "c_n2": "N2熱伝導率 [W/m/K]",
+    "c_mean": "平均熱伝導率 [W/m/K]",
+    "vi_co2": "CO2粘度 [Pas]",
+    "vi_n2": "N2粘度 [Pas]",
+    "vi_mean": "平均粘度 [Pas]",
+    "enthalpy": "エンタルピー [kJ/kg]",
+    "cp_co2": "co2比熱 [kJ/kg/K]",
+    "cp_n2": "n2比熱 [kJ/kg/K]",
+    "cp_mean": "平均比熱 [kJ/kg/K]",
+    "C_per_hour": "1h熱容量 [kJ/K/h]",
+    "adsorp_heat_co2": "CO2吸着熱 [kJ/kg]",
+    "adsorp_heat_n2": "N2吸着熱 [kJ/kg]",
 }
 
 UNIT = {
