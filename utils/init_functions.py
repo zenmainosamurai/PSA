@@ -77,6 +77,52 @@ def add_common_conds(common_conds):
     return common_conds
 
 
+def update_params_by_obs(common_conds):
+    """ 観測値によって更新されたパラメータに紐づくパラメータの更新
+
+    Args:
+        common_conds (dict): 実験パラメータ
+
+    Returns:
+        dict: 一部更新後の実験パラメータ
+    """
+    # 導入ガス条件
+    input_gass = common_conds["INFLOW_GAS_COND"]
+    input_gass["fr_all"] = input_gass["fr_co2"] + input_gass["fr_n2"]
+    input_gass["mf_co2"] = input_gass["fr_co2"] / input_gass["fr_all"]
+    input_gass["mf_n2"] = input_gass["fr_n2"] / input_gass["fr_all"]
+
+    # CO2密度 [kg/m3] (暫定、Teamsチャットより)
+    input_gass["dence_co2"] = 18.355 * input_gass["press"]
+    # N2密度 [kg/m3] (暫定、Teamsチャットより)
+    input_gass["dence_n2"] = 11.577 * input_gass["press"]
+
+    input_gass["dense_mean"] = (
+        input_gass["dense_co2"] * input_gass["mf_co2"]
+        + input_gass["dense_n2"] * input_gass["mf_n2"]
+    )
+    input_gass["c_mean"] = (
+        input_gass["c_co2"] * input_gass["mf_co2"]
+        + input_gass["c_n2"] * input_gass["mf_n2"]
+    )
+    input_gass["vi_mean"] = (
+        input_gass["vi_co2"] * input_gass["mf_co2"]
+        + input_gass["vi_n2"] * input_gass["mf_n2"]
+    )
+    input_gass["cp_mean"] = (
+        input_gass["cp_co2"] * input_gass["mf_co2"]
+        + input_gass["cp_n2"] * input_gass["mf_n2"]
+    )
+    a1 = input_gass["fr_co2"] / 22.4 * input_gass["mw_co2"] * 60 / 1000
+    a2 = input_gass["fr_n2"] / 22.4 * input_gass["mw_n2"] * 60 / 1000
+    a3 = a1 + a2
+    input_gass["C_per_hour"] = input_gass["cp_mean"] * a3
+
+
+
+    return common_conds
+
+
 def init_stream_conds(common_conds, stream, stream_conds):
     """ 全体条件から各ストリーム条件を算出する
 

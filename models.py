@@ -12,7 +12,7 @@ import matplotlib.pyplot as plt
 import japanize_matplotlib
 from scipy import optimize
 
-from utils import const, init_functions, plot_csv
+from utils import const, init_functions, plot_csv, other_utils
 
 import warnings
 warnings.simplefilter('error')
@@ -55,7 +55,8 @@ class GasAdosorption_Breakthrough_simulator():
 
         # 観測値(data)の読み込み
         filepath = const.DATA_DIR + self.common_conds["data_path"]
-        self.df_obs = pd.read_excel(filepath, sheet_name="python実装用_吸着のみ_立ち上がり修正", index_col="time")
+        self.df_obs = pd.read_excel(filepath, sheet_name=self.common_conds["sheet_name"], index_col="time")
+        self.df_obs = other_utils.resample_obs_data(self.df_obs, self.common_conds["dt"]) # リサンプリング
 
         # その他初期化
 
@@ -129,7 +130,7 @@ class GasAdosorption_Breakthrough_simulator():
         timestamp = 0
         while timestamp < self.df_obs.index[-1]:
             # 1step計算実行
-            variables, all_output = self.calc_all_cell_balance(variables=variables)
+            variables, all_output = self.calc_all_cell_balance(variables, timestamp)
             # timestamp更新
             timestamp += self.common_conds["dt"]
             timestamp = round(timestamp, 2)
@@ -191,14 +192,16 @@ class GasAdosorption_Breakthrough_simulator():
         plot_csv.plot_csv_files(tgt_foldapath = output_foldapath + mode + "/",
                                 unit_dict=const.UNIT,
                                 data_dir=const.DATA_DIR,
-                                tgt_sections=plot_target_sec
+                                tgt_sections=plot_target_sec,
+                                sheet_name=self.common_conds["sheet_name"],
                                 )
 
-    def calc_all_cell_balance(self, variables):
+    def calc_all_cell_balance(self, variables, timestamp):
         """全体のマテバラ・熱バラを順次計算する
 
         Args:
             variables (dict): 状態変数
+            timestamp (float): 現在時刻
 
         Returns:
             dict: 更新後の状態変数
@@ -214,7 +217,8 @@ class GasAdosorption_Breakthrough_simulator():
             # sec_1は手動で実施
             mb_dict[stream][1] = self.calc_cell_material(stream=stream,
                                                          section=1,
-                                                         variables=variables)
+                                                         variables=variables,
+                                                         timestamp=timestamp)
             hb_dict[stream][1] = self.calc_cell_heat(stream=stream,
                                                      section=1,
                                                      variables=variables,
@@ -224,6 +228,7 @@ class GasAdosorption_Breakthrough_simulator():
                 mb_dict[stream][section] = self.calc_cell_material(stream=stream,
                                                                    section=section,
                                                                    variables=variables,
+                                                                   timestamp=timestamp,
                                                                    inflow_gas=mb_dict[stream][section-1])
                 hb_dict[stream][section] = self.calc_cell_heat(stream=stream,
                                                                section=section,
@@ -273,21 +278,34 @@ class GasAdosorption_Breakthrough_simulator():
 
         return new_variables, output
 
-    def calc_cell_material(self, stream, section, variables, inflow_gas=None):
+    def calc_cell_material(self, stream, section, variables, timestamp, inflow_gas=None):
         """任意セルのマテリアルバランスを計算する
 
         Args:
             stream (int): 対象セルのstream番号
             section (int): 対象セルのsection番号
             variables (dict): 温度等の状態変数
+            timestamp (float): 現在時刻
             inflow_gas (dict): 上部セルの出力値
 
         Returns:
             dict: 対象セルの計算結果
         """
+        ### 観測値によるパラメータの更新 -------------------------------------
+
+        # 現在時刻に最も近い観測値のindex
+        tgt_index = self.df_obs.index[np.argmin(np.abs(self.df_obs.index - timestamp))]
+        # パラメータ更新
+        self.common_conds["INFLOW_GAS_COND"]["fr_co2"] = self.df_obs.loc[tgt_index, "flow_rate_co2"] # ガス流量_CO2 [L/min]
+        self.common_conds["INFLOW_GAS_COND"]["fr_n2"] = self.df_obs.loc[tgt_index, "flow_rate_n2"] # ガス流量_N2 [L/min]
+        self.common_conds["INFLOW_GAS_COND"]["press"] = self.df_obs.loc[tgt_index, "Pressure"] / 1000 # 圧力[Mpa]
+        # 上記に紐づくパラメータの更新
+        init_functions.update_params_by_obs(self.common_conds)
+
+        ### マテバラ計算開始 ------------------------------------------------
+
         # セクション吸着材量 [g]
         Mabs = self.stream_conds[stream]["Mabs"] / self.num_sec
-        # 流入CO2流量 [cm3]
         if section == 1:
             inflow_fr_co2 = (
                 self.common_conds["INFLOW_GAS_COND"]["fr_co2"] * self.common_conds["dt"]

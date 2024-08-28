@@ -23,23 +23,22 @@ class GasAdosorption_for_Optimize(GasAdosorption_Breakthrough_simulator):
     """ ガス吸着モデル(バッチプロセス)を実行するクラス
     """
 
-    def __init__(self, cond_id):
+    def __init__(self, cond_id, opt_params):
         """ 初期化関数
 
         Args:
-            obs_name (str): 観測値の名前(ex. obs_case1)
-            cond_id (str): 実験条件の名前(ex. test1)
+            cond_id (str): 実験条件の名前
+            opt_params (dict): 最適化パラメータ
         """
         self.cond_id = cond_id
         super().__init__(self.cond_id)
-        self.n_processes = 8
-        self.max_trial = 1000 / self.n_processes
-        self.max_trial = round(self.max_trial)
-        self.num_trial = 0
+        self.n_processes = opt_params["num_processes"]
+        self.max_trials = opt_params["num_trials"] / self.n_processes
+        self.max_trials = round(self.max_trials)
+        self.trials_num = 0
 
     def optimize_params(self):
         # 最適化の実施
-        print("最適化実施中 ...")
         optuna.logging.set_verbosity(optuna.logging.WARNING)
         storage_path = const.OUTPUT_DIR + self.cond_id + "/simulation/"
         os.makedirs(storage_path, exist_ok=True)
@@ -58,9 +57,9 @@ class GasAdosorption_for_Optimize(GasAdosorption_Breakthrough_simulator):
         # テキスト出力
         params_dict = {
             "INFLOW_GAS_COND": {
-                "fr_co2": 22 * self.study.best_params["fr"],
-                "fr_n2": 28 * self.study.best_params["fr"],
-                "adsorp_heat_co2": 1363.6 * self.study.best_params["adsorp_heat"],
+                # "fr_co2": 22 * self.study.best_params["fr"],
+                # "fr_n2": 28 * self.study.best_params["fr"],
+                "adsorp_heat_co2": 1363.6 * self.study.best_params["adsorp_heat_co2"],
             },
             "PACKED_BED_COND": {
                 "Mabs": 10800 * self.study.best_params["Mabs"],
@@ -73,12 +72,14 @@ class GasAdosorption_for_Optimize(GasAdosorption_Breakthrough_simulator):
         try:
             txt_filepath = const.OUTPUT_DIR + self.cond_id + "/simulation/best_params.txt"
             with open(txt_filepath, mode="w") as f:
-                f.write(str(self.study.best_params))
+                for key, value in self.study.best_params.items():
+                    f.write(f"{key}: {value}\n")
+                f.write(f"\nbest_score = {self.study.best_value}")
         except:
             print("失敗")
         print("最適化結果 ---------------")
-        print(params_dict)
-        print(self.study.best_value)
+        print("params: ", params_dict)
+        print("best_score: ", self.study.best_value)
         # 再シミュレーション
         for cond_category, cond_dict in params_dict.items():
             for cond_name, value in cond_dict.items():
@@ -87,18 +88,18 @@ class GasAdosorption_for_Optimize(GasAdosorption_Breakthrough_simulator):
 
     def run_optimization(self):
         optuna.logging.set_verbosity(optuna.logging.WARNING)
-        self.study.optimize(self.objective, n_trials=self.max_trial)
+        self.study.optimize(self.objective, n_trials=self.max_trials)
 
     def objective(self, trial):
         """ 最適化条件の設定
         """
-        self.num_trial += 1
+        self.trials_num += 1
         # 最適化条件
         params_dict = {
             "INFLOW_GAS_COND": {
-                "fr_co2": 22 * trial.suggest_loguniform("fr", 0.1, 10),
-                "fr_n2": 28 * trial.suggest_loguniform("fr", 0.1, 10),
-                "adsorp_heat_co2": 1363.6 * trial.suggest_loguniform("adsorp_heat", 0.1, 10),
+                # "fr_co2": 22 * trial.suggest_loguniform("fr", 0.1, 10),
+                # "fr_n2": 28 * trial.suggest_loguniform("fr", 0.1, 10),
+                "adsorp_heat_co2": 1363.6 * trial.suggest_loguniform("adsorp_heat_co2", 0.1, 10),
             },
             "PACKED_BED_COND": {
                 "Mabs": 10800 * trial.suggest_loguniform("Mabs", 0.1, 10),
@@ -114,7 +115,7 @@ class GasAdosorption_for_Optimize(GasAdosorption_Breakthrough_simulator):
                 self.common_conds[cond_category][cond_name] = value
         # rmse計算
         rmse = self.calc_rmse()
-        print("\r" + f"trial: {self.num_trial}/{self.max_trial}", end="")
+        print("\r" + f"trial: {self.trials_num}/{self.max_trials}", end="")
         
         return rmse
 
@@ -145,7 +146,7 @@ class GasAdosorption_for_Optimize(GasAdosorption_Breakthrough_simulator):
         timestamp = 0
         while timestamp < self.df_obs.index[-1]:
             # 1step計算実行
-            variables, all_output = self.calc_all_cell_balance(variables=variables)
+            variables, all_output = self.calc_all_cell_balance(variables, timestamp)
             # timestamp更新
             timestamp += self.common_conds["dt"]
             timestamp = round(timestamp, 2)
@@ -184,19 +185,19 @@ class GasAdosorption_for_Optimize(GasAdosorption_Breakthrough_simulator):
             nearest_sec.append(1 + np.argmin(np.abs(loc_cells - value)))
 
         # データ準備
-        tgt_cols = [f"temp_reached_{str(stream).zfill(3)}_{str(section).zfill(3)}" for stream in [1,2] for section in nearest_sec[2:]]
-        rename_cols = [f"temp_{str(stream).zfill(3)}_{str(section).zfill(3)}" for stream in [1,2] for section in [3]]
+        tgt_cols = [f"temp_reached_{str(stream).zfill(3)}_{str(section).zfill(3)}" for stream in [1,2] for section in nearest_sec[1:]]
+        rename_cols = [f"temp_{str(stream).zfill(3)}_{str(section).zfill(3)}" for stream in [1,2] for section in [2,3]]
         df_sim = df[tgt_cols]
         df_sim.columns = rename_cols
-        df_obs = pd.read_excel(const.DATA_DIR + "20240624_ICTへの提供データ_PSA実験_編集_メイン.xlsx", # 観測値
-                               sheet_name="python実装用_吸着のみ", index_col="time")
+        df_obs = pd.read_excel(const.DATA_DIR + self.common_conds["data_path"], # 観測値
+                               sheet_name=self.common_conds["sheet_name"], index_col="time")
         common_index = [np.argmin(np.abs(df_obs.index[i] - df_sim.index)) for i in range(len(df_obs.index))]
         df_sim = df_sim.iloc[common_index]
 
         # RMSE計算
         rmse_list = []
         for col in rename_cols:
-            rmse = mean_squared_error(df_sim[col], df_obs[col], squared=True)
+            rmse = mean_squared_error(df_sim[col], df_obs[col], squared=False)
             rmse_list.append(rmse)
 
         return np.mean(rmse_list)

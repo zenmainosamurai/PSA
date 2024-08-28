@@ -2,15 +2,20 @@
 
 # 実行モードを指定
 mode_list: [
-  "simulation",
+  # "simulation",
   # "assimilation",
+  "optimize",
 ]
 
 # 実行したいconditionファイルを指定
 cond_list: [
-  # 2_20_mod_num_section,
-  # 2_21_mod_adsorp_amt,
-  # opt,
-  opt2
-  # tmp
+  # 2_22_mod_use_data_as_params,
+  2_23_opt_params,
+  # opt2
 ]
+
+# パラメータ最適化のパラメータ
+opt_params: {
+  num_processes: 8,
+  num_trials: 300,
+}
