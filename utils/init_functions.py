@@ -90,8 +90,12 @@ def update_params_by_obs(common_conds):
     # 導入ガス条件
     input_gass = common_conds["INFLOW_GAS_COND"]
     input_gass["fr_all"] = input_gass["fr_co2"] + input_gass["fr_n2"]
-    input_gass["mf_co2"] = input_gass["fr_co2"] / input_gass["fr_all"]
-    input_gass["mf_n2"] = input_gass["fr_n2"] / input_gass["fr_all"]
+    if input_gass["fr_all"] != 0:
+        input_gass["mf_co2"] = input_gass["fr_co2"] / input_gass["fr_all"]
+        input_gass["mf_n2"] = input_gass["fr_n2"] / input_gass["fr_all"]
+    else:
+        input_gass["mf_co2"] = 0
+        input_gass["mf_n2"] = 0
 
     # CropProp関連の物性
     T_K = input_gass["temp"] + 273.15 # 温度 [K]

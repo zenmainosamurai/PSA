@@ -55,7 +55,10 @@ class GasAdosorption_Breakthrough_simulator():
 
         # 観測値(data)の読み込み
         filepath = const.DATA_DIR + self.common_conds["data_path"]
-        self.df_obs = pd.read_excel(filepath, sheet_name=self.common_conds["sheet_name"], index_col="time")
+        if filepath[-3:] == "csv":
+            self.df_obs = pd.read_csv(filepath, index_col="time")
+        else:
+            self.df_obs = pd.read_excel(filepath, sheet_name=self.common_conds["sheet_name"], index_col="time")
         self.df_obs = other_utils.resample_obs_data(self.df_obs, self.common_conds["dt"]) # リサンプリング
 
         # その他初期化
@@ -209,9 +212,8 @@ class GasAdosorption_Breakthrough_simulator():
         # png出力
         plot_csv.plot_csv_outputs(tgt_foldapath = output_foldapath + mode + "/",
                                   unit_dict=const.UNIT,
-                                  data_dir=const.DATA_DIR,
+                                  df_obs=self.df_obs,
                                   tgt_sections=plot_target_sec,
-                                  sheet_name=self.common_conds["sheet_name"],
                                   )
 
         # パラメータ値の可視化

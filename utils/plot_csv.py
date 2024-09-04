@@ -5,15 +5,14 @@ import japanize_matplotlib
 import math
 import glob
 
-def plot_csv_outputs(tgt_foldapath, unit_dict, data_dir, tgt_sections, sheet_name):
+def plot_csv_outputs(tgt_foldapath, unit_dict, df_obs, tgt_sections):
     """ モデルで算出されたcsvファイルを可視化する関数
 
     Args:
         tgt_foldapath (str): 出力先フォルダパス
         unit_dict (str): 日本語名と単位のdict
-        data_dir (str): dataフォルダパス
+        df_obs (pd.DataFrame): 観測値のデータフレーム
         tgt_sections (list): 可視化対象のセクション
-        sheet_name (str): 観測値エクセルファイルのシート名
     """
     # csv読み込み
     filename_list = glob.glob(tgt_foldapath + "csv/*.csv")
@@ -53,8 +52,6 @@ def plot_csv_outputs(tgt_foldapath, unit_dict, data_dir, tgt_sections, sheet_nam
     plt.rcParams["font.size"] = 16
     plt.subplot(num_row, 1, 1)
     df = df_dict["セクション到達温度"] # 計算値
-    df_obs = pd.read_excel(data_dir + "20240624_ICTへの提供データ_PSA実験_編集_メイン.xlsx", # 観測値
-                           sheet_name=sheet_name, index_col="time")
     for stream in range(1,3):
         for section in tgt_sections:
             plt.plot(df[f"temp_reached_{str(stream).zfill(3)}_{str(section).zfill(3)}"],

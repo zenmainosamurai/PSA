@@ -62,7 +62,7 @@ class GasAdosorption_for_Optimize(GasAdosorption_Breakthrough_simulator):
                 "adsorp_heat_co2": 1363.6 * self.study.best_params["adsorp_heat_co2"],
             },
             "PACKED_BED_COND": {
-                "Mabs": 10800 * self.study.best_params["Mabs"],
+                # "Mabs": 10800 * self.study.best_params["Mabs"],
                 "ks": 4 * self.study.best_params["ks"],
             },
             "DRUM_WALL_COND": {
@@ -102,11 +102,11 @@ class GasAdosorption_for_Optimize(GasAdosorption_Breakthrough_simulator):
                 "adsorp_heat_co2": 1363.6 * trial.suggest_loguniform("adsorp_heat_co2", 0.1, 10),
             },
             "PACKED_BED_COND": {
-                "Mabs": 10800 * trial.suggest_loguniform("Mabs", 0.1, 10),
+                # "Mabs": 10800 * trial.suggest_loguniform("Mabs", 0.1, 10),
                 "ks": 4 * trial.suggest_loguniform("ks", 0.1, 10),
             },
             "DRUM_WALL_COND": {
-                "coef_hw1": 1 * trial.suggest_loguniform("coef_hw1", 0.1, 1),
+                "coef_hw1": 1 * trial.suggest_loguniform("coef_hw1", 0.1, 10),
             }
         }
         # パラメータ置換
@@ -189,15 +189,13 @@ class GasAdosorption_for_Optimize(GasAdosorption_Breakthrough_simulator):
         rename_cols = [f"temp_{str(stream).zfill(3)}_{str(section).zfill(3)}" for stream in [1,2] for section in [2,3]]
         df_sim = df[tgt_cols]
         df_sim.columns = rename_cols
-        df_obs = pd.read_excel(const.DATA_DIR + self.common_conds["data_path"], # 観測値
-                               sheet_name=self.common_conds["sheet_name"], index_col="time")
-        common_index = [np.argmin(np.abs(df_obs.index[i] - df_sim.index)) for i in range(len(df_obs.index))]
+        common_index = [np.argmin(np.abs(self.df_obs.index[i] - df_sim.index)) for i in range(len(self.df_obs.index))]
         df_sim = df_sim.iloc[common_index]
 
         # RMSE計算
         rmse_list = []
         for col in rename_cols:
-            rmse = mean_squared_error(df_sim[col], df_obs[col], squared=False)
+            rmse = mean_squared_error(df_sim[col], self.df_obs[col], squared=False)
             rmse_list.append(rmse)
 
         return np.mean(rmse_list)
