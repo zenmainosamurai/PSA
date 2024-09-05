@@ -464,127 +464,10 @@ class GasAdosorption_Breakthrough_simulator():
         Aout = self.stream_conds[stream]["Aout"] / self.num_sec
         # 下流セル境界面積 [m2]
         Abb = self.stream_conds[stream]["Sstream"]
-
-        ### 層伝熱係数
-
-        # 導入気体の熱伝導率 [W/m/K]
-        kf = (
-            self.common_conds["INFLOW_GAS_COND"]["c_co2"] * material_output["inflow_mf_co2"]
-            + self.common_conds["INFLOW_GAS_COND"]["c_n2"] * material_output["inflow_mf_n2"]
-        )
-        # 充填剤の熱伝導率 [W/m/K]
-        kp = self.common_conds["PACKED_BED_COND"]["lambda_col"]
-        # Yagi-Kunii式 1
-        Phi_1 = 0.15
-        # Yagi-Kunii式 2
-        Phi_2 = 0.07
-        # Yagi-Kunii式 3
-        Phi = (
-            Phi_2 + (Phi_1 - Phi_2)
-            * (self.common_conds["PACKED_BED_COND"]["epsilon"] - 0.26)
-            / 0.26
-        )
-        # Yagi-Kunii式 4
-        hrv = (
-            (0.227 / (1 + self.common_conds["PACKED_BED_COND"]["epsilon"] / 2
-                      / (1 - self.common_conds["PACKED_BED_COND"]["epsilon"])
-                      * (1 - self.common_conds["PACKED_BED_COND"]["epsilon_p"])
-                      / self.common_conds["PACKED_BED_COND"]["epsilon_p"]))
-            * ((temp_now + 273.15) / 100)**3
-        )
-        # Yagi-Kunii式 5
-        hrp = (
-            0.227 * self.common_conds["PACKED_BED_COND"]["epsilon_p"]
-            / (2 - self.common_conds["PACKED_BED_COND"]["epsilon_p"])
-            * ((temp_now + 273.15) / 100)**3
-        )
-        # Yagi-Kunii式 6
-        ksi = (
-            1 / Phi + hrp * self.common_conds["PACKED_BED_COND"]["dp"] / kf
-        )
-        # Yagi-Kunii式 7
-        ke0_kf = (
-            self.common_conds["PACKED_BED_COND"]["epsilon"]
-            * (1 + hrv * self.common_conds["PACKED_BED_COND"]["dp"] / kf)
-            + (1 - self.common_conds["PACKED_BED_COND"]["epsilon"])
-            / (1 / ksi + 2 * kf / 3 / kp)
-        )
-        # 静止充填層有効熱伝導率 [W/m/K]
-        ke0 = kf * ke0_kf        
-        # ストリーム換算直径 [m]
-        d1 = 2 * (self.stream_conds[stream]["Sstream"] / math.pi)**0.5
-        # 気体粘度 [Pas]
-        mu = (
-            self.common_conds["INFLOW_GAS_COND"]["vi_co2"] * material_output["inflow_mf_co2"]
-            + self.common_conds["INFLOW_GAS_COND"]["vi_n2"] * material_output["inflow_mf_n2"]
-        )
-        # プラントル数
-        Pr = mu * 1000 * gas_cp / kf
-        # 流入ガス体積流量 [m3/s]
-        f0 = (
-            (material_output["inflow_fr_co2"] + material_output["inflow_fr_n2"])
-            / 1e6 / (self.common_conds["dt"] * 60)
-        )
-        # ストリーム空塔速度 [m/s]
-        vcol = f0 / self.stream_conds[stream]["Sstream"]
-        # 気体動粘度 [m2/s]
-        nu = mu / material_output["gas_density"]
-        # 粒子レイノルズ数
-        Rep = vcol * self.common_conds["PACKED_BED_COND"]["dp"] / nu
-        # 充填層有効熱伝導率 1
-        psi_beta = (
-            1.0985 * (self.common_conds["PACKED_BED_COND"]["dp"] / d1)**2
-            - 0.5192 * (self.common_conds["PACKED_BED_COND"]["dp"] / d1) + 0.1324
-        )
-        # 充填層有効熱伝導率 2
-        ke_kf = ke0 / kf + psi_beta * Pr * Rep
-        # 充填層有効熱伝導率 3 [W/m/K]
-        ke = ke_kf * kf
-        # ヌッセルト数
-        Nup = 0.84 * Rep
-        # 粒子‐流体間熱伝達率 [W/m2/K]
-        habs = Nup / self.common_conds["PACKED_BED_COND"]["dp"] * kf
-        # 隙間係数
-        a = 2
-        # 格子長さ [m]
-        l0 = self.common_conds["PACKED_BED_COND"]["dp"] * a * 2 / 2**0.5
-        # 粒子代表長さ [m]
-        dlat = l0 * (1 - self.common_conds["PACKED_BED_COND"]["epsilon"])
-        # 代表長さ（セクション全長）1
-        c0 = 4
-        # 代表長さ（セクション全長）2
-        Lambda_2 = c0 * Pr ** (1/3) * Rep ** (1/2)
-        # 代表長さ（セクション全長）3
-        knew = ke + 1 / (1 / (0.02 * Pr * Rep) + 2 / Lambda_2)
-        # 代表長さ（セクション全長）4
-        Lambda_1 = 2 / (kf / ke - kf / knew)
-        # 代表長さ（セクション全長）5
-        b0 = (
-            0.5 * Lambda_1 * d1 / self.common_conds["PACKED_BED_COND"]["dp"]
-            * kf / ke
-        )
-        # 代表長さ（セクション全長）6
-        Phi_b = 0.0775 * np.log(b0)+0.028
-        # 代表長さ（セクション全長）7
-        a12 = 0.9107 * np.log(b0) + 2.2395
-        # 代表長さ（セクション全長）8 [m]
-        Lp = self.common_conds["PACKED_BED_COND"]["Lbed"] / self.num_sec
-        # 粒子層-壁面伝熱ヌッセルト数 1
-        y0 = (
-            4 * self.common_conds["PACKED_BED_COND"]["dp"]
-            / d1 * Lp / d1 * ke_kf / (Pr * Rep)
-        )
-        # 粒子層-壁面伝熱ヌッセルト数 1
-        Nupw = (
-            self.common_conds["PACKED_BED_COND"]["dp"]
-            / d1 * ke_kf * (a12 + Phi_b / y0)
-        )
-        # 壁-層伝熱係数 [W/m2/K]
-        hw1 = Nupw / self.common_conds["PACKED_BED_COND"]["dp"] * kf
-        hw1 *= self.common_conds["DRUM_WALL_COND"]["coef_hw1"]
-        # 層伝熱係数 [W/m2/K]
-        u1 = 1 / (dlat / ke + 1 / habs)
-
+        # 壁-層伝熱係数、層伝熱係数
+        hw1, u1 = self._calc_heat_transfer_coef(stream,
+                                                temp_now,
+                                                material_output)
         # 内側境界からの熱流束 [J]
         if stream == 1:
             Hwin = 0
@@ -634,7 +517,7 @@ class GasAdosorption_Breakthrough_simulator():
 
         output = {
             "temp_reached": temp_reached,
-            "hw1": hw1,
+            "hw1": hw1, # 壁-層伝熱係数
             "Hroof": Hroof,
             "Hbb": Hbb, # 下流セルへの熱流束 [J]
             ### 以下確認用
@@ -777,6 +660,137 @@ class GasAdosorption_Breakthrough_simulator():
         }
 
         return output
+
+    def _calc_heat_transfer_coef(self, stream, temp_now, material_output):
+        """ 層伝熱係数、壁-層伝熱係数を算出する
+
+        Args:
+            stream (int): 対象のストリーム番号
+            temp_now (float): 対象セルの現在温度
+            material_output (dict): 対象セルのマテバラ計算結果
+
+        Returns:
+            float: 層伝熱係数、壁-層伝熱係数
+        """
+        # 導入気体の熱伝導率 [W/m/K]
+        kf = (
+            self.common_conds["INFLOW_GAS_COND"]["c_co2"] * material_output["inflow_mf_co2"]
+            + self.common_conds["INFLOW_GAS_COND"]["c_n2"] * material_output["inflow_mf_n2"]
+        )
+        # 充填剤の熱伝導率 [W/m/K]
+        kp = self.common_conds["PACKED_BED_COND"]["lambda_col"]
+        # Yagi-Kunii式 1
+        Phi_1 = 0.15
+        # Yagi-Kunii式 2
+        Phi_2 = 0.07
+        # Yagi-Kunii式 3
+        Phi = (
+            Phi_2 + (Phi_1 - Phi_2)
+            * (self.common_conds["PACKED_BED_COND"]["epsilon"] - 0.26)
+            / 0.26
+        )
+        # Yagi-Kunii式 4
+        hrv = (
+            (0.227 / (1 + self.common_conds["PACKED_BED_COND"]["epsilon"] / 2
+                      / (1 - self.common_conds["PACKED_BED_COND"]["epsilon"])
+                      * (1 - self.common_conds["PACKED_BED_COND"]["epsilon_p"])
+                      / self.common_conds["PACKED_BED_COND"]["epsilon_p"]))
+            * ((temp_now + 273.15) / 100)**3
+        )
+        # Yagi-Kunii式 5
+        hrp = (
+            0.227 * self.common_conds["PACKED_BED_COND"]["epsilon_p"]
+            / (2 - self.common_conds["PACKED_BED_COND"]["epsilon_p"])
+            * ((temp_now + 273.15) / 100)**3
+        )
+        # Yagi-Kunii式 6
+        ksi = (
+            1 / Phi + hrp * self.common_conds["PACKED_BED_COND"]["dp"] / kf
+        )
+        # Yagi-Kunii式 7
+        ke0_kf = (
+            self.common_conds["PACKED_BED_COND"]["epsilon"]
+            * (1 + hrv * self.common_conds["PACKED_BED_COND"]["dp"] / kf)
+            + (1 - self.common_conds["PACKED_BED_COND"]["epsilon"])
+            / (1 / ksi + 2 * kf / 3 / kp)
+        )
+        # 静止充填層有効熱伝導率 [W/m/K]
+        ke0 = kf * ke0_kf        
+        # ストリーム換算直径 [m]
+        d1 = 2 * (self.stream_conds[stream]["Sstream"] / math.pi)**0.5
+        # 気体粘度 [Pas]
+        mu = (
+            self.common_conds["INFLOW_GAS_COND"]["vi_co2"] * material_output["inflow_mf_co2"]
+            + self.common_conds["INFLOW_GAS_COND"]["vi_n2"] * material_output["inflow_mf_n2"]
+        )
+        # プラントル数
+        Pr = mu * 1000 * material_output["gas_cp"] / kf
+        # 流入ガス体積流量 [m3/s]
+        f0 = (
+            (material_output["inflow_fr_co2"] + material_output["inflow_fr_n2"])
+            / 1e6 / (self.common_conds["dt"] * 60)
+        )
+        # ストリーム空塔速度 [m/s]
+        vcol = f0 / self.stream_conds[stream]["Sstream"]
+        # 気体動粘度 [m2/s]
+        nu = mu / material_output["gas_density"]
+        # 粒子レイノルズ数
+        Rep = vcol * self.common_conds["PACKED_BED_COND"]["dp"] / nu
+        # 充填層有効熱伝導率 1
+        psi_beta = (
+            1.0985 * (self.common_conds["PACKED_BED_COND"]["dp"] / d1)**2
+            - 0.5192 * (self.common_conds["PACKED_BED_COND"]["dp"] / d1) + 0.1324
+        )
+        # 充填層有効熱伝導率 2
+        ke_kf = ke0 / kf + psi_beta * Pr * Rep
+        # 充填層有効熱伝導率 3 [W/m/K]
+        ke = ke_kf * kf
+        # ヌッセルト数
+        Nup = 0.84 * Rep
+        # 粒子‐流体間熱伝達率 [W/m2/K]
+        habs = Nup / self.common_conds["PACKED_BED_COND"]["dp"] * kf
+        # 隙間係数
+        a = 2
+        # 格子長さ [m]
+        l0 = self.common_conds["PACKED_BED_COND"]["dp"] * a * 2 / 2**0.5
+        # 粒子代表長さ [m]
+        dlat = l0 * (1 - self.common_conds["PACKED_BED_COND"]["epsilon"])
+        # 代表長さ（セクション全長）1
+        c0 = 4
+        # 代表長さ（セクション全長）2
+        Lambda_2 = c0 * Pr ** (1/3) * Rep ** (1/2)
+        # 代表長さ（セクション全長）3
+        knew = ke + 1 / (1 / (0.02 * Pr * Rep) + 2 / Lambda_2)
+        # 代表長さ（セクション全長）4
+        Lambda_1 = 2 / (kf / ke - kf / knew)
+        # 代表長さ（セクション全長）5
+        b0 = (
+            0.5 * Lambda_1 * d1 / self.common_conds["PACKED_BED_COND"]["dp"]
+            * kf / ke
+        )
+        # 代表長さ（セクション全長）6
+        Phi_b = 0.0775 * np.log(b0)+0.028
+        # 代表長さ（セクション全長）7
+        a12 = 0.9107 * np.log(b0) + 2.2395
+        # 代表長さ（セクション全長）8 [m]
+        Lp = self.common_conds["PACKED_BED_COND"]["Lbed"] / self.num_sec
+        # 粒子層-壁面伝熱ヌッセルト数 1
+        y0 = (
+            4 * self.common_conds["PACKED_BED_COND"]["dp"]
+            / d1 * Lp / d1 * ke_kf / (Pr * Rep)
+        )
+        # 粒子層-壁面伝熱ヌッセルト数 1
+        Nupw = (
+            self.common_conds["PACKED_BED_COND"]["dp"]
+            / d1 * ke_kf * (a12 + Phi_b / y0)
+        )
+        # 壁-層伝熱係数 [W/m2/K]
+        hw1 = Nupw / self.common_conds["PACKED_BED_COND"]["dp"] * kf
+        hw1 *= self.common_conds["DRUM_WALL_COND"]["coef_hw1"]
+        # 層伝熱係数 [W/m2/K]
+        u1 = 1 / (dlat / ke + 1 / habs)
+
+        return hw1, u1
 
     def __optimize_temp_reached(self, temp_reached,
                                 gas_cp, Mgas, temp_now,
