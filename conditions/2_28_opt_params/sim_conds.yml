@@ -1,7 +1,7 @@
 # 各種初期条件・境界条件の定義
 
 # 使用データ
-data_path: 20240624_ICTへの提供データ_PSA実験_編集_メイン.xlsx
+data_path: 吸着のみ_弁停止フラグ.csv
 
 # 計算時間(min)
 dt: 0.01
@@ -9,7 +9,14 @@ dt: 0.01
 # セル分割
 CELL_SPLIT: {
   num_str: 2,         # ストリーム分割数（垂直方向）
-  num_sec: 3,         # セクション分割数（平行方向）
+  num_sec: 20,         # セクション分割数（平行方向）
+}
+
+# 温度計の位置 [m]
+LOC_CENCER: {
+  up: 0.084,     # 上流温度計
+  mid: 0.428,   # 中流温度計
+  down: 0.774,  # 下流温度計
 }
 
 # 触媒充填層の初期条件
@@ -21,7 +28,7 @@ PACKED_BED_COND: {
   # Vbed: Sbed * Lbed,# 充填体積 [m3]
   Mabs: 10800,        # 充填吸着材量 [g]
   # rho_abs: Mabs/Vbed/1e6 # 吸着材かさ密度 [g/cm3]
-  lambda_col: 0.2,    # 充填層熱伝導率 [W/m/K]
+  lambda_col: 1.135,    # 充填層熱伝導率 [W/m/K]
   epsilon_p: 0.3,     # 充填層粒子放射率 [-]
   cabs: 0.8,          # 充填層粒子比率 [J/g/K]
   # Cbed: cabs*Mabs,  # 充填層熱容量 [J/K]
@@ -30,7 +37,7 @@ PACKED_BED_COND: {
   dp: 0.003,          # 平均粒子径 [m]
   phi: 1,             # 形状補正係数 [-]
   vp: 2,              # 到達真空圧力 [kPaA]
-  ks: 400,              # 吸着移動係数 [1e-6/sec]
+  ks: 4,              # 吸着移動係数 [1e-6/sec]
 }
 
 # 容器壁条件
@@ -46,9 +53,33 @@ DRUM_WALL_COND: {
   sh_drumw: 0.59,     # 容器壁比熱 [J/g/K]
   c_drumw: 16.7,      # 容器壁熱伝導率 [W/m/K]
   # la_drum: pi*Ddrum*Ldrum, # 容器側面積 [m2]
-  coef_outair_heat: 20, # 外気熱伝達係数 [W/m2/K]
+  coef_outair_heat: 200, # 外気熱伝達係数 [W/m2/K]
   temp_outside: 18,   # 外気温 [℃]
-  # coef_hw1: 1,        # 壁-層伝熱係数の補正係数
+  coef_hw1: 1,        # 壁-層伝熱係数の補正係数
+}
+
+# 上下の蓋の条件
+LID_COND: {
+  UP: {
+    Dflange: 280,       # フランジ径 [mm]
+    Tflange: 22,        # フランジ厚 [mm]
+    PDflange_up: 34,    # 上蓋フラ内孔径 [mm]
+    # Sflange_up: ,     # 上蓋フラ面積 [m2]
+    # Vflange_up: ,     # 上蓋フラ体積 [cm3]
+    PDflange_dw: 165,   # 下蓋フラ内孔径 [mm]
+    # Vflange_dw: ,     # 下蓋フラ体積 [cm3]
+    # Mflange: ,        # フランジ重量 [g]
+  },
+  DOWN: {
+    Dflange: 280,       # フランジ径 [mm]
+    Tflange: 22,        # フランジ厚 [mm]
+    PDflange_up: 60.5,  # 下底フラ内孔径 [mm]
+    # Sflange_up: ,     # 下底フラ面積 [m2]
+    # Vflange_up: ,     # 下底フラ体積 [cm3]
+    PDflange_dw: 165,   # 上底フラ内孔径 [mm]
+    # Vflange_dw: ,     # 上底フラ体積 [cm3]
+    # Mflange: ,        # フランジ重量 [g]
+  }
 }
 
 # 導入ガス条件

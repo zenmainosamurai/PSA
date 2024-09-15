@@ -94,6 +94,15 @@ class GasAdosorption_Breakthrough_simulator():
                     +0.1828984*self.common_conds["PACKED_BED_COND"]["vp"]**2
                     -30.8594655*self.common_conds["PACKED_BED_COND"]["vp"]+1700.5767712
                 )
+        # 壁-、層伝熱係数
+        variables["heat_t_coef"] = {} # 層伝熱係数
+        variables["heat_t_coef_wall"] = {} # 壁-層伝熱係数
+        for stream in range(1, self.num_str+1):
+            variables["heat_t_coef"][stream] = {}
+            variables["heat_t_coef_wall"][stream] = {}
+            for section in range(1, self.num_sec+1):
+                variables["heat_t_coef"][stream][section] = 1e-5
+                variables["heat_t_coef_wall"][stream][section] = 14
 
         return variables
 
@@ -133,8 +142,16 @@ class GasAdosorption_Breakthrough_simulator():
         # 全体計算
         timestamp = 0
         while timestamp < self.df_obs.index[-1]:
-            # 1step計算実行
-            variables, all_output = self.calc_all_cell_balance(variables, timestamp)
+            # 最も時刻が近い観測値のindex
+            idx_obs = self.df_obs.index[np.argmin(np.abs(timestamp - self.df_obs.index))]
+            # 弁停止していない場合
+            if self.df_obs.loc[idx_obs, "valve_stop_flag"] == 0:
+                # 通常のマテバラ・熱バラ計算を実行
+                variables, all_output = self.calc_all_cell_balance(variables, timestamp)
+            # 弁停止している場合
+            elif self.df_obs.loc[idx_obs, "valve_stop_flag"] == 1:
+                # 弁停止時の関数を実行
+                variables, all_output = self.calc_all_cell_balance_when_valve_stop(variables, timestamp)
             # timestamp更新
             timestamp += self.common_conds["dt"]
             timestamp = round(timestamp, 2)
@@ -289,10 +306,106 @@ class GasAdosorption_Breakthrough_simulator():
             new_variables["temp_lid"][position] = hb_lid[position]["temp_reached"]
         # 既存吸着量
         new_variables["adsorp_amt"] = {}
-        for stream in range(1, 1+self.num_str): # 壁面考慮
+        for stream in range(1, 1+self.num_str):
             new_variables["adsorp_amt"][stream] = {}
             for section in range(1, 1+self.num_sec):
                 new_variables["adsorp_amt"][stream][section] = mb_dict[stream][section]["accum_adsorp_amt"]
+        # 壁―, 層伝熱係数
+        new_variables["heat_t_coef"] = {}
+        new_variables["heat_t_coef_wall"] = {}
+        for stream in range(1, 1+self.num_str):
+            new_variables["heat_t_coef"][stream] = {}
+            new_variables["heat_t_coef_wall"][stream] = {}
+            for section in range(1, 1+self.num_sec):
+                new_variables["heat_t_coef"][stream][section] = hb_dict[stream][section]["hw1"]
+                new_variables["heat_t_coef_wall"][stream][section] = hb_dict[stream][section]["u1"]
+        # 全出力結果(参考・記録用)
+        output = {
+            "material": mb_dict,
+            "heat": hb_dict,
+            "heat_lid": hb_lid,
+        }
+
+        return new_variables, output
+
+    def calc_all_cell_balance_when_valve_stop(self, variables, timestamp):
+        """ 全体のマテバラ・熱バラを順次計算する
+            *弁停止モード
+
+        Args:
+            variables (dict): 状態変数
+            timestamp (float): 現在時刻
+
+        Returns:
+            dict: 更新後の状態変数
+            dict: マテバラ・熱バラの全出力（参考・記録用）
+        """
+        ### マテバラ・熱バラ計算
+        mb_dict = {}
+        hb_dict = {}
+        hb_lid = {}
+        for stream in range(1, 1+self.num_str):
+            mb_dict[stream] = {}
+            hb_dict[stream] = {}
+            # sec_1は手動で実施
+            mb_dict[stream][1] = self.calc_cell_material_valve_stop(stream=stream, # 弁停止時のマテバラ計算
+                                                                    section=1,
+                                                                    variables=variables)
+            hb_dict[stream][1] = self.calc_cell_heat_valve_stop(stream=stream, # 弁停止時の熱バラ計算
+                                                                section=1,
+                                                                variables=variables)
+            # sec_2以降は自動で実施
+            for section in range(2, 1+self.num_sec):
+                mb_dict[stream][section] = self.calc_cell_material_valve_stop(stream=stream,
+                                                                              section=section,
+                                                                              variables=variables)
+                hb_dict[stream][section] = self.calc_cell_heat_valve_stop(stream=stream,
+                                                                          section=section,
+                                                                          variables=variables,
+                                                                          heat_output=hb_dict[stream][section-1],)
+        # 壁面熱バラ（stream = self.num_str+1）
+        hb_dict[self.num_str+1] = {}
+        hb_dict[self.num_str+1][1] = self.calc_cell_heat_wall(section=1,
+                                                            variables=variables,
+                                                            heat_output=hb_dict[self.num_str][1])
+        for section in range(2, 1+self.num_sec):
+            hb_dict[self.num_str+1][section] = self.calc_cell_heat_wall(section=section,
+                                                                      variables=variables,
+                                                                      heat_output=hb_dict[self.num_str][section],
+                                                                      heat_wall_output=hb_dict[self.num_str+1][section-1])
+        # 上下蓋熱バラ
+        for position in ["up", "down"]:
+            hb_lid[position] = self.calc_cell_heat_lid(position=position,
+                                                       variables=variables,
+                                                       heat_output_dict=hb_dict)
+
+        ### 出力
+        # 更新後の状態変数
+        new_variables = {}
+        # 温度
+        new_variables["temp"] = {}
+        for stream in range(1, 2+self.num_str): # 壁面考慮
+            new_variables["temp"][stream] = {}
+            for section in range(1, 1+self.num_sec):
+                new_variables["temp"][stream][section] = hb_dict[stream][section]["temp_reached"]
+        new_variables["temp_lid"] = {} # 上下蓋の温度
+        for position in ["up", "down"]:
+            new_variables["temp_lid"][position] = hb_lid[position]["temp_reached"]
+        # 既存吸着量
+        new_variables["adsorp_amt"] = {}
+        for stream in range(1, 1+self.num_str):
+            new_variables["adsorp_amt"][stream] = {}
+            for section in range(1, 1+self.num_sec):
+                new_variables["adsorp_amt"][stream][section] = mb_dict[stream][section]["accum_adsorp_amt"]
+        # 壁―, 層伝熱係数
+        new_variables["heat_t_coef"] = {}
+        new_variables["heat_t_coef_wall"] = {}
+        for stream in range(1, 1+self.num_str):
+            new_variables["heat_t_coef"][stream] = {}
+            new_variables["heat_t_coef_wall"][stream] = {}
+            for section in range(1, 1+self.num_sec):
+                new_variables["heat_t_coef"][stream][section] = hb_dict[stream][section]["hw1"]
+                new_variables["heat_t_coef_wall"][stream][section] = hb_dict[stream][section]["u1"]
         # 全出力結果(参考・記録用)
         output = {
             "material": mb_dict,
@@ -412,8 +525,37 @@ class GasAdosorption_Breakthrough_simulator():
             "outflow_fr_n2": outflow_fr_n2,
             "outflow_mf_co2": outflow_mf_co2,
             "outflow_mf_n2": outflow_mf_n2,
-            "Mabs": Mabs,
             "adsorp_amt_estimate_abs": adsorp_amt_estimate_abs,
+        }
+
+        return output
+
+    def calc_cell_material_valve_stop(self, stream, section, variables):
+        """ 任意セルのマテリアルバランスを計算する
+            *弁停止モード
+
+        Args:
+            stream (int): 対象セルのstream番号
+            section (int): 対象セルのsection番号
+            variables (dict): 温度等の状態変数
+
+        Returns:
+            dict: 対象セルの計算結果
+        """
+        output = {
+            "inflow_fr_co2": 0,
+            "inflow_fr_n2": 0,
+            "inflow_mf_co2": 0,
+            "inflow_mf_n2": 0,
+            "gas_density": 0,
+            "gas_cp": 0,
+            "adsorp_amt_estimate": 0,
+            "accum_adsorp_amt": variables["adsorp_amt"][stream][section],
+            "outflow_fr_co2": 0,
+            "outflow_fr_n2": 0,
+            "outflow_mf_co2": 0,
+            "outflow_mf_n2": 0,
+            "adsorp_amt_estimate_abs": 0,
         }
 
         return output
@@ -512,8 +654,6 @@ class GasAdosorption_Breakthrough_simulator():
             "stream": stream,
         }
         temp_reached = optimize.newton(self.__optimize_temp_reached, temp_now, args=args.values())
-        # 流入ガスが受け取る熱 [J]
-        Hgas = gas_cp * Mgas * (temp_reached - temp_now)
 
         output = {
             "temp_reached": temp_reached,
@@ -522,7 +662,108 @@ class GasAdosorption_Breakthrough_simulator():
             "Hbb": Hbb, # 下流セルへの熱流束 [J]
             ### 以下確認用
             "Habs": Habs, # 発生する吸着熱 [J]
-            "Hgas": Hgas, # 流入ガスが受け取る熱 [J]
+            "Hwin": Hwin, # 内側境界からの熱流束 [J]
+            "Hwout": Hwout, # 外側境界への熱流束 [J]
+            "u1": u1, # 層伝熱係数 [W/m2/K]
+        }
+
+        return output
+
+    def calc_cell_heat_valve_stop(self, stream, section, variables, heat_output=None):
+        """ 対象セルの熱バランスを計算する
+            *弁停止モード
+
+        Args:
+            stream (int): 対象セルのstream番号
+            section (int): 対象セルのsection番号
+            variables (dict): 状態変数
+            heat_output (dict): 上流セクションの熱バラ出力
+
+        Returns:
+            dict: 対象セルの熱バラ出力
+        """
+        # セクション現在温度 [℃]
+        temp_now = variables["temp"][stream][section]
+        # 内側セクション温度 [℃]
+        if stream == 1:
+            temp_inside_cell = 18
+        else:
+            temp_inside_cell = variables["temp"][stream-1][section]
+        # 外側セクション温度 [℃]
+        temp_outside_cell = variables["temp"][stream+1][section]
+        # 下流セクション温度 [℃]
+        if section != self.num_sec:
+            temp_below_cell = variables["temp"][stream][section+1]
+        # 発生する吸着熱 [J]
+        ### 弁停止対応
+        Habs = 0
+        # 流入ガス質量 [g]
+        ### 弁停止対応
+        Mgas = 0
+        # 流入ガス比熱 [J/g/K]
+        ### 弁停止対応
+        gas_cp = 0
+        # 内側境界面積 [m2]
+        Ain = self.stream_conds[stream]["Ain"] / self.num_sec
+        # 外側境界面積 [m2]
+        Aout = self.stream_conds[stream]["Aout"] / self.num_sec
+        # 下流セル境界面積 [m2]
+        Abb = self.stream_conds[stream]["Sstream"]
+        # 壁-層伝熱係数、層伝熱係数
+        hw1 = variables["heat_t_coef"][stream][section]
+        u1 = variables["heat_t_coef_wall"][stream][section]
+        # 内側境界からの熱流束 [J]
+        if stream == 1:
+            Hwin = 0
+        else:
+            Hwin = u1 * Ain * (temp_inside_cell - temp_now) * self.common_conds["dt"] * 60
+        # 外側境界への熱流束 [J]
+        if stream == self.num_str:
+            Hwout = hw1 * Aout * (temp_now - temp_outside_cell) * self.common_conds["dt"] * 60
+        else :
+            Hwout = u1 * Aout * (temp_now - temp_outside_cell) * self.common_conds["dt"] * 60
+        # 下流セルへの熱流束 [J]
+        if section != self.num_sec:
+            Hbb = ( # 下流セルへの熱流束
+                u1 * Abb * (temp_now - temp_below_cell)
+                * self.common_conds["dt"] * 60
+            )
+        else:
+            Hbb = ( # 下蓋への熱流束
+                hw1 * self.stream_conds[stream]["Sstream"]
+                * (temp_now - variables["temp_lid"]["down"])
+                * self.common_conds["dt"] * 60
+            )
+        # 上流セルヘの熱流束 [J]
+        if section == 1: # 上蓋からの熱流束
+            Hroof = (
+                hw1 * self.stream_conds[stream]["Sstream"]
+                * (temp_now - variables["temp_lid"]["up"])
+                * self.common_conds["dt"] * 60
+            )
+        else: # 上流セルヘの熱流束 = -1 * 上流セルの「下流セルへの熱流束」
+            Hroof = - heat_output["Hbb"]
+        # セクション到達温度 [℃]
+        args = {
+            "gas_cp": gas_cp,
+            "Mgas": Mgas,
+            "temp_now": temp_now,
+            "Habs": Habs,
+            "Hwin": Hwin,
+            "Hwout": Hwout,
+            "Hbb": Hbb,
+            "Hroof": Hroof,
+            "stream": stream,
+        }
+        temp_reached = optimize.newton(self.__optimize_temp_reached, temp_now, args=args.values())
+
+        output = {
+            "temp_reached": temp_reached,
+            "hw1": hw1, # 壁-層伝熱係数
+            "Hroof": Hroof,
+            "Hbb": Hbb, # 下流セルへの熱流束 [J]
+            ### 以下確認用
+            "Habs": Habs, # 発生する吸着熱 [J]
             "Hwin": Hwin, # 内側境界からの熱流束 [J]
             "Hwout": Hwout, # 外側境界への熱流束 [J]
             "u1": u1, # 層伝熱係数 [W/m2/K]
@@ -648,10 +889,6 @@ class GasAdosorption_Breakthrough_simulator():
             "position": position,
         }
         temp_reached = optimize.newton(self.__optimize_temp_reached_lid, temp_now, args=args.values())
-        # 壁が受け取る熱(ΔT基準) [J]
-        Hlid_time = (
-            self.common_conds["DRUM_WALL_COND"]["sh_drumw"] * (temp_reached - temp_now)
-        )
 
         output = {
             "temp_reached": temp_reached,

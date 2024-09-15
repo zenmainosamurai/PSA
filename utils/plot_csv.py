@@ -44,7 +44,7 @@ def plot_csv_outputs(tgt_foldapath, unit_dict, df_obs, tgt_sections):
     os.makedirs(output_foldapath, exist_ok=True)
 
     ### 可視化(all) ----------------------------------------------------------------------
-    num_row = math.ceil((len(df_dict) + 2)/3)
+    num_row = math.ceil((len(df_dict) + 4)/3)
     fig = plt.figure(figsize=(8*3, 5.5*num_row), tight_layout=True)
     fig.patch.set_facecolor('white')
 
