@@ -61,7 +61,8 @@ class GasAdosorption_for_Optimize():
                 "adsorp_heat_co2": study.best_params["adsorp_heat_co2"],
             },
             "PACKED_BED_COND": {
-                "ks": study.best_params["ks"],
+                "ks_adsorp": study.best_params["ks_adsorp"],
+                "ks_desorp": study.best_params["ks_desorp"],
             },
             "DRUM_WALL_COND": {
                 "coef_hw1": study.best_params["coef_hw1"],
@@ -100,7 +101,8 @@ class GasAdosorption_for_Optimize():
                 "adsorp_heat_co2": trial.suggest_float("adsorp_heat_co2", 1e2, 1e4, log=True),
             },
             "PACKED_BED_COND": {
-                "ks": trial.suggest_float("ks", 0.1, 100, log=True),
+                "ks_adsorp": trial.suggest_float("ks_adsorp", 0.1, 100, log=True),
+                "ks_desorp": trial.suggest_float("ks_desorp", 0.1, 100, log=True),
             },
             "DRUM_WALL_COND": {
                 "coef_hw1": trial.suggest_float("coef_hw1", 0.1, 10, log=True),

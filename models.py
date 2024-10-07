@@ -477,7 +477,7 @@ class GasAdosorption_Breakthrough_simulator():
         adsorp_amt_current = variables["adsorp_amt"][stream][section]
         # 理論新規吸着量 [cm3/g-abs]
         adsorp_amt_estimate_abs = (
-            self.common_conds["PACKED_BED_COND"]["ks"] ** (adsorp_amt_current / adsorp_amt_equilibrium)
+            self.common_conds["PACKED_BED_COND"]["ks_adsorp"] ** (adsorp_amt_current / adsorp_amt_equilibrium)
             / self.common_conds["PACKED_BED_COND"]["rho_abs"]
             * 6 * (1 - self.common_conds["PACKED_BED_COND"]["epsilon"]) * self.common_conds["PACKED_BED_COND"]["phi"]
             / self.common_conds["PACKED_BED_COND"]["dp"] * (adsorp_amt_equilibrium - adsorp_amt_current)
@@ -592,7 +592,7 @@ class GasAdosorption_Breakthrough_simulator():
         adsorp_amt_current = variables["adsorp_amt"][stream][section]
         # 理論新規吸着量 [cm3/g-abs]
         adsorp_amt_estimate_abs = (
-            self.common_conds["PACKED_BED_COND"]["ks"] ** (adsorp_amt_current / adsorp_amt_equilibrium)
+            self.common_conds["PACKED_BED_COND"]["ks_desorp"] ** (adsorp_amt_current / adsorp_amt_equilibrium)
             / self.common_conds["PACKED_BED_COND"]["rho_abs"]
             * 6 * (1 - self.common_conds["PACKED_BED_COND"]["epsilon"]) * self.common_conds["PACKED_BED_COND"]["phi"]
             / self.common_conds["PACKED_BED_COND"]["dp"] * (adsorp_amt_equilibrium - adsorp_amt_current)
