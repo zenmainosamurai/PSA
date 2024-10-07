@@ -1,26 +1,23 @@
 import os
 import pandas as pd
+import numpy as np
 import matplotlib.pyplot as plt
 import japanize_matplotlib
 import math
 import glob
+from utils import const
 
-def plot_csv_outputs(tgt_foldapath, unit_dict, df_obs, tgt_sections):
-    """ モデルで算出されたcsvファイルを可視化する関数
+def plot_csv_outputs(tgt_foldapath, df_obs, tgt_sections):
+    """ 熱バラ計算結果の可視化
 
     Args:
         tgt_foldapath (str): 出力先フォルダパス
-        unit_dict (str): 日本語名と単位のdict
+        const (str): 上位ディレクトリの
         df_obs (pd.DataFrame): 観測値のデータフレーム
         tgt_sections (list): 可視化対象のセクション
     """
-    # csv読み込み
-    filename_list = glob.glob(tgt_foldapath + "csv/*.csv")
-    df_dict = {}
-    for filename in filename_list:
-        df_dict[filename[len(tgt_foldapath)+4:-4]] = pd.read_csv(filename, index_col="timestamp")
+    ### パラメータ設定 --------------------------------------
 
-    ### 可視化パラメータ
     linestyle_dict = { # section
         tgt_sections[0]: "-",
         tgt_sections[1]: "--",
@@ -35,236 +32,225 @@ def plot_csv_outputs(tgt_foldapath, unit_dict, df_obs, tgt_sections):
         1: "black",
         2: "dimgrey",
     }
-    linewidth_dict = {
-        tgt_sections[0]: 3,
-        tgt_sections[1]: 2,
-        tgt_sections[2]: 1.5,
-    }
     output_foldapath = tgt_foldapath + "png/"
     os.makedirs(output_foldapath, exist_ok=True)
 
-    ### 可視化(all) ----------------------------------------------------------------------
-    num_row = math.ceil((len(df_dict) + 4)/3)
-    fig = plt.figure(figsize=(8*3, 5.5*num_row), tight_layout=True)
+    ### 可視化（熱バラ） -------------------------------------
+    
+    # csv読み込み
+    filename_list = glob.glob(tgt_foldapath + "csv/heat/*.csv")
+    df_dict = {}
+    for filename in filename_list:
+        df_dict[filename.split("/")[-1][:-4].split("\\")[1]] = pd.read_csv(filename, index_col="timestamp")
+
+    num_row = math.ceil((len(df_dict))/2)
+    fig = plt.figure(figsize=(16*2, 5.5*num_row), tight_layout=True)
     fig.patch.set_facecolor('white')
 
-    # セクション到達温度(吸着層)
-    plt.rcParams["font.size"] = 16
-    plt.subplot(num_row, 1, 1)
-    df = df_dict["セクション到達温度"] # 計算値
-    for stream in range(1,3):
-        for section in tgt_sections:
-            plt.plot(df[f"temp_reached_{str(stream).zfill(3)}_{str(section).zfill(3)}"],
-                    label = f"(str,sec) = ({stream}, {section})",
-                    linestyle = linestyle_dict[section],
-                    c = color_dict[stream],
-                    )
-    for stream in range(1,3):
-        for i, section in enumerate(range(1,4)):
-            plt.plot(df_obs[f"temp_{str(stream).zfill(3)}_{str(section).zfill(3)}"],
-                     label=f"(str,sec) = ({stream}, {tgt_sections[i]})",
-                     linestyle = linestyle_dict[tgt_sections[i]],
-                     c = color_dict_obs[stream]
-                     )
-    plt.title("セクション到達温度（吸着層）")
-    plt.grid()
-    plt.legend(fontsize=12)
-
-    # セクション到達温度(壁面)
-    plt.rcParams["font.size"] = 16
-    plt.subplot(num_row, 3, 4)
-    for section in tgt_sections:
-        plt.plot(df[f"temp_reached_003_{str(section).zfill(3)}"],
-                label = f"(sec) = ({section})",
-                linestyle = linestyle_dict[section],
-                c = color_dict[3],
-                )
-    plt.title("セクション到達温度（壁面）")
-    plt.grid()
-    plt.legend(fontsize=12)
-
-    # セクション到達温度(上下蓋)
-    plt.rcParams["font.size"] = 16
-    plt.subplot(num_row, 3, 5)
-    plt.plot(df[f"temp_reached_up"], label = "up")
-    plt.plot(df[f"temp_reached_dw"], label = "dw")
-    plt.title("セクション到達温度（上下蓋）")
-    plt.grid()
-    plt.legend(fontsize=12)
-
-    # その他
-    tgt_keys = [key for key in df_dict.keys() if key != "セクション到達温度"]
-    # カテゴリごとに可視化
-    for i, key in enumerate(tgt_keys):
-        plt.rcParams["font.size"] = 16
-        plt.subplot(num_row,3,i+6)
+    for i, (key, df) in enumerate(df_dict.items()):
+        plt.rcParams["font.size"] = 20
+        plt.subplot(num_row, 2, i+1)
         # 可視化対象のcolumnsを抽出
-        plt_tgt_cols = [col for col in df_dict[key].columns if int(col.split("_")[-1]) in tgt_sections]
+        plt_tgt_cols = [col for col in df.columns if int(col.split("-")[-1]) in tgt_sections]
         for col in plt_tgt_cols:
-            stream = int(col.split("_")[-2])
-            section = int(col.split("_")[-1])
-            plt.plot(df_dict[key][col],
+            stream = int(col.split("-")[-2])
+            section = int(col.split("-")[-1])
+            plt.plot(df[col],
                     label = f"(str,sec) = ({stream}, {section})",
                     linestyle = linestyle_dict[section],
                     c = color_dict[stream],
-                    #  linewidth = linewidth_dict[section]
                     )
-        plt.title(key + " " + unit_dict[key])
+        plt.title(key + " " + const.UNIT[key])
         plt.grid()
         plt.legend(fontsize=12)
         plt.xlabel("timestamp")
-    plt.savefig(output_foldapath + "all.png", dpi=100)
+        if key == "セクション到達温度":
+            for stream in range(1,3):
+                for i, section in enumerate(range(1,4)):
+                    plt.plot(df_obs[f"temp_{str(stream).zfill(3)}_{str(section).zfill(3)}"],
+                            label=f"(str,sec) = ({stream}, {tgt_sections[i]})",
+                            linestyle = linestyle_dict[tgt_sections[i]],
+                            c = color_dict_obs[stream]
+                            )
+            plt.legend(fontsize=8)
+    plt.savefig(output_foldapath + "heat.png", dpi=100)
     plt.close()
 
-    ### 可視化(all_2) ----------------------------------------------------------------------
-    # num_row = len(df_dict)
-    # num_row += 2 # セクション到達温度を3分割するため
-    # fig = plt.figure(figsize=(8*2.5, 5.5*num_row), tight_layout=True)
-    # fig.patch.set_facecolor('white')
+    ### 可視化（マテバラ） -------------------------------------
+    
+    # csv読み込み
+    filename_list = glob.glob(tgt_foldapath + "csv/material/*.csv")
+    df_dict = {}
+    for filename in filename_list:
+        df_dict[filename.split("/")[-1][:-4].split("\\")[1]] = pd.read_csv(filename, index_col="timestamp")
 
-    # # セクション到達温度（吸着層）
-    # plt.rcParams["font.size"] = 16
-    # plt.subplot(num_row, 1, 1)
-    # df = df_dict["セクション到達温度"]
-    # df_obs = pd.read_excel(data_dir + "20240624_ICTへの提供データ_PSA実験_編集_メイン.xlsx",
-    #                        sheet_name="python実装用_吸着のみ_立ち上がり修正", index_col="time")
-    # for stream in range(1,3):
-    #     for section in tgt_sections:
-    #         plt.plot(df[f"temp_reached_{str(stream).zfill(3)}_{str(section).zfill(3)}"],
-    #                 label = f"(str,sec) = ({stream}, {section})",
-    #                 linestyle = linestyle_dict[section],
-    #                 c = color_dict[stream],
-    #                 )
-    # for stream in range(1,3):
-    #     for i, section in enumerate(range(1,4)):
-    #         plt.plot(df_obs[f"temp_{str(stream).zfill(3)}_{str(section).zfill(3)}"],
-    #                  label=f"(str,sec) = ({stream}, {section})",
-    #                  linestyle = linestyle_dict[tgt_sections[i]],
-    #                  c = color_dict_obs[stream]
-    #                  )
-    # plt.title("セクション到達温度（吸着層）")
-    # plt.grid()
-    # plt.xlabel("timestamp")
-    # plt.legend(fontsize=12)
+    num_row = math.ceil((len(df_dict))/2)
+    fig = plt.figure(figsize=(16*2, 5.5*num_row), tight_layout=True)
+    fig.patch.set_facecolor('white')
 
-    # # セクション到達温度（壁面）
-    # plt.rcParams["font.size"] = 16
-    # plt.subplot(num_row, 1, 2)
-    # for section in tgt_sections:
-    #     plt.plot(df[f"temp_reached_003_{str(section).zfill(3)}"],
-    #             label = f"(sec) = ({section})",
-    #             linestyle = linestyle_dict[section],
-    #             c = color_dict[3],
-    #             )
-    # plt.title("セクション到達温度（壁面）")
-    # plt.grid()
-    # plt.xlabel("timestamp")
-    # plt.legend(fontsize=12)
+    for i, (key, df) in enumerate(df_dict.items()):
+        plt.rcParams["font.size"] = 20
+        plt.subplot(num_row, 2, i+1)
+        # 可視化対象のcolumnsを抽出
+        plt_tgt_cols = [col for col in df.columns if int(col.split("-")[-1]) in tgt_sections]
+        for col in plt_tgt_cols:
+            stream = int(col.split("-")[-2])
+            section = int(col.split("-")[-1])
+            plt.plot(df[col],
+                    label = f"(str,sec) = ({stream}, {section})",
+                    linestyle = linestyle_dict[section],
+                    c = color_dict[stream],
+                    )
+        plt.title(key + " " + const.UNIT[key])
+        plt.grid()
+        plt.legend(fontsize=16)
+        plt.xlabel("timestamp")
+    plt.savefig(output_foldapath + "material.png", dpi=100)
+    plt.close()
 
-    # # セクション到達温度（上下蓋）
-    # plt.rcParams["font.size"] = 16
-    # plt.subplot(num_row, 1, 3)
-    # plt.plot(df[f"temp_reached_up"], label="up")
-    # plt.plot(df[f"temp_reached_dw"], label="down")
-    # plt.title("セクション到達温度（上下蓋）")
-    # plt.grid()
-    # plt.xlabel("timestamp")
-    # plt.legend(fontsize=12)
+    ### 可視化（熱バラ(上下蓋)） -------------------------------------
 
-    # # その他
-    # tgt_keys = [key for key in df_dict.keys() if key != "セクション到達温度"]
-    # for i, key in enumerate(tgt_keys):
-    #     plt.rcParams["font.size"] = 16
-    #     plt.subplot(num_row,1,i+4)
-    #     plt_tgt_cols = [col for col in df_dict[key].columns if int(col.split("_")[-1]) in tgt_sections]
-    #     for col in plt_tgt_cols:
-    #         stream = int(col.split("_")[-2])
-    #         section = int(col.split("_")[-1])
-    #         plt.plot(df_dict[key][col],
-    #                 label = f"(str,sec) = ({stream}, {section})",
-    #                 linestyle = linestyle_dict[section],
-    #                 c = color_dict[stream],
-    #                 #  linewidth = linewidth_dict[col[-1]]
-    #                 )
-    #     plt.title(key + " " + unit_dict[key])
-    #     plt.grid()
-    #     plt.legend()
-    #     plt.xlabel("timestamp")
-    # plt.savefig(output_foldapath + "all_2.png", dpi=100)
-    # plt.close()
+    # csv読み込み
+    filename_list = glob.glob(tgt_foldapath + "csv/heat_lid/heat_lid.csv")
+    df = pd.read_csv(filename_list[0], index_col="timestamp")
 
-    ### 可視化(indivisual) ----------------------------------------------------------------------
-    # # 温度
-    # df = df_dict["セクション到達温度"]
-    # df_obs = pd.read_excel(data_dir + "20240624_ICTへの提供データ_PSA実験_編集_メイン.xlsx",
-    #                        sheet_name="python実装用_吸着のみ_立ち上がり修正", index_col="time")
-    # plt.rcParams["font.size"] = 14
-    # fig = plt.figure(figsize=(16, 5), tight_layout=True)
-    # fig.patch.set_facecolor('white')
-    # for stream in range(1,4):
-    #     for section in tgt_sections:
-    #         plt.plot(df[f"temp_reached_{stream}_{section}"],
-    #                 label = f"(str,sec) = ({stream}, {section})",
-    #                 linestyle = linestyle_dict[section],
-    #                 c = color_dict[stream],
-    #                 )
-    # for stream in range(1,3):
-    #     for section in tgt_sections:
-    #         plt.plot(df_obs[f"temp_{stream}_{section}"],
-    #                  label=f"(str,sec) = ({stream}, {section})",
-    #                  linestyle = linestyle_dict[section],
-    #                  c = color_dict_obs[stream]
-    #                  )
-    # plt.title("セクション到達温度")
-    # plt.grid()
-    # plt.legend(fontsize=10)
-    # plt.savefig(output_foldapath + "セクション到達温度_観測値.png", dpi=100)
-    # plt.close()
+    num_row = math.ceil((len(df.columns))/2)
+    fig = plt.figure(figsize=(16*2, 5.5*num_row), tight_layout=True)
+    fig.patch.set_facecolor('white')
 
-    # # その他
-    # for i, key in enumerate(tgt_keys):
-    #     plt.rcParams["font.size"] = 14
-    #     fig = plt.figure(figsize=(16, 5), tight_layout=True)
-    #     fig.patch.set_facecolor('white')
-    #     for col in df_dict[key].columns:
-    #         plt.plot(df_dict[key][col],
-    #                 label = f"(str,sec) = ({col[-2]}, {col[-1]})",
-    #                 linestyle = linestyle_dict[col[-1]],
-    #                 c = color_dict[col[-2]],
-    #                 #  linewidth = linewidth_dict[col[-1]]
-    #                 )
-    #     plt.title(key + " " + unit_dict[key])
-    #     plt.grid()
-    #     plt.legend()
-    #     plt.savefig(output_foldapath + key + ".png", dpi=100)
-    #     plt.close()
+    for i, col in enumerate(df.columns):
+        plt.rcParams["font.size"] = 20
+        plt.subplot(num_row, 2, i+1)
+        plt.plot(df[col])
+        title = const.TRANSLATION[col.split("-")[0]]
+        unit = const.UNIT[title]
+        if col.split("-")[1] == "up":
+            title += "_上蓋"
+        else:
+            title += "_下蓋"
+        plt.title(title + " " + unit)
+        plt.grid()
+        plt.xlabel("timestamp")
+    plt.savefig(output_foldapath + "heat_lid.png", dpi=100)
+    plt.close()
+
+    ### 可視化（vaccume） -------------------------------------
+
+    # csv読み込み
+    filename_list = glob.glob(tgt_foldapath + "csv/vaccume/vaccume.csv")
+    df = pd.read_csv(filename_list[0], index_col="timestamp")
+
+    num_row = math.ceil((len(df.columns))/2)
+    fig = plt.figure(figsize=(16*2, 5.5*num_row), tight_layout=True)
+    fig.patch.set_facecolor('white')
+
+    for i, col in enumerate(df.columns):
+        plt.rcParams["font.size"] = 20
+        plt.subplot(num_row, 2, i+1)
+        plt.plot(df[col])
+        title = const.TRANSLATION[col]
+        unit = const.UNIT[title]
+        plt.title(title + " " + unit)
+        plt.grid()
+        plt.xlabel("timestamp")
+    plt.savefig(output_foldapath + "vaccume.png", dpi=100)
+    plt.close()
 
 
-def plot_csv_params(tgt_foldapath, unit_dict):
-    """ パラメータ値のcsvをpng化
+def outputs_to_csv(tgt_foldapath, record_dict, common_conds):
+    """ 計算結果をcsv出力する
 
     Args:
         tgt_foldapath (str): 出力先フォルダパス
-        unit_dict (str): 日本語名と単位のdict
+        record_dict (dict): 計算結果
+        common_conds (dict): 実験パラメータ
     """
-    # csv読み込み
-    filename_list = glob.glob(tgt_foldapath + "params/*.csv")
-    df_dict = {}
-    for filename in filename_list:
-        df_dict[filename[len(tgt_foldapath)+7:-4]] = pd.read_csv(filename, index_col="timestamp")
+    # heat
+    foldapath = tgt_foldapath + f"/heat/"
+    os.makedirs(foldapath, exist_ok=True)
+    values = []
+    for i in range(len(record_dict["heat"])):
+        values_tmp = []
+        for stream in range(1, 1+common_conds["CELL_SPLIT"]["num_str"]):
+            for section in range(1, 1+common_conds["CELL_SPLIT"]["num_sec"]):
+                for value in record_dict["heat"][i][stream][section].values():
+                    values_tmp.append(value)
+        values.append(values_tmp)
+    columns = []
+    for stream in range(1, 1+common_conds["CELL_SPLIT"]["num_str"]):
+        for section in range(1, 1+common_conds["CELL_SPLIT"]["num_sec"]):
+            for key in record_dict["heat"][i][stream][section].keys():
+                columns.append(key+"-"+str(stream).zfill(3)+"-"+str(section).zfill(3))
+    for key in record_dict["heat"][i][stream][section].keys():
+        idx = [columns.index(col) for col in columns if key in col]
+        df = pd.DataFrame(np.array(values)[:, idx],
+                            columns=np.array(columns)[idx],
+                            index=record_dict["timestamp"])
+        df.index.name = "timestamp"
+        df.to_csv(foldapath + const.TRANSLATION[key] + ".csv")
 
-    ### 可視化(all) ----------------------------------------------------------------------
-    df = df_dict["inflow_gas"]
+    # heat_lid
+    foldapath = tgt_foldapath + f"/heat_lid/"
+    os.makedirs(foldapath, exist_ok=True)
+    values = []
+    for i in range(len(record_dict["heat_lid"])):
+        values.append([
+            record_dict["heat_lid"][i]["up"]["temp_reached"],
+            record_dict["heat_lid"][i]["down"]["temp_reached"]
+        ])
+    columns = ["temp_reached-up", "temp_reached-down"]
+    df = pd.DataFrame(values,
+                        columns=columns,
+                        index=record_dict["timestamp"])
+    df.index.name = "timestamp"
+    df.to_csv(foldapath + "heat_lid.csv")
 
-    num_row = math.ceil((len(df.columns))/3)
-    fig = plt.figure(figsize=(8*3, 5.5*num_row), tight_layout=True)
-    fig.patch.set_facecolor('white')
-    for i, col in enumerate(df.columns):
-        plt.rcParams["font.size"] = 16
-        plt.subplot(num_row,3,i+1)
-        plt.plot(df[col])
-        plt.title(unit_dict[col])
-        plt.grid()
-        plt.xlabel("timestamp")
-    plt.savefig(tgt_foldapath + "params/inflow_gas.png", dpi=100)
-    plt.close()
+    # material
+    foldapath = tgt_foldapath + f"/material/"
+    os.makedirs(foldapath, exist_ok=True)
+    values = []
+    for i in range(len(record_dict["material"])):
+        values_tmp = []
+        for stream in range(1, 1+common_conds["CELL_SPLIT"]["num_str"]):
+            for section in range(1, 1+common_conds["CELL_SPLIT"]["num_sec"]):
+                for value in record_dict["material"][i][stream][section].values():
+                    values_tmp.append(value)
+        values.append(values_tmp)
+    columns = []
+    for stream in range(1, 1+common_conds["CELL_SPLIT"]["num_str"]):
+        for section in range(1, 1+common_conds["CELL_SPLIT"]["num_sec"]):
+            for key in record_dict["material"][i][stream][section].keys():
+                columns.append(key+"-"+str(stream).zfill(3)+"-"+str(section).zfill(3))
+    for key in record_dict["material"][i][stream][section].keys():
+        idx = [columns.index(col) for col in columns if key in col]
+        df = pd.DataFrame(np.array(values)[:, idx],
+                            columns=np.array(columns)[idx],
+                            index=record_dict["timestamp"])
+        df.index.name = "timestamp"
+        df.to_csv(foldapath + const.TRANSLATION[key] + ".csv")
+
+    # vaccume
+    foldapath = tgt_foldapath + f"/vaccume/"
+    os.makedirs(foldapath, exist_ok=True)
+    values = []
+    for i in range(len(record_dict["vaccume"])):
+        values.append(list(record_dict["vaccume"][i].values()))
+    columns = list(record_dict["vaccume"][i].keys())
+    df = pd.DataFrame(values,
+                        columns=columns,
+                        index=record_dict["timestamp"])
+    df.index.name = "timestamp"
+    df.to_csv(foldapath + "vaccume.csv")
+
+    # params
+    foldapath = tgt_foldapath + f"/params/"
+    os.makedirs(foldapath, exist_ok=True)
+    values = []
+    for i in range(len(record_dict["params"])):
+        values.append(list(record_dict["params"][i].values()))
+    columns = common_conds["INFLOW_GAS_COND"].keys()
+    df = pd.DataFrame(values,
+                        columns=columns,
+                        index=record_dict["timestamp"])
+    df.index.name = "timestamp"
+    df.to_csv(foldapath + "params.csv")

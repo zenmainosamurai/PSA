@@ -99,7 +99,7 @@ def update_params_by_obs(common_conds):
 
     # CropProp関連の物性
     T_K = input_gass["temp"] + 273.15 # 温度 [K]
-    P = input_gass["press"] * 1e6 # 圧力 [Pa]
+    P = input_gass["total_press"] * 1e6 # 圧力 [Pa]
     # CO2密度 [kg/m3]
     input_gass["dense_co2"] = CP.PropsSI('D', 'T', T_K, 'P', P, "co2")
     # N2密度 [kg/m3]
@@ -112,9 +112,9 @@ def update_params_by_obs(common_conds):
     input_gass["vi_co2"] = CP.PropsSI('V', 'T', T_K, 'P', P, "co2") * 1e6
     # N2粘度 [Pa s]
     input_gass["vi_n2"] = CP.PropsSI('V', 'T', T_K, 'P', P, "nitrogen") * 1e6
-    # CO2比熱容量
+    # CO2比熱容量 [kJ/kg/K]
     input_gass["cp_co2"] = CP.PropsSI('C', 'T', T_K, 'P', P, "co2") / 1000
-    # N2比熱容量
+    # N2比熱容量 [kJ/kg/K]
     input_gass["cp_n2"] = CP.PropsSI('C', 'T', T_K, 'P', P, "nitrogen") / 1000
 
     input_gass["dense_mean"] = (

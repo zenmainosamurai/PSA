@@ -58,13 +58,13 @@ class GasAdosorption_for_Optimize():
                                     storage=storage, sampler=TPESampler(), load_if_exists=True)
         params_dict = {
             "INFLOW_GAS_COND": {
-                "adsorp_heat_co2": 1363.6 * study.best_params["adsorp_heat_co2"],
+                "adsorp_heat_co2": study.best_params["adsorp_heat_co2"],
             },
             "PACKED_BED_COND": {
-                "ks": 4 * study.best_params["ks"],
+                "ks": study.best_params["ks"],
             },
             "DRUM_WALL_COND": {
-                "coef_hw1": 1 * study.best_params["coef_hw1"],
+                "coef_hw1": study.best_params["coef_hw1"],
             }
         }
         txt_filepath = const.OUTPUT_DIR + self.cond_id + "/simulation/best_params.txt"
@@ -97,16 +97,13 @@ class GasAdosorption_for_Optimize():
         # 最適化条件
         params_dict = {
             "INFLOW_GAS_COND": {
-                # "fr_co2": 22 * trial.suggest_float("fr", 0.1, 10, log=True),
-                # "fr_n2": 28 * trial.suggest_float("fr", 0.1, 10, log=True),
-                "adsorp_heat_co2": 1363.6 * trial.suggest_float("adsorp_heat_co2", 0.1, 10, log=True),
+                "adsorp_heat_co2": trial.suggest_float("adsorp_heat_co2", 1e2, 1e4, log=True),
             },
             "PACKED_BED_COND": {
-                # "Mabs": 10800 * trial.suggest_float("Mabs", 0.1, 10, log=True),
-                "ks": 4 * trial.suggest_float("ks", 0.1, 10, log=True),
+                "ks": trial.suggest_float("ks", 0.1, 100, log=True),
             },
             "DRUM_WALL_COND": {
-                "coef_hw1": 1 * trial.suggest_float("coef_hw1", 0.1, 10, log=True),
+                "coef_hw1": trial.suggest_float("coef_hw1", 0.1, 10, log=True),
             }
         }
         # score計算
@@ -141,22 +138,14 @@ class GasAdosorption_for_Optimize():
         # 全体計算
         timestamp = 0
         while timestamp < instance.df_obs.index[-1]:
-            # 最も時刻が近い観測値のindex
-            idx_obs = instance.df_obs.index[np.argmin(np.abs(timestamp - instance.df_obs.index))]
-            # 弁停止していない場合
-            if instance.df_obs.loc[idx_obs, "valve_stop_flag"] == 0:
-                # 通常のマテバラ・熱バラ計算を実行
-                variables, all_output = instance.calc_all_cell_balance(variables, timestamp)
-            # 弁停止している場合
-            elif instance.df_obs.loc[idx_obs, "valve_stop_flag"] == 1:
-                # 弁停止時の関数を実行
-                variables, all_output = instance.calc_all_cell_balance_when_valve_stop(variables, timestamp)
+            # 通常のマテバラ・熱バラ計算を実行
+            variables, all_output = instance.calc_all_cell_balance(variables, timestamp)
             # timestamp更新
             timestamp += instance.common_conds["dt"]
             timestamp = round(timestamp, 2)
             # 記録用配列の平坦化
             output_flatten = {}
-            for stream in range(1, 2+instance.num_str): # 熱バラ
+            for stream in range(1, 1+instance.num_str): # 熱バラ
                 for section in range(1, 1+instance.num_sec):
                         for key, value in all_output["heat"][stream][section].items():
                             output_flatten[key+"_"+str(stream).zfill(3)+"_"+str(section).zfill(3)] = value

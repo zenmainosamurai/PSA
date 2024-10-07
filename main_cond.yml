@@ -2,16 +2,16 @@
 
 # 実行モードを指定
 mode_list: [
-  # "simulation",
+  "simulation",
   # "assimilation",
-  "optimize",
+  # "optimize",
 ]
 
 # 実行したいconditionファイルを指定
 cond_list: [
-  # 2_28_mod_valve_stop_flag,
-  # 2_28_opt_params
-  2_28_opt_params2
+  # 3_02_mod_desorp,
+  3_02_use_obs_data,
+  # 3_02_opt_params
 ]
 
 # パラメータ最適化のパラメータ
