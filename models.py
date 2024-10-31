@@ -168,7 +168,6 @@ class GasAdosorption_Breakthrough_simulator():
             for key, values in all_output.items():
                 record_dict[key].append(values)
             record_dict["params"].append(self.common_conds["INFLOW_GAS_COND"])
-
         ### ◆(3/4) csv出力 -------------------------------------------------
         print("(2/3) csv output...")
 
@@ -468,11 +467,9 @@ class GasAdosorption_Breakthrough_simulator():
             + self.common_conds["INFLOW_GAS_COND"]["cp_n2"] * inflow_mf_n2
         )
         # 現在雰囲気の平衡吸着量 [cm3/g-abs]
-        adsorp_amt_equilibrium = (
-            (0.0000021*(total_press*1000)**2-0.0003385*(total_press*1000)+0.0145345)*(temp+273.15)**2
-            +(-0.0012701*(total_press*1000)**2+0.2091781*(total_press*1000)-9.9261428)*(temp+273.15)
-            +0.1828984*(total_press*1000)**2-30.8594655*(total_press*1000)+1700.5767712
-        )
+        P_kpaa = total_press * 1000 # [kPaA]
+        T_K = temp + 273.15 # [K]
+        adsorp_amt_equilibrium = self._calc_equilibrium_adsorp_amt(P_kpaa, T_K)
         # 現在の既存吸着量 [cm3/g-abs]
         adsorp_amt_current = variables["adsorp_amt"][stream][section]
         # 理論新規吸着量 [cm3/g-abs]
@@ -583,11 +580,8 @@ class GasAdosorption_Breakthrough_simulator():
             + CP.PropsSI('C', 'T', T_K, 'P', P, "nitrogen") * variables["mf_n2"]
         )
         # 現在雰囲気の平衡吸着量 [cm3/g-abs]
-        adsorp_amt_equilibrium = (
-            (0.0000021*(p_co2*1000)**2-0.0003385*(p_co2*1000)+0.0145345)*(T_K)**2
-            +(-0.0012701*(p_co2*1000)**2+0.2091781*(p_co2*1000)-9.9261428)*(T_K)
-            +0.1828984*(p_co2*1000)**2-30.8594655*(p_co2*1000)+1700.5767712
-        )
+        P_kpa = P / 1000 # [kPaA]
+        adsorp_amt_equilibrium = self._calc_equilibrium_adsorp_amt(P, T_K)
         # 現在の既存吸着量 [cm3/g-abs]
         adsorp_amt_current = variables["adsorp_amt"][stream][section]
         # 理論新規吸着量 [cm3/g-abs]
@@ -1162,6 +1156,22 @@ class GasAdosorption_Breakthrough_simulator():
         u1 = 1 / (dlat / ke + 1 / habs)
 
         return hw1, u1
+
+    def _calc_equilibrium_adsorp_amt(self, P, T):
+        """ 平衡吸着量を計算
+
+        Args:
+            P (float): 圧力 [kPaA]
+            T (float): 温度 [K]
+        Returns:
+            平衡吸着量
+        """
+        # 吸着等温式（シンボリック回帰による近似式）
+        adsorp_amt_equilibrium = (
+            P * (252.0724 - 0.50989705 * T)
+            / (P - 3554.54819062669*(1 - 0.0655247236249063 * np.sqrt(T))**3 + 1.7354268)
+        )
+        return adsorp_amt_equilibrium
 
     def __optimize_temp_reached(self, temp_reached,
                                 gas_cp, Mgas, temp_now,
