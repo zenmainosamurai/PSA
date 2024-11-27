@@ -581,7 +581,7 @@ class GasAdosorption_Breakthrough_simulator():
         )
         # 現在雰囲気の平衡吸着量 [cm3/g-abs]
         P_kpa = P / 1000 # [kPaA]
-        adsorp_amt_equilibrium = self._calc_equilibrium_adsorp_amt(P, T_K)
+        adsorp_amt_equilibrium = self._calc_equilibrium_adsorp_amt(P_kpa, T_K)
         # 現在の既存吸着量 [cm3/g-abs]
         adsorp_amt_current = variables["adsorp_amt"][stream][section]
         # 理論新規吸着量 [cm3/g-abs]
