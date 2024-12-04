@@ -37,5 +37,5 @@ if __name__ == '__main__':
     ptime_min = int(ptime%3600//60)
     ptime_s = int(ptime%3600%60)
     print(f"実行時間: {ptime_hour} h {ptime_min} m {ptime_s}s")
-            
+
     print("complete!")

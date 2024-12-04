@@ -2,6 +2,7 @@ import os
 
 import numpy as np
 import pandas as pd
+import seaborn as sns
 import matplotlib.pyplot as plt
 import japanize_matplotlib
 from scipy import optimize
@@ -38,22 +39,24 @@ class GasAdosorption_for_Optimize():
         self.max_trials = round(self.max_trials)
         self.trials_num = 0
 
+        # 出力先フォルダ
+        self.opt_path = const.OUTPUT_DIR + self.cond_id + "/simulation/optimize/"
+        os.makedirs(self.opt_path, exist_ok=True)
+
     def optimize_params(self):
         # 最適化の実施
         optuna.logging.set_verbosity(optuna.logging.WARNING)
-        self.storage_path = const.OUTPUT_DIR + self.cond_id + "/simulation/"
-        os.makedirs(self.storage_path, exist_ok=True)
         processes = []
-        for i in range(self.n_processes): # 並列化
+        for _ in range(self.n_processes): # 並列化
             p = multiprocessing.Process(target=self.run_optimization)
             p.start()
             processes.append(p)
-        for i, p in enumerate(processes): # 全プロセスが完了するまで待機
+        for p in processes: # 全プロセスが完了するまで待機
             p.join()
         print("")
 
-        # 最適化結果
-        storage = optuna.storages.RDBStorage(url=f'sqlite:///{self.storage_path}/optimize.db')
+        # 最適化結果の読み込み
+        storage = optuna.storages.RDBStorage(url=f'sqlite:///{self.opt_path}/optimize.db')
         study = optuna.create_study(study_name="GasAdsorption", direction="minimize",
                                     storage=storage, sampler=TPESampler(), load_if_exists=True)
         params_dict = {
@@ -68,14 +71,63 @@ class GasAdosorption_for_Optimize():
                 "coef_hw1": study.best_params["coef_hw1"],
             }
         }
-        txt_filepath = const.OUTPUT_DIR + self.cond_id + "/simulation/best_params.txt"
-        with open(txt_filepath, mode="w") as f:
-            for key, value in study.best_params.items():
-                f.write(f"{key}: {value}\n")
-            f.write(f"\nbest_score = {study.best_value}")
         print("最適化結果 ---------------")
         print("params: ", params_dict)
         print("best_score: ", study.best_value)
+
+        ### 記録 ----------------------------------------
+
+        # txt化
+        with open(self.opt_path + "best_params.txt", mode="w") as f:
+            for key, value in study.best_params.items():
+                f.write(f"{key}: {value}\n")
+            f.write(f"\nbest_score = {study.best_value}")
+        # csv化
+        df_opt = study.trials_dataframe()
+        df_opt.to_csv(self.opt_path + "/study.csv", index=False)
+        # 可視化: 目的関数の時系列プロット
+        plt.rcParams["font.size"] = 14
+        plt.figure(figsize=(16, 5), tight_layout=True)
+        plt.subplot(1,2,1)
+        plt.plot(df_opt["value"])
+        plt.title('目的関数の時系列プロット')
+        plt.xlabel("Trial Number")
+        plt.ylabel("Object")
+        plt.grid()
+        # 可視化: 目的関数のヒストグラム
+        plt.subplot(1,2,2)
+        sns.histplot(data=df_opt, x='value')
+        plt.title('目的関数のヒストグラム')
+        plt.xlabel("Object")
+        plt.grid()
+        plt.savefig(self.opt_path + "line_histogram.png", dpi=100)
+        plt.close()
+        # 可視化: 散布図
+        plt.figure(figsize=(16, 10), tight_layout=True)
+        for i, key in enumerate(study.best_params.keys()):
+            plt.subplot(2,2,i+1)
+            plt.scatter(df_opt[f"params_{key}"], df_opt["value"])
+            plt.title(key)
+            plt.xlabel(key)
+            plt.ylabel("Object")
+            plt.grid()
+        plt.savefig(self.opt_path + "scatter.png", dpi=100)
+        plt.close()
+        # ヒートマップ（相関係数）
+        correlation = df_opt.filter(like='params_')
+        correlation.columns = [col[7:] for col in correlation.columns]
+        correlation = correlation.corr()
+        plt.figure(figsize=(16, 10), tight_layout=True)
+        sns.heatmap(correlation, annot=True,
+                        cmap=sns.color_palette('coolwarm', 5),
+                        fmt='.2f',
+                        vmin = -1,
+                        vmax = 1,
+                        annot_kws={'fontsize': 16, 'color':'black'})
+        plt.title('Parameter Correlations')
+        plt.savefig(self.opt_path + "heatmap.png", dpi=100)
+        plt.close()
+
         # 再シミュレーション
         print("再シミュレーション ---------------")
         instance = GasAdosorption_Breakthrough_simulator(self.cond_id)
@@ -86,7 +138,7 @@ class GasAdosorption_for_Optimize():
 
     def run_optimization(self):
         optuna.logging.set_verbosity(optuna.logging.WARNING)
-        storage = optuna.storages.RDBStorage(url=f'sqlite:///{self.storage_path}/optimize.db')
+        storage = optuna.storages.RDBStorage(url=f'sqlite:///{self.opt_path}/optimize.db')
         study = optuna.create_study(study_name="GasAdsorption", direction="minimize",
                                     storage=storage, sampler=TPESampler(), load_if_exists=True)
         study.optimize(self.objective, n_trials=self.max_trials)
@@ -98,21 +150,27 @@ class GasAdosorption_for_Optimize():
         # 最適化条件
         params_dict = {
             "INFLOW_GAS_COND": {
-                "adsorp_heat_co2": trial.suggest_float("adsorp_heat_co2", 1e2, 1e4, log=True),
+                "adsorp_heat_co2": trial.suggest_float("adsorp_heat_co2", 100, 1500, log=True),
             },
             "PACKED_BED_COND": {
-                "ks_adsorp": trial.suggest_float("ks_adsorp", 0.1, 100, log=True),
-                "ks_desorp": trial.suggest_float("ks_desorp", 0.1, 100, log=True),
+                "ks_adsorp": trial.suggest_float("ks_adsorp", 1e-3, 10, log=True),
+                "ks_desorp": trial.suggest_float("ks_desorp", 1e-3, 10, log=True),
             },
             "DRUM_WALL_COND": {
-                "coef_hw1": trial.suggest_float("coef_hw1", 0.1, 10, log=True),
+                "coef_hw1": trial.suggest_float("coef_hw1", 1e-2, 1e1, log=True),
             }
         }
         # score計算
-        score = self.calc_score(params_dict)
-        print("\r" + f"trial: {self.trials_num}/{self.max_trials}", end="")
-
-        return score
+        try:
+            score = self.calc_score(params_dict)
+            print("\r" + f"trial: {self.trials_num}/{self.max_trials}", end="")
+            return score
+        # 例外処理
+        except Exception as e:
+            # エラーをログに記録
+            # print(f"Error occurred: {e}")
+            # 試行を失敗として扱う
+            return float('inf')  # または raise
 
     def calc_score(self, params_dict):
         """ 物理計算を通しで実行

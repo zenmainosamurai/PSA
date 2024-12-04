@@ -93,12 +93,8 @@ class GasAdosorption_Breakthrough_simulator():
             variables["adsorp_amt"][stream] = {}
             for section in range(1, 1+self.num_sec):
                 variables["adsorp_amt"][stream][section] = (
-                    (0.0000021*self.common_conds["PACKED_BED_COND"]["vp"]**2-0.0003385
-                    *self.common_conds["PACKED_BED_COND"]["vp"]+0.0145345)*(variables["temp"][stream][section]+273.15)**2
-                    +(-0.0012701*self.common_conds["PACKED_BED_COND"]["vp"]**2+0.2091781
-                    *self.common_conds["PACKED_BED_COND"]["vp"]-9.9261428)*(variables["temp"][stream][section]+273.15)
-                    +0.1828984*self.common_conds["PACKED_BED_COND"]["vp"]**2
-                    -30.8594655*self.common_conds["PACKED_BED_COND"]["vp"]+1700.5767712
+                    self._calc_equilibrium_adsorp_amt(self.common_conds["PACKED_BED_COND"]["vp"],
+                                                      variables["temp"][stream][section])
                 )
         # 壁-、層伝熱係数
         variables["heat_t_coef"] = {} # 層伝熱係数
@@ -467,19 +463,22 @@ class GasAdosorption_Breakthrough_simulator():
             + self.common_conds["INFLOW_GAS_COND"]["cp_n2"] * inflow_mf_n2
         )
         # 現在雰囲気の平衡吸着量 [cm3/g-abs]
-        P_kpaa = total_press * 1000 # [kPaA]
+        P_kpa = p_co2 * 1000 # [kPaA]
         T_K = temp + 273.15 # [K]
-        adsorp_amt_equilibrium = self._calc_equilibrium_adsorp_amt(P_kpaa, T_K)
+        adsorp_amt_equilibrium = self._calc_equilibrium_adsorp_amt(P_kpa, T_K)
         # 現在の既存吸着量 [cm3/g-abs]
         adsorp_amt_current = variables["adsorp_amt"][stream][section]
         # 理論新規吸着量 [cm3/g-abs]
-        adsorp_amt_estimate_abs = (
-            self.common_conds["PACKED_BED_COND"]["ks_adsorp"] ** (adsorp_amt_current / adsorp_amt_equilibrium)
-            / self.common_conds["PACKED_BED_COND"]["rho_abs"]
-            * 6 * (1 - self.common_conds["PACKED_BED_COND"]["epsilon"]) * self.common_conds["PACKED_BED_COND"]["phi"]
-            / self.common_conds["PACKED_BED_COND"]["dp"] * (adsorp_amt_equilibrium - adsorp_amt_current)
-            * self.common_conds["dt"] / 1e6 * 60
-        )
+        if adsorp_amt_equilibrium != 0:
+            adsorp_amt_estimate_abs = (
+                self.common_conds["PACKED_BED_COND"]["ks_adsorp"] ** (adsorp_amt_current / adsorp_amt_equilibrium)
+                / self.common_conds["PACKED_BED_COND"]["rho_abs"]
+                * 6 * (1 - self.common_conds["PACKED_BED_COND"]["epsilon"]) * self.common_conds["PACKED_BED_COND"]["phi"]
+                / self.common_conds["PACKED_BED_COND"]["dp"] * (adsorp_amt_equilibrium - adsorp_amt_current)
+                * self.common_conds["dt"] / 1e6 * 60
+            )
+        else:
+            adsorp_amt_estimate_abs = 0
         # セクション理論新規吸着量 [cm3]
         adsorp_amt_estimate = adsorp_amt_estimate_abs * Mabs
         # 実際のセクション新規吸着量 [cm3]
@@ -580,7 +579,7 @@ class GasAdosorption_Breakthrough_simulator():
             + CP.PropsSI('C', 'T', T_K, 'P', P, "nitrogen") * variables["mf_n2"]
         )
         # 現在雰囲気の平衡吸着量 [cm3/g-abs]
-        P_kpa = P / 1000 # [kPaA]
+        P_kpa = p_co2 / 1000 # [kPaA]
         adsorp_amt_equilibrium = self._calc_equilibrium_adsorp_amt(P_kpa, T_K)
         # 現在の既存吸着量 [cm3/g-abs]
         adsorp_amt_current = variables["adsorp_amt"][stream][section]
