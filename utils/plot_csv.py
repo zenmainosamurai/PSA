@@ -7,14 +7,14 @@ import math
 import glob
 from utils import const
 
-def plot_csv_outputs(tgt_foldapath, df_obs, tgt_sections):
+def plot_csv_outputs(tgt_foldapath, df_obs, tgt_sections, tower_num, timestamp):
     """ 熱バラ計算結果の可視化
 
     Args:
         tgt_foldapath (str): 出力先フォルダパス
-        const (str): 上位ディレクトリの
         df_obs (pd.DataFrame): 観測値のデータフレーム
         tgt_sections (list): 可視化対象のセクション
+        tower_num (int): 塔番号
     """
     ### パラメータ設定 --------------------------------------
 
@@ -32,13 +32,13 @@ def plot_csv_outputs(tgt_foldapath, df_obs, tgt_sections):
         1: "black",
         2: "dimgrey",
     }
-    output_foldapath = tgt_foldapath + "png/"
+    output_foldapath = tgt_foldapath + f"/png/tower_{tower_num}/"
     os.makedirs(output_foldapath, exist_ok=True)
 
     ### 可視化（熱バラ） -------------------------------------
-    
+
     # csv読み込み
-    filename_list = glob.glob(tgt_foldapath + "csv/heat/*.csv")
+    filename_list = glob.glob(tgt_foldapath + f"/csv/tower_{tower_num}/heat/*.csv")
     df_dict = {}
     for filename in filename_list:
         df_dict[filename.split("/")[-1][:-4].split("\\")[1]] = pd.read_csv(filename, index_col="timestamp")
@@ -66,20 +66,19 @@ def plot_csv_outputs(tgt_foldapath, df_obs, tgt_sections):
         plt.xlabel("timestamp")
         if key == "セクション到達温度":
             for stream in range(1,3):
-                for i, section in enumerate(range(1,4)):
-                    plt.plot(df_obs[f"temp_{str(stream).zfill(3)}_{str(section).zfill(3)}"],
-                            label=f"(str,sec) = ({stream}, {tgt_sections[i]})",
-                            linestyle = linestyle_dict[tgt_sections[i]],
-                            c = color_dict_obs[stream]
-                            )
+                plt.plot(df_obs.loc[:timestamp, f"T{tower_num}_temp_{stream}"],
+                        label=f"(str,sec) = ({stream}, {tgt_sections[i]})",
+                        linestyle = linestyle_dict[tgt_sections[i]],
+                        c = color_dict_obs[stream]
+                        )
             plt.legend(fontsize=8)
     plt.savefig(output_foldapath + "heat.png", dpi=100)
     plt.close()
 
     ### 可視化（マテバラ） -------------------------------------
-    
+
     # csv読み込み
-    filename_list = glob.glob(tgt_foldapath + "csv/material/*.csv")
+    filename_list = glob.glob(tgt_foldapath + f"/csv/tower_{tower_num}/material/*.csv")
     df_dict = {}
     for filename in filename_list:
         df_dict[filename.split("/")[-1][:-4].split("\\")[1]] = pd.read_csv(filename, index_col="timestamp")
@@ -111,7 +110,7 @@ def plot_csv_outputs(tgt_foldapath, df_obs, tgt_sections):
     ### 可視化（熱バラ(上下蓋)） -------------------------------------
 
     # csv読み込み
-    filename_list = glob.glob(tgt_foldapath + "csv/heat_lid/heat_lid.csv")
+    filename_list = glob.glob(tgt_foldapath + f"/csv/tower_{tower_num}/heat_lid/heat_lid.csv")
     df = pd.read_csv(filename_list[0], index_col="timestamp")
 
     num_row = math.ceil((len(df.columns))/2)
@@ -134,10 +133,10 @@ def plot_csv_outputs(tgt_foldapath, df_obs, tgt_sections):
     plt.savefig(output_foldapath + "heat_lid.png", dpi=100)
     plt.close()
 
-    ### 可視化（vaccume） -------------------------------------
+    ### 可視化（others） -------------------------------------
 
     # csv読み込み
-    filename_list = glob.glob(tgt_foldapath + "csv/vaccume/vaccume.csv")
+    filename_list = glob.glob(tgt_foldapath + f"/csv/tower_{tower_num}/others/others.csv")
     df = pd.read_csv(filename_list[0], index_col="timestamp")
 
     num_row = math.ceil((len(df.columns))/2)
@@ -147,13 +146,16 @@ def plot_csv_outputs(tgt_foldapath, df_obs, tgt_sections):
     for i, col in enumerate(df.columns):
         plt.rcParams["font.size"] = 20
         plt.subplot(num_row, 2, i+1)
-        plt.plot(df[col])
-        title = const.TRANSLATION[col]
-        unit = const.UNIT[title]
-        plt.title(title + " " + unit)
+        plt.plot(df[col], label="計算値")
+        if col == "total_press": # 全圧の観測値もプロット
+            plt.plot(df_obs.loc[:timestamp, f"T{tower_num}_press"], label="観測値", c="black")
+        _title = const.TRANSLATION[col]
+        _unit = const.UNIT[_title]
+        plt.title(_title + " " + _unit)
+        plt.legend()
         plt.grid()
         plt.xlabel("timestamp")
-    plt.savefig(output_foldapath + "vaccume.png", dpi=100)
+    plt.savefig(output_foldapath + "others.png", dpi=100)
     plt.close()
 
 
@@ -165,29 +167,30 @@ def outputs_to_csv(tgt_foldapath, record_dict, common_conds):
         record_dict (dict): 計算結果
         common_conds (dict): 実験パラメータ
     """
-    # heat
-    foldapath = tgt_foldapath + f"/heat/"
-    os.makedirs(foldapath, exist_ok=True)
-    values = []
-    for i in range(len(record_dict["heat"])):
-        values_tmp = []
+    # heat, material
+    for _tgt_name in ["heat", "material"]:
+        _foldapath = tgt_foldapath + f"/{_tgt_name}/"
+        os.makedirs(_foldapath, exist_ok=True)
+        values = []
+        for i in range(len(record_dict[_tgt_name])):
+            values_tmp = []
+            for stream in range(1, 1+common_conds["CELL_SPLIT"]["num_str"]):
+                for section in range(1, 1+common_conds["CELL_SPLIT"]["num_sec"]):
+                    for value in record_dict[_tgt_name][i][stream][section].values():
+                        values_tmp.append(value)
+            values.append(values_tmp)
+        columns = []
         for stream in range(1, 1+common_conds["CELL_SPLIT"]["num_str"]):
             for section in range(1, 1+common_conds["CELL_SPLIT"]["num_sec"]):
-                for value in record_dict["heat"][i][stream][section].values():
-                    values_tmp.append(value)
-        values.append(values_tmp)
-    columns = []
-    for stream in range(1, 1+common_conds["CELL_SPLIT"]["num_str"]):
-        for section in range(1, 1+common_conds["CELL_SPLIT"]["num_sec"]):
-            for key in record_dict["heat"][i][stream][section].keys():
-                columns.append(key+"-"+str(stream).zfill(3)+"-"+str(section).zfill(3))
-    for key in record_dict["heat"][i][stream][section].keys():
-        idx = [columns.index(col) for col in columns if key in col]
-        df = pd.DataFrame(np.array(values)[:, idx],
-                            columns=np.array(columns)[idx],
-                            index=record_dict["timestamp"])
-        df.index.name = "timestamp"
-        df.to_csv(foldapath + const.TRANSLATION[key] + ".csv")
+                for key in record_dict[_tgt_name][i][stream][section].keys():
+                    columns.append(key+"-"+str(stream).zfill(3)+"-"+str(section).zfill(3))
+        for key in record_dict[_tgt_name][i][stream][section].keys():
+            idx = [columns.index(col) for col in columns if key in col]
+            df = pd.DataFrame(np.array(values)[:, idx],
+                                columns=np.array(columns)[idx],
+                                index=record_dict["timestamp"])
+            df.index.name = "timestamp"
+            df.to_csv(_foldapath + const.TRANSLATION[key] + ".csv")
 
     # heat_lid
     foldapath = tgt_foldapath + f"/heat_lid/"
@@ -205,52 +208,18 @@ def outputs_to_csv(tgt_foldapath, record_dict, common_conds):
     df.index.name = "timestamp"
     df.to_csv(foldapath + "heat_lid.csv")
 
-    # material
-    foldapath = tgt_foldapath + f"/material/"
-    os.makedirs(foldapath, exist_ok=True)
+    # others
+    _tgt_name = "others"
+    _foldapath = tgt_foldapath + f"/{_tgt_name}/"
+    os.makedirs(_foldapath, exist_ok=True)
     values = []
-    for i in range(len(record_dict["material"])):
-        values_tmp = []
-        for stream in range(1, 1+common_conds["CELL_SPLIT"]["num_str"]):
-            for section in range(1, 1+common_conds["CELL_SPLIT"]["num_sec"]):
-                for value in record_dict["material"][i][stream][section].values():
-                    values_tmp.append(value)
-        values.append(values_tmp)
-    columns = []
-    for stream in range(1, 1+common_conds["CELL_SPLIT"]["num_str"]):
-        for section in range(1, 1+common_conds["CELL_SPLIT"]["num_sec"]):
-            for key in record_dict["material"][i][stream][section].keys():
-                columns.append(key+"-"+str(stream).zfill(3)+"-"+str(section).zfill(3))
-    for key in record_dict["material"][i][stream][section].keys():
-        idx = [columns.index(col) for col in columns if key in col]
-        df = pd.DataFrame(np.array(values)[:, idx],
-                            columns=np.array(columns)[idx],
-                            index=record_dict["timestamp"])
-        df.index.name = "timestamp"
-        df.to_csv(foldapath + const.TRANSLATION[key] + ".csv")
-
-    # vaccume
-    foldapath = tgt_foldapath + f"/vaccume/"
-    os.makedirs(foldapath, exist_ok=True)
-    values = []
-    for i in range(len(record_dict["vaccume"])):
-        values.append(list(record_dict["vaccume"][i].values()))
-    columns = list(record_dict["vaccume"][i].keys())
+    for i in range(len(record_dict[_tgt_name])):
+        values.append(list(record_dict[_tgt_name][i].values()))
+    columns = list(record_dict[_tgt_name][i].keys())
     df = pd.DataFrame(values,
-                        columns=columns,
-                        index=record_dict["timestamp"])
+                      columns=columns,
+                      index=record_dict["timestamp"])
     df.index.name = "timestamp"
-    df.to_csv(foldapath + "vaccume.csv")
+    df.to_csv(_foldapath + f"{_tgt_name}.csv")
 
-    # params
-    foldapath = tgt_foldapath + f"/params/"
-    os.makedirs(foldapath, exist_ok=True)
-    values = []
-    for i in range(len(record_dict["params"])):
-        values.append(list(record_dict["params"][i].values()))
-    columns = common_conds["INFLOW_GAS_COND"].keys()
-    df = pd.DataFrame(values,
-                        columns=columns,
-                        index=record_dict["timestamp"])
-    df.index.name = "timestamp"
-    df.to_csv(foldapath + "params.csv")
+    # heat_wall

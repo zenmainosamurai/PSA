@@ -16,7 +16,7 @@ from fastdtw import fastdtw
 from scipy.spatial.distance import euclidean
 
 from utils import const, init_functions, plot_csv
-from models import GasAdosorption_Breakthrough_simulator
+from simulator import GasAdosorption_Breakthrough_simulator
 
 import warnings
 warnings.simplefilter('ignore')
