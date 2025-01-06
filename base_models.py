@@ -113,6 +113,7 @@ def material_balance_adsorp(sim_conds, stream_conds, stream, section, variables,
         "inflow_mf_n2": inflow_mf_n2,
         "gas_density": gas_density,
         "gas_cp": gas_cp,
+        "adsorp_amt_equilibrium": adsorp_amt_equilibrium, # 平衡吸着量
         "adsorp_amt_estimate": adsorp_amt_estimate,
         "accum_adsorp_amt": accum_adsorp_amt,
         "outflow_fr_co2": outflow_fr_co2,
@@ -120,37 +121,6 @@ def material_balance_adsorp(sim_conds, stream_conds, stream, section, variables,
         "outflow_mf_co2": outflow_mf_co2,
         "outflow_mf_n2": outflow_mf_n2,
         "adsorp_amt_estimate_abs": adsorp_amt_estimate_abs,
-        "desorp_mw_co2": 0,
-    }
-
-    return output
-
-def material_balance_valve_stop(sim_conds, stream_conds, stream, section, variables):
-    """ 任意セルのマテリアルバランスを計算する
-        弁停止モード
-
-    Args:
-        stream (int): 対象セルのstream番号
-        section (int): 対象セルのsection番号
-        variables (dict): 温度等の状態変数
-
-    Returns:
-        dict: 対象セルの計算結果
-    """
-    output = {
-        "inflow_fr_co2": 0,
-        "inflow_fr_n2": 0,
-        "inflow_mf_co2": 0,
-        "inflow_mf_n2": 0,
-        "gas_density": 0,
-        "gas_cp": 0,
-        "adsorp_amt_estimate": 0,
-        "accum_adsorp_amt": variables["adsorp_amt"][stream][section],
-        "outflow_fr_co2": 0,
-        "outflow_fr_n2": 0,
-        "outflow_mf_co2": 0,
-        "outflow_mf_n2": 0,
-        "adsorp_amt_estimate_abs": 0,
         "desorp_mw_co2": 0,
     }
 
@@ -222,6 +192,7 @@ def material_balance_desorp(sim_conds, stream_conds, stream, section, variables,
         "inflow_mf_n2": 0,
         "gas_density": gas_density,
         "gas_cp": gas_cp,
+        "adsorp_amt_equilibrium": adsorp_amt_equilibrium, # 平衡吸着量
         "adsorp_amt_estimate": adsorp_amt_estimate,
         "accum_adsorp_amt": accum_adsorp_amt,
         "outflow_fr_co2": 0,

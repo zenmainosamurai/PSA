@@ -171,6 +171,7 @@ def outputs_to_csv(tgt_foldapath, record_dict, common_conds):
     for _tgt_name in ["heat", "material"]:
         _foldapath = tgt_foldapath + f"/{_tgt_name}/"
         os.makedirs(_foldapath, exist_ok=True)
+        # 値の抽出
         values = []
         for i in range(len(record_dict[_tgt_name])):
             values_tmp = []
@@ -179,11 +180,13 @@ def outputs_to_csv(tgt_foldapath, record_dict, common_conds):
                     for value in record_dict[_tgt_name][i][stream][section].values():
                         values_tmp.append(value)
             values.append(values_tmp)
+        # カラム名の抽出
         columns = []
         for stream in range(1, 1+common_conds["CELL_SPLIT"]["num_str"]):
             for section in range(1, 1+common_conds["CELL_SPLIT"]["num_sec"]):
                 for key in record_dict[_tgt_name][i][stream][section].keys():
                     columns.append(key+"-"+str(stream).zfill(3)+"-"+str(section).zfill(3))
+        # df化
         for key in record_dict[_tgt_name][i][stream][section].keys():
             idx = [columns.index(col) for col in columns if key in col]
             df = pd.DataFrame(np.array(values)[:, idx],

@@ -139,59 +139,59 @@ def stop_mode(sim_conds, stream_conds, variables):
         mb_dict[stream] = {}
         hb_dict[stream] = {}
         # sec_1は手動で実施
-        mb_dict[stream][1] = base_models.material_balance_adsorp(sim_conds=sim_conds,
-                                                                      stream_conds=stream_conds,
-                                                                      stream=stream,
-                                                                      section=1,
-                                                                      variables=variables,
-                                                                      inflow_gas=None)
+        mb_dict[stream][1] = base_models.material_balance_desorp(sim_conds=sim_conds,
+                                                                 stream_conds=stream_conds,
+                                                                 stream=stream,
+                                                                 section=1,
+                                                                 variables=variables,
+                                                                 vaccume_output=vaccume_output)
         hb_dict[stream][1] = base_models.heat_balance(sim_conds=sim_conds,
-                                                           stream_conds=stream_conds,
-                                                           stream=stream,
-                                                           section=1,
-                                                           variables=variables,
-                                                           mode=mode,
-                                                           material_output=mb_dict[stream][1],
-                                                           heat_output=None,
-                                                           vaccume_output=None)
+                                                      stream_conds=stream_conds,
+                                                      stream=stream,
+                                                      section=1,
+                                                      variables=variables,
+                                                      mode=mode,
+                                                      material_output=mb_dict[stream][1],
+                                                      heat_output=None,
+                                                      vaccume_output=vaccume_output)
         # sec_2以降は自動で実施
         for section in range(2, 1+sim_conds["CELL_SPLIT"]["num_sec"]):
-            mb_dict[stream][section] = base_models.material_balance_adsorp(sim_conds=sim_conds,
-                                                                                stream_conds=stream_conds,
-                                                                                stream=stream,
-                                                                                section=section,
-                                                                                variables=variables,
-                                                                                inflow_gas=mb_dict[stream][section-1])
+            mb_dict[stream][section] = base_models.material_balance_desorp(sim_conds=sim_conds,
+                                                                           stream_conds=stream_conds,
+                                                                           stream=stream,
+                                                                           section=section,
+                                                                           variables=variables,
+                                                                           vaccume_output=vaccume_output)
             hb_dict[stream][section] = base_models.heat_balance(sim_conds=sim_conds,
-                                                                     stream_conds=stream_conds,
-                                                                     stream=stream,
-                                                                     section=section,
-                                                                     variables=variables,
-                                                                     mode=mode,
-                                                                     material_output=mb_dict[stream][section],
-                                                                     heat_output=hb_dict[stream][section-1],
-                                                                     vaccume_output=None)
+                                                                stream_conds=stream_conds,
+                                                                stream=stream,
+                                                                section=section,
+                                                                variables=variables,
+                                                                mode=mode,
+                                                                material_output=mb_dict[stream][section],
+                                                                heat_output=hb_dict[stream][section-1],
+                                                                vaccume_output=vaccume_output)
     # 2. 壁面熱バラ（stream = 1+sim_conds["CELL_SPLIT"]["num_str"]）
     hb_wall[1] = base_models.heat_balance_wall(sim_conds=sim_conds,
-                                                    stream_conds=stream_conds,
-                                                    section=1,
-                                                    variables=variables,
-                                                    heat_output=hb_dict[sim_conds["CELL_SPLIT"]["num_str"]][1],
-                                                    heat_wall_output=None)
+                                               stream_conds=stream_conds,
+                                               section=1,
+                                               variables=variables,
+                                               heat_output=hb_dict[sim_conds["CELL_SPLIT"]["num_str"]][1],
+                                               heat_wall_output=None)
     for section in range(2, 1+sim_conds["CELL_SPLIT"]["num_sec"]):
         hb_wall[section] = base_models.heat_balance_wall(sim_conds=sim_conds,
-                                                              stream_conds=stream_conds,
-                                                              section=section,
-                                                              variables=variables,
-                                                              heat_output=hb_dict[sim_conds["CELL_SPLIT"]["num_str"]][section],
-                                                              heat_wall_output=hb_wall[section-1])
+                                                         stream_conds=stream_conds,
+                                                         section=section,
+                                                         variables=variables,
+                                                         heat_output=hb_dict[sim_conds["CELL_SPLIT"]["num_str"]][section],
+                                                         heat_wall_output=hb_wall[section-1])
     # 3. 上下蓋熱バラ
     for position in ["up", "down"]:
         hb_lid[position] = base_models.heat_balance_lid(sim_conds=sim_conds,
-                                                             position=position,
-                                                             variables=variables,
-                                                             heat_output=hb_dict,
-                                                             heat_wall_output=hb_wall)
+                                                        position=position,
+                                                        variables=variables,
+                                                        heat_output=hb_dict,
+                                                        heat_wall_output=hb_wall)
     # 4. 排気後モル分率計算
     mf_after_vaccume = base_models.mf_after_vaccume(sim_conds=sim_conds,
                                                     vaccume_output=vaccume_output,
@@ -337,64 +337,66 @@ def equalization_pressure_depressurization(sim_conds, stream_conds, variables,
 
     ### セル計算 --------------------------------------------------------------
 
+    vaccume_output = {}
+    vaccume_output["total_press_after_vaccume"] = variables["total_press"]
     # 1. マテバラ・熱バラ計算
     for stream in range(1, 1+sim_conds["CELL_SPLIT"]["num_str"]):
         mb_dict[stream] = {}
         hb_dict[stream] = {}
         # sec_1は手動で実施
-        mb_dict[stream][1] = base_models.material_balance_adsorp(sim_conds=sim_conds,
-                                                                      stream_conds=stream_conds,
-                                                                      stream=stream,
-                                                                      section=1,
-                                                                      variables=variables,
-                                                                      inflow_gas=None)
+        mb_dict[stream][1] = base_models.material_balance_desorp(sim_conds=sim_conds,
+                                                                 stream_conds=stream_conds,
+                                                                 stream=stream,
+                                                                 section=1,
+                                                                 variables=variables,
+                                                                 vaccume_output=vaccume_output)
         hb_dict[stream][1] = base_models.heat_balance(sim_conds=sim_conds,
-                                                           stream_conds=stream_conds,
-                                                           stream=stream,
-                                                           section=1,
-                                                           variables=variables,
-                                                           mode=mode,
-                                                           material_output=mb_dict[stream][1],
-                                                           heat_output=None,
-                                                           vaccume_output=None)
+                                                      stream_conds=stream_conds,
+                                                      stream=stream,
+                                                      section=1,
+                                                      variables=variables,
+                                                      mode=mode,
+                                                      material_output=mb_dict[stream][1],
+                                                      heat_output=None,
+                                                      vaccume_output=vaccume_output)
         # sec_2以降は自動で実施
         for section in range(2, 1+sim_conds["CELL_SPLIT"]["num_sec"]):
-            mb_dict[stream][section] = base_models.material_balance_adsorp(sim_conds=sim_conds,
-                                                                                stream_conds=stream_conds,
-                                                                                stream=stream,
-                                                                                section=section,
-                                                                                variables=variables,
-                                                                                inflow_gas=mb_dict[stream][section-1])
+            mb_dict[stream][section] = base_models.material_balance_desorp(sim_conds=sim_conds,
+                                                                           stream_conds=stream_conds,
+                                                                           stream=stream,
+                                                                           section=section,
+                                                                           variables=variables,
+                                                                           vaccume_output=vaccume_output)
             hb_dict[stream][section] = base_models.heat_balance(sim_conds=sim_conds,
-                                                                     stream_conds=stream_conds,
-                                                                     stream=stream,
-                                                                     section=section,
-                                                                     variables=variables,
-                                                                     mode=mode,
-                                                                     material_output=mb_dict[stream][section],
-                                                                     heat_output=hb_dict[stream][section-1],
-                                                                     vaccume_output=None)
+                                                                stream_conds=stream_conds,
+                                                                stream=stream,
+                                                                section=section,
+                                                                variables=variables,
+                                                                mode=mode,
+                                                                material_output=mb_dict[stream][section],
+                                                                heat_output=hb_dict[stream][section-1],
+                                                                vaccume_output=vaccume_output)
     # 2. 壁面熱バラ（stream = 1+sim_conds["CELL_SPLIT"]["num_str"]）
     hb_wall[1] = base_models.heat_balance_wall(sim_conds=sim_conds,
-                                                    stream_conds=stream_conds,
-                                                    section=1,
-                                                    variables=variables,
-                                                    heat_output=hb_dict[sim_conds["CELL_SPLIT"]["num_str"]][1],
-                                                    heat_wall_output=None)
+                                               stream_conds=stream_conds,
+                                               section=1,
+                                               variables=variables,
+                                               heat_output=hb_dict[sim_conds["CELL_SPLIT"]["num_str"]][1],
+                                               heat_wall_output=None)
     for section in range(2, 1+sim_conds["CELL_SPLIT"]["num_sec"]):
         hb_wall[section] = base_models.heat_balance_wall(sim_conds=sim_conds,
-                                                              stream_conds=stream_conds,
-                                                              section=section,
-                                                              variables=variables,
-                                                              heat_output=hb_dict[sim_conds["CELL_SPLIT"]["num_str"]][section],
-                                                              heat_wall_output=hb_wall[section-1])
+                                                         stream_conds=stream_conds,
+                                                         section=section,
+                                                         variables=variables,
+                                                         heat_output=hb_dict[sim_conds["CELL_SPLIT"]["num_str"]][section],
+                                                         heat_wall_output=hb_wall[section-1])
     # 3. 上下蓋熱バラ
     for position in ["up", "down"]:
         hb_lid[position] = base_models.heat_balance_lid(sim_conds=sim_conds,
-                                                             position=position,
-                                                             variables=variables,
-                                                             heat_output=hb_dict,
-                                                             heat_wall_output=hb_wall)
+                                                        position=position,
+                                                        variables=variables,
+                                                        heat_output=hb_dict,
+                                                        heat_wall_output=hb_wall)
     # 4. 減圧後圧力・モル分率
     total_press_and_mf = base_models.total_press_after_decompression(sim_conds=sim_conds,
                                                                      variables=variables,
@@ -442,59 +444,59 @@ def desorption_by_vaccuming(sim_conds, stream_conds, variables):
         mb_dict[stream] = {}
         hb_dict[stream] = {}
         # sec_1は手動で実施
-        mb_dict[stream][1] = base_models.material_balance_adsorp(sim_conds=sim_conds,
-                                                                      stream_conds=stream_conds,
-                                                                      stream=stream,
-                                                                      section=1,
-                                                                      variables=variables,
-                                                                      inflow_gas=None)
+        mb_dict[stream][1] = base_models.material_balance_desorp(sim_conds=sim_conds,
+                                                                 stream_conds=stream_conds,                                                                      
+                                                                 stream=stream,
+                                                                 section=1,
+                                                                 variables=variables,
+                                                                 vaccume_output=vaccume_output)
         hb_dict[stream][1] = base_models.heat_balance(sim_conds=sim_conds,
-                                                           stream_conds=stream_conds,
-                                                           stream=stream,
-                                                           section=1,
-                                                           variables=variables,
-                                                           mode=mode,
-                                                           material_output=mb_dict[stream][1],
-                                                           heat_output=None,
-                                                           vaccume_output=None)
+                                                      stream_conds=stream_conds,
+                                                      stream=stream,
+                                                      section=1,
+                                                      variables=variables,
+                                                      mode=mode,
+                                                      material_output=mb_dict[stream][1],
+                                                      heat_output=None,
+                                                      vaccume_output=vaccume_output)
         # sec_2以降は自動で実施
         for section in range(2, 1+sim_conds["CELL_SPLIT"]["num_sec"]):
-            mb_dict[stream][section] = base_models.material_balance_adsorp(sim_conds=sim_conds,
-                                                                                stream_conds=stream_conds,
-                                                                                stream=stream,
-                                                                                section=section,
-                                                                                variables=variables,
-                                                                                inflow_gas=mb_dict[stream][section-1])
+            mb_dict[stream][section] = base_models.material_balance_desorp(sim_conds=sim_conds,
+                                                                           stream_conds=stream_conds,
+                                                                           stream=stream,
+                                                                           section=section,
+                                                                           variables=variables,
+                                                                           vaccume_output=vaccume_output)
             hb_dict[stream][section] = base_models.heat_balance(sim_conds=sim_conds,
-                                                                     stream_conds=stream_conds,
-                                                                     stream=stream,
-                                                                     section=section,
-                                                                     variables=variables,
-                                                                     mode=mode,
-                                                                     material_output=mb_dict[stream][section],
-                                                                     heat_output=hb_dict[stream][section-1],
-                                                                     vaccume_output=None)
+                                                                stream_conds=stream_conds,
+                                                                stream=stream,
+                                                                section=section,
+                                                                variables=variables,
+                                                                mode=mode,
+                                                                material_output=mb_dict[stream][section],
+                                                                heat_output=hb_dict[stream][section-1],
+                                                                vaccume_output=vaccume_output)
     # 2. 壁面熱バラ（stream = 1+sim_conds["CELL_SPLIT"]["num_str"]）
     hb_wall[1] = base_models.heat_balance_wall(sim_conds=sim_conds,
-                                                    stream_conds=stream_conds,
-                                                    section=1,
-                                                    variables=variables,
-                                                    heat_output=hb_dict[sim_conds["CELL_SPLIT"]["num_str"]][1],
-                                                    heat_wall_output=None)
+                                               stream_conds=stream_conds,
+                                               section=1,
+                                               variables=variables,
+                                               heat_output=hb_dict[sim_conds["CELL_SPLIT"]["num_str"]][1],
+                                               heat_wall_output=None)
     for section in range(2, 1+sim_conds["CELL_SPLIT"]["num_sec"]):
         hb_wall[section] = base_models.heat_balance_wall(sim_conds=sim_conds,
-                                                              stream_conds=stream_conds,
-                                                              section=section,
-                                                              variables=variables,
-                                                              heat_output=hb_dict[sim_conds["CELL_SPLIT"]["num_str"]][section],
-                                                              heat_wall_output=hb_wall[section-1])
+                                                         stream_conds=stream_conds,
+                                                         section=section,
+                                                         variables=variables,
+                                                         heat_output=hb_dict[sim_conds["CELL_SPLIT"]["num_str"]][section],
+                                                         heat_wall_output=hb_wall[section-1])
     # 3. 上下蓋熱バラ
     for position in ["up", "down"]:
         hb_lid[position] = base_models.heat_balance_lid(sim_conds=sim_conds,
-                                                             position=position,
-                                                             variables=variables,
-                                                             heat_output=hb_dict,
-                                                             heat_wall_output=hb_wall)
+                                                        position=position,
+                                                        variables=variables,
+                                                        heat_output=hb_dict,
+                                                        heat_wall_output=hb_wall)
     # 4. 排気後モル分率計算
     mf_after_vaccume = base_models.mf_after_vaccume(sim_conds=sim_conds,
                                                     vaccume_output=vaccume_output,

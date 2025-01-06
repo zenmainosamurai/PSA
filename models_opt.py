@@ -5,15 +5,11 @@ import pandas as pd
 import seaborn as sns
 import matplotlib.pyplot as plt
 import japanize_matplotlib
-from scipy import optimize
 from sklearn.metrics import mean_squared_error
 import optuna
 from optuna.samplers import TPESampler
 import sqlite3
 import multiprocessing
-from contextlib import redirect_stdout
-from fastdtw import fastdtw
-from scipy.spatial.distance import euclidean
 
 from utils import const, init_functions, plot_csv
 from simulator import GasAdosorption_Breakthrough_simulator
@@ -133,7 +129,7 @@ class GasAdosorption_for_Optimize():
         instance = GasAdosorption_Breakthrough_simulator(self.cond_id)
         for cond_category, cond_dict in params_dict.items():
             for cond_name, value in cond_dict.items():
-                instance.common_conds[cond_category][cond_name] = value
+                instance.sim_conds[cond_category][cond_name] = value
         instance.execute_simulation()
 
     def run_optimization(self):
@@ -153,8 +149,8 @@ class GasAdosorption_for_Optimize():
                 "adsorp_heat_co2": trial.suggest_float("adsorp_heat_co2", 100, 1500, log=True),
             },
             "PACKED_BED_COND": {
-                "ks_adsorp": trial.suggest_float("ks_adsorp", 1e-3, 10, log=True),
-                "ks_desorp": trial.suggest_float("ks_desorp", 1e-3, 10, log=True),
+                "ks_adsorp": trial.suggest_float("ks_adsorp", 1e-3, 1, log=True),
+                "ks_desorp": trial.suggest_float("ks_desorp", 1e-3, 1, log=True),
             },
             "DRUM_WALL_COND": {
                 "coef_hw1": trial.suggest_float("coef_hw1", 1e-2, 1e1, log=True),
@@ -168,7 +164,7 @@ class GasAdosorption_for_Optimize():
         # 例外処理
         except Exception as e:
             # エラーをログに記録
-            # print(f"Error occurred: {e}")
+            print(f"Error occurred: {e}")
             # 試行を失敗として扱う
             return float('inf')  # または raise
 
@@ -180,69 +176,60 @@ class GasAdosorption_for_Optimize():
         # パラメータ置換
         for cond_category, cond_dict in params_dict.items():
             for cond_name, value in cond_dict.items():
-                instance.common_conds[cond_category][cond_name] = value
+                instance.sim_conds[cond_category][cond_name] = value
 
-        ### ◆(1/4) 前準備 ------------------------------------------------
+        ### ◆前準備 ------------------------------------------------
 
-        # 記録用dictの用意
-        record_dict = {
-            "timestamp": [],
-            "all_output": [],
-        }
+        # 記録用配列の用意
+        _record_item_list = ["material", "heat", "heat_wall", "heat_lid", "others"]
+        record_dict = {}
+        for _tower_num in range(1, 1+instance.sim_conds["NUM_TOWER"]):
+            record_dict[_tower_num] = {}
+            record_dict[_tower_num]["timestamp"] = []
+            for _item in _record_item_list:
+                record_dict[_tower_num][_item] = []
 
         ### ◆(1/2) シミュレーション実行 --------------------------------------
 
-        # 初期化
-        variables = instance.init_variables()
-
-        # 全体計算
+        # a. 状態変数の初期化
+        variables_tower = instance._init_variables()
+        # b. 吸着計算
         timestamp = 0
-        while timestamp < instance.df_obs.index[-1]:
-            # 通常のマテバラ・熱バラ計算を実行
-            variables, all_output = instance.calc_all_cell_balance(variables, timestamp)
-            # timestamp更新
-            timestamp += instance.common_conds["dt"]
-            timestamp = round(timestamp, 2)
-            # 記録用配列の平坦化
-            output_flatten = {}
-            for stream in range(1, 1+instance.num_str): # 熱バラ
-                for section in range(1, 1+instance.num_sec):
-                        for key, value in all_output["heat"][stream][section].items():
-                            output_flatten[key+"_"+str(stream).zfill(3)+"_"+str(section).zfill(3)] = value
-            # 記録
-            record_dict["timestamp"].append(timestamp)
-            record_dict["all_output"].append(output_flatten)
-
-        # DataFrame化
-        values = []
-        for i in range(len(record_dict["all_output"])):
-            values.append(record_dict["all_output"][i].values())
-        df = pd.DataFrame(values,
-                          index=record_dict["timestamp"],
-                          columns=record_dict["all_output"][0].keys())
-        df.index.name = "timestamp"
+        for p in instance.df_operation.index:
+            # 各塔の稼働モード抽出
+            mode_list = list(instance.df_operation.loc[p, ["塔1", "塔2", "塔3"]])
+            # 終了条件(文字列)の抽出
+            termination_cond_str = instance.df_operation.loc[p, "終了条件"]
+            # プロセスpにおける各塔の吸着計算実施
+            timestamp, variables_tower, record_dict = instance.calc_adsorption_process(instance.sim_conds,
+                                                                                   mode_list,
+                                                                                   termination_cond_str,
+                                                                                   variables_tower,
+                                                                                   record_dict,
+                                                                                   timestamp)
+        # 温度データの抽出
+        values = {}
+        num_data = len(record_dict[1]["timestamp"])
+        # for _tower_num in range(1,1+instance.sim_conds["NUM_TOWER"]):
+            # for stream in range(1,1+instance.sim_conds["CELL_SPLIT"]["num_str"]):
+        _tower_num = 1
+        for i, section in enumerate(instance.sim_conds["LOC_CENCER_SECTION"].values()):
+            values[f"T{_tower_num}_temp_{i+1}"] = []
+            for j in range(num_data):
+                values[f"T{_tower_num}_temp_{i+1}"].append(record_dict[_tower_num]["heat"][j][1][section]["temp_reached"])
+        df_sim = pd.DataFrame(values, index=record_dict[1]["timestamp"])
+        df_sim.index.name = "timestamp"
 
         ### ◆(2/2) スコア計算 -------------------------------------------------
-        # センサーに最も近いセクションの算出
-        nearest_sec = []
-        loc_cells = np.arange(0, instance.common_conds["PACKED_BED_COND"]["Lbed"],
-                              instance.common_conds["PACKED_BED_COND"]["Lbed"] / instance.num_sec) # 各セルの位置
-        loc_cells += instance.common_conds["PACKED_BED_COND"]["Lbed"] / instance.num_sec / 2 # セルの半径を加算
-        for value in instance.common_conds["LOC_CENCER"].values(): # 温度計に最も近いセクションを算出
-            nearest_sec.append(1 + np.argmin(np.abs(loc_cells - value)))
 
-        # データ準備
-        tgt_cols = [f"temp_reached_{str(stream).zfill(3)}_{str(section).zfill(3)}" for stream in [1,2] for section in nearest_sec]
-        rename_cols = [f"temp_{str(stream).zfill(3)}_{str(section).zfill(3)}" for stream in [1,2] for section in [1,2,3]]
-        df_sim = df[tgt_cols]
-        df_sim.columns = rename_cols
-        common_index = [np.argmin(np.abs(instance.df_obs.index[i] - df_sim.index)) for i in range(len(instance.df_obs.index))]
+        # indexを合わせる
+        df_obs = instance.df_obs.loc[:df_sim.index[-1], :]
+        common_index = [np.argmin(np.abs(instance.df_obs.index[i] - df_sim.index)) for i in range(len(df_obs))]
         df_sim = df_sim.iloc[common_index]
-
         # スコア計算
         score_list = []
-        for col in rename_cols:
-            score = mean_squared_error(df_sim[col], instance.df_obs[col], squared=False) # RMSE
+        for col in df_sim.columns:
+            score = mean_squared_error(df_sim[col], df_obs[col], squared=False) # RMSE
             # score, _ = fastdtw(df_sim[col], instance.df_obs[col], dist=euclidean) # DTW
             score_list.append(score)
 

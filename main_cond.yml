@@ -9,11 +9,11 @@ mode_list: [
 
 # 実行したいconditionファイルを指定
 cond_list: [
-  4_01_mod_3tower,
+  4_03_sim_flow_adsorp,
 ]
 
 # パラメータ最適化のパラメータ
 opt_params: {
-  num_processes: 8,
-  num_trials: 1,
+  num_processes: 6,
+  num_trials: 100,
 }
