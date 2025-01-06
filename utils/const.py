@@ -62,6 +62,7 @@ TRANSLATION = {
     "total_press": "全圧",
     "mf_co2": "気相CO2モル分率",
     "mf_n2": "気相N2モル分率",
+    "p_co2": "CO2分圧",
 }
 
 UNIT = {
@@ -99,6 +100,7 @@ UNIT = {
     "全圧": "[MPaA]",
     "気相CO2モル分率": "",
     "気相N2モル分率": "",
+    "CO2分圧": "[MPaA]",
 }
 
 TRANSLATION_PARAMS = {

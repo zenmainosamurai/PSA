@@ -122,6 +122,7 @@ def material_balance_adsorp(sim_conds, stream_conds, stream, section, variables,
         "outflow_mf_n2": outflow_mf_n2,
         "adsorp_amt_estimate_abs": adsorp_amt_estimate_abs,
         "desorp_mw_co2": 0,
+        "p_co2": p_co2,
     }
 
     return output
@@ -146,8 +147,6 @@ def material_balance_desorp(sim_conds, stream_conds, stream, section, variables,
     P = vaccume_output["total_press_after_vaccume"] * 1e6 # 圧力 [Pa]        
     # セクション吸着材量 [g]
     Mabs = stream_conds[stream]["Mabs"] / sim_conds["CELL_SPLIT"]["num_sec"]
-    # CO2分圧 [MPaA]
-    p_co2 = vaccume_output["total_press_after_vaccume"] * variables["mf_co2"]
     # ガス密度 [kg/m3]
     gas_density = (
         CP.PropsSI('D', 'T', T_K, 'P', P, "co2") * variables["mf_co2"]
@@ -158,8 +157,10 @@ def material_balance_desorp(sim_conds, stream_conds, stream, section, variables,
         CP.PropsSI('C', 'T', T_K, 'P', P, "co2") * variables["mf_co2"]
         + CP.PropsSI('C', 'T', T_K, 'P', P, "nitrogen") * variables["mf_n2"]
     )
+    # CO2分圧 [MPaA]
+    p_co2 = vaccume_output["total_press_after_vaccume"] * variables["mf_co2"]
     # 現在雰囲気の平衡吸着量 [cm3/g-abs]
-    P_kpa = p_co2 / 1000 # [kPaA]
+    P_kpa = p_co2 * 1000 # [MPaA] → [kPaA]
     adsorp_amt_equilibrium = _equilibrium_adsorp_amt(P_kpa, T_K)
     # 現在の既存吸着量 [cm3/g-abs]
     adsorp_amt_current = variables["adsorp_amt"][stream][section]
@@ -201,6 +202,7 @@ def material_balance_desorp(sim_conds, stream_conds, stream, section, variables,
         "outflow_mf_n2": 0,
         "adsorp_amt_estimate_abs": adsorp_amt_estimate_abs,
         "desorp_mw_co2": desorp_mw_co2,
+        "p_co2": p_co2,
     }
 
     return output

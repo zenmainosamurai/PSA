@@ -146,14 +146,14 @@ class GasAdosorption_for_Optimize():
         # 最適化条件
         params_dict = {
             "INFLOW_GAS_COND": {
-                "adsorp_heat_co2": trial.suggest_float("adsorp_heat_co2", 100, 1500, log=True),
+                "adsorp_heat_co2": trial.suggest_float("adsorp_heat_co2", 100, 2500, log=True),
             },
             "PACKED_BED_COND": {
-                "ks_adsorp": trial.suggest_float("ks_adsorp", 1e-3, 1, log=True),
-                "ks_desorp": trial.suggest_float("ks_desorp", 1e-3, 1, log=True),
+                "ks_adsorp": trial.suggest_float("ks_adsorp", 1e-3, 1e2, log=True),
+                "ks_desorp": trial.suggest_float("ks_desorp", 1e-3, 1e2, log=True),
             },
             "DRUM_WALL_COND": {
-                "coef_hw1": trial.suggest_float("coef_hw1", 1e-2, 1e1, log=True),
+                "coef_hw1": trial.suggest_float("coef_hw1", 1e-3, 1e1, log=True),
             }
         }
         # score計算
@@ -164,7 +164,8 @@ class GasAdosorption_for_Optimize():
         # 例外処理
         except Exception as e:
             # エラーをログに記録
-            print(f"Error occurred: {e}")
+            # print(f"Error occurred: {e}")
+            print(f"Error occurred: {params_dict}")
             # 試行を失敗として扱う
             return float('inf')  # または raise
 
