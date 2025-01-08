@@ -9,11 +9,12 @@ mode_list: [
 
 # 実行したいconditionファイルを指定
 cond_list: [
-  4_03_mod_equilibrium_unit_miss,
+  # 4_06_mod_manual_mode,
+  test
 ]
 
 # パラメータ最適化のパラメータ
 opt_params: {
-  num_processes: 8,
-  num_trials: 200,
+  num_processes: 6,
+  num_trials: 100,
 }

@@ -80,13 +80,22 @@ def material_balance_adsorp(sim_conds, stream_conds, stream, section, variables,
     adsorp_amt_current = variables["adsorp_amt"][stream][section]
     # 理論新規吸着量 [cm3/g-abs]
     if adsorp_amt_equilibrium != 0:
-        adsorp_amt_estimate_abs = (
-            sim_conds["PACKED_BED_COND"]["ks_adsorp"] ** (adsorp_amt_current / adsorp_amt_equilibrium)
-            / sim_conds["PACKED_BED_COND"]["rho_abs"]
-            * 6 * (1 - sim_conds["PACKED_BED_COND"]["epsilon"]) * sim_conds["PACKED_BED_COND"]["phi"]
-            / sim_conds["PACKED_BED_COND"]["dp"] * (adsorp_amt_equilibrium - adsorp_amt_current)
-            * sim_conds["dt"] / 1e6 * 60
-        )
+        if adsorp_amt_equilibrium >= adsorp_amt_current:
+            adsorp_amt_estimate_abs = (
+                sim_conds["PACKED_BED_COND"]["ks_adsorp"] ** (adsorp_amt_current / adsorp_amt_equilibrium)
+                / sim_conds["PACKED_BED_COND"]["rho_abs"]
+                * 6 * (1 - sim_conds["PACKED_BED_COND"]["epsilon"]) * sim_conds["PACKED_BED_COND"]["phi"]
+                / sim_conds["PACKED_BED_COND"]["dp"] * (adsorp_amt_equilibrium - adsorp_amt_current)
+                * sim_conds["dt"] / 1e6 * 60
+            )
+        else:
+            adsorp_amt_estimate_abs = (
+                sim_conds["PACKED_BED_COND"]["ks_desorp"] ** (adsorp_amt_current / adsorp_amt_equilibrium)
+                / sim_conds["PACKED_BED_COND"]["rho_abs"]
+                * 6 * (1 - sim_conds["PACKED_BED_COND"]["epsilon"]) * sim_conds["PACKED_BED_COND"]["phi"]
+                / sim_conds["PACKED_BED_COND"]["dp"] * (adsorp_amt_equilibrium - adsorp_amt_current)
+                * sim_conds["dt"] / 1e6 * 60
+            )
     else:
         adsorp_amt_estimate_abs = 0
     # セクション理論新規吸着量 [cm3]
@@ -165,13 +174,22 @@ def material_balance_desorp(sim_conds, stream_conds, stream, section, variables,
     # 現在の既存吸着量 [cm3/g-abs]
     adsorp_amt_current = variables["adsorp_amt"][stream][section]
     # 理論新規吸着量 [cm3/g-abs]
-    adsorp_amt_estimate_abs = (
-        sim_conds["PACKED_BED_COND"]["ks_desorp"] ** (adsorp_amt_current / adsorp_amt_equilibrium)
-        / sim_conds["PACKED_BED_COND"]["rho_abs"]
-        * 6 * (1 - sim_conds["PACKED_BED_COND"]["epsilon"]) * sim_conds["PACKED_BED_COND"]["phi"]
-        / sim_conds["PACKED_BED_COND"]["dp"] * (adsorp_amt_equilibrium - adsorp_amt_current)
-        * sim_conds["dt"] / 1e6 * 60
-    )
+    if adsorp_amt_equilibrium >= adsorp_amt_current:
+        adsorp_amt_estimate_abs = (
+            sim_conds["PACKED_BED_COND"]["ks_adsorp"] ** (adsorp_amt_current / adsorp_amt_equilibrium)
+            / sim_conds["PACKED_BED_COND"]["rho_abs"]
+            * 6 * (1 - sim_conds["PACKED_BED_COND"]["epsilon"]) * sim_conds["PACKED_BED_COND"]["phi"]
+            / sim_conds["PACKED_BED_COND"]["dp"] * (adsorp_amt_equilibrium - adsorp_amt_current)
+            * sim_conds["dt"] / 1e6 * 60
+        )
+    else:
+        adsorp_amt_estimate_abs = (
+            sim_conds["PACKED_BED_COND"]["ks_desorp"] ** (adsorp_amt_current / adsorp_amt_equilibrium)
+            / sim_conds["PACKED_BED_COND"]["rho_abs"]
+            * 6 * (1 - sim_conds["PACKED_BED_COND"]["epsilon"]) * sim_conds["PACKED_BED_COND"]["phi"]
+            / sim_conds["PACKED_BED_COND"]["dp"] * (adsorp_amt_equilibrium - adsorp_amt_current)
+            * sim_conds["dt"] / 1e6 * 60
+        )
     # セクション理論新規吸着量 [cm3]
     adsorp_amt_estimate = adsorp_amt_estimate_abs * Mabs
     # 実際のセクション新規吸着量 [cm3]

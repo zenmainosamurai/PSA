@@ -139,6 +139,8 @@ class GasAdosorption_Breakthrough_simulator():
 
         ### ◆(2/4) シミュレーション実行 --------------------------------------
         print("(1/3) simulation...")
+        # プロセス終了時刻記録用
+        p_end_dict = {}
         # a. 状態変数の初期化
         variables_tower = self._init_variables()
         # b. 吸着計算
@@ -146,25 +148,33 @@ class GasAdosorption_Breakthrough_simulator():
         for p in self.df_operation.index:
             # 各塔の稼働モード抽出
             mode_list = list(self.df_operation.loc[p, ["塔1", "塔2", "塔3"]])
-            # 終了条件(文字列)の抽出
-            termination_cond_str = self.df_operation.loc[p, "終了条件"]
+            # # 終了条件(文字列)の抽出
+            # termination_cond_str = self.df_operation.loc[p, "終了条件"]
+            # 手動終了条件の抽出
+            termination_time = self.df_operation.loc[p, "手動終了時刻"]
             # プロセスpにおける各塔の吸着計算実施
-            timestamp, variables_tower, record_dict = self.calc_adsorption_process(self.sim_conds,
-                                                                                   mode_list,
-                                                                                   termination_cond_str,
-                                                                                   variables_tower,
-                                                                                   record_dict,
-                                                                                   timestamp)
+            timestamp, variables_tower, record_dict = self.calc_adsorption_process(sim_conds=self.sim_conds,
+                                                                                   mode_list=mode_list,
+                                                                                   termination_cond_str=termination_time,
+                                                                                   variables_tower=variables_tower,
+                                                                                   record_dict=record_dict,
+                                                                                   timestamp=timestamp,
+                                                                                   manual=True)
             print(f"プロセス {p}: done. timestamp: {round(timestamp,2)}")
-            # if p == 11:
-            #     break
+            # 記録
+            p_end_dict[p] = timestamp
 
         ### ◆(3/4) csv出力 -------------------------------------------------
         print("(2/3) csv output...")
+        # 計算結果
         for _tower_num in range(1, 1+self.sim_conds["NUM_TOWER"]):
-            tgt_foldapath = output_foldapath + mode + f"/csv/tower_{_tower_num}/"
-            os.makedirs(tgt_foldapath, exist_ok=True)
-            plot_csv.outputs_to_csv(tgt_foldapath, record_dict[_tower_num], self.sim_conds)
+            _tgt_foldapath = output_foldapath + mode + f"/csv/tower_{_tower_num}/"
+            os.makedirs(_tgt_foldapath, exist_ok=True)
+            plot_csv.outputs_to_csv(_tgt_foldapath, record_dict[_tower_num], self.sim_conds)
+        # プロセス終了時刻
+        _tgt_foldapath = output_foldapath + mode
+        self.df_operation["終了時刻(min)"] = p_end_dict.values()
+        self.df_operation.to_csv(_tgt_foldapath + "/プロセス終了時刻.csv", encoding="shift-jis")
 
         ### ◆(4/4) 可視化 -------------------------------------------------
         print("(3/3) png output...")
@@ -182,9 +192,10 @@ class GasAdosorption_Breakthrough_simulator():
                                       df_obs=self.df_obs,
                                       tgt_sections=plot_target_sec,
                                       tower_num=_tower_num,
-                                      timestamp=timestamp)
+                                      timestamp=timestamp,
+                                      df_p_end=self.df_operation)
 
-    def calc_adsorption_process(self, sim_conds, mode_list, termination_cond_str, variables_tower, record_dict, timestamp):
+    def calc_adsorption_process(self, sim_conds, mode_list, termination_cond_str, variables_tower, record_dict, timestamp, manual=False):
         """ プロセスpの各塔のガス吸着計算を行う
 
         Args:
@@ -194,37 +205,12 @@ class GasAdosorption_Breakthrough_simulator():
             record_dict (dict): 計算結果の記録用
             timestamp (float): 時刻t
         """
-        # プロセス開始後経過時間
-        timestamp_p = 0
-        # 終了条件関数の抽出
-        termination_cond_1, termination_cond_2 = self._create_termination_cond(termination_cond_str)
-        # 吸着計算
-        # 終了条件１
-        while termination_cond_1(variables_tower, timestamp_p):
-            # 状態変数(圧力)の上書き
-            _tgt_index = self.df_obs.index[np.abs(self.df_obs.index - (timestamp+timestamp_p)).argmin()]
-            for _tower_num in range(1, 1+self.sim_conds["NUM_TOWER"]):
-                variables_tower[_tower_num]["total_press"] = self.df_obs.loc[_tgt_index, f"T{_tower_num}_press"]
-            # 各塔の吸着計算実施
-            variables_tower, _record_outputs_tower = self.calc_adsorption_mode_list(sim_conds,
-                                                                                    mode_list,
-                                                                                    variables_tower,
-                                                                                    timestamp + timestamp_p)
-            # timestamp_p更新
-            timestamp_p += sim_conds["dt"]
-            # 記録
-            for _tower_num in range(1, 1+sim_conds["NUM_TOWER"]):
-                record_dict[_tower_num]["timestamp"].append(timestamp + timestamp_p)
-                for key, values in _record_outputs_tower[_tower_num].items():
-                    record_dict[_tower_num][key].append(values)
-            # # 強制終了
-            if timestamp_p >= 10:
-                break
-        # 終了条件２（あれば実行）
-        if termination_cond_2 is not None:
-            timestamp += timestamp_p
+        # 手動の場合は時間経過で終了
+        if manual:
+            # プロセス開始後経過時間
             timestamp_p = 0
-            while termination_cond_2(timestamp_p):
+            # 吸着計算
+            while timestamp + timestamp_p <= termination_cond_str:
                 # 状態変数(圧力)の上書き
                 _tgt_index = self.df_obs.index[np.abs(self.df_obs.index - (timestamp+timestamp_p)).argmin()]
                 for _tower_num in range(1, 1+self.sim_conds["NUM_TOWER"]):
@@ -241,6 +227,55 @@ class GasAdosorption_Breakthrough_simulator():
                     record_dict[_tower_num]["timestamp"].append(timestamp + timestamp_p)
                     for key, values in _record_outputs_tower[_tower_num].items():
                         record_dict[_tower_num][key].append(values)
+        # 終了条件を読み込む場合
+        else:
+            # プロセス開始後経過時間
+            timestamp_p = 0
+            # 終了条件関数の抽出
+            termination_cond_1, termination_cond_2 = self._create_termination_cond(termination_cond_str)
+            # 吸着計算
+            # 終了条件１
+            while termination_cond_1(variables_tower, timestamp_p):
+                # 状態変数(圧力)の上書き
+                _tgt_index = self.df_obs.index[np.abs(self.df_obs.index - (timestamp+timestamp_p)).argmin()]
+                for _tower_num in range(1, 1+self.sim_conds["NUM_TOWER"]):
+                    variables_tower[_tower_num]["total_press"] = self.df_obs.loc[_tgt_index, f"T{_tower_num}_press"]
+                # 各塔の吸着計算実施
+                variables_tower, _record_outputs_tower = self.calc_adsorption_mode_list(sim_conds,
+                                                                                        mode_list,
+                                                                                        variables_tower,
+                                                                                        timestamp + timestamp_p)
+                # timestamp_p更新
+                timestamp_p += sim_conds["dt"]
+                # 記録
+                for _tower_num in range(1, 1+sim_conds["NUM_TOWER"]):
+                    record_dict[_tower_num]["timestamp"].append(timestamp + timestamp_p)
+                    for key, values in _record_outputs_tower[_tower_num].items():
+                        record_dict[_tower_num][key].append(values)
+                # # 強制終了
+                if timestamp_p >= 10:
+                    break
+            # 終了条件２（あれば実行）
+            if termination_cond_2 is not None:
+                timestamp += timestamp_p
+                timestamp_p = 0
+                while termination_cond_2(timestamp_p):
+                    # 状態変数(圧力)の上書き
+                    _tgt_index = self.df_obs.index[np.abs(self.df_obs.index - (timestamp+timestamp_p)).argmin()]
+                    for _tower_num in range(1, 1+self.sim_conds["NUM_TOWER"]):
+                        variables_tower[_tower_num]["total_press"] = self.df_obs.loc[_tgt_index, f"T{_tower_num}_press"]
+                    # 各塔の吸着計算実施
+                    variables_tower, _record_outputs_tower = self.calc_adsorption_mode_list(sim_conds,
+                                                                                            mode_list,
+                                                                                            variables_tower,
+                                                                                            timestamp + timestamp_p)
+                    # timestamp_p更新
+                    timestamp_p += sim_conds["dt"]
+                    # 記録
+                    for _tower_num in range(1, 1+sim_conds["NUM_TOWER"]):
+                        record_dict[_tower_num]["timestamp"].append(timestamp + timestamp_p)
+                        for key, values in _record_outputs_tower[_tower_num].items():
+                            record_dict[_tower_num][key].append(values)
 
         return timestamp + timestamp_p, variables_tower, record_dict
 
@@ -549,4 +584,4 @@ class GasAdosorption_Breakthrough_simulator():
                 _time /= 60 # 単位をminに合わせる
             def termination_cond_2(timestamp_p): # 終了条件(ブール値)
                 return timestamp_p <= _time
-            return termination_cond_1, None
+            return termination_cond_1, termination_cond_2

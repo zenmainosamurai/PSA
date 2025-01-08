@@ -5,7 +5,7 @@ data_path: 3塔データ.csv
 operation_path: 稼働工程表_test.xlsx
 
 # 計算ステップ(min)
-dt: 0.001
+dt: 0.01
 dt_eq: 0.000000000001 # 均圧モード用
 
 # 吸着塔の数

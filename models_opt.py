@@ -146,11 +146,11 @@ class GasAdosorption_for_Optimize():
         # 最適化条件
         params_dict = {
             "INFLOW_GAS_COND": {
-                "adsorp_heat_co2": trial.suggest_float("adsorp_heat_co2", 100, 2500, log=True),
+                "adsorp_heat_co2": trial.suggest_float("adsorp_heat_co2", 100, 3000, log=True),
             },
             "PACKED_BED_COND": {
-                "ks_adsorp": trial.suggest_float("ks_adsorp", 1e-3, 1e2, log=True),
-                "ks_desorp": trial.suggest_float("ks_desorp", 1e-3, 1e2, log=True),
+                "ks_adsorp": trial.suggest_float("ks_adsorp", 1e-3, 10, log=True),
+                "ks_desorp": trial.suggest_float("ks_desorp", 1e-3, 10, log=True),
             },
             "DRUM_WALL_COND": {
                 "coef_hw1": trial.suggest_float("coef_hw1", 1e-3, 1e1, log=True),
@@ -165,9 +165,9 @@ class GasAdosorption_for_Optimize():
         except Exception as e:
             # エラーをログに記録
             # print(f"Error occurred: {e}")
-            print(f"Error occurred: {params_dict}")
+            print(f"Error occurred: {e}")
             # 試行を失敗として扱う
-            return float('inf')  # または raise
+            return 100  # または raise
 
     def calc_score(self, params_dict):
         """ 物理計算を通しで実行
@@ -201,13 +201,16 @@ class GasAdosorption_for_Optimize():
             mode_list = list(instance.df_operation.loc[p, ["塔1", "塔2", "塔3"]])
             # 終了条件(文字列)の抽出
             termination_cond_str = instance.df_operation.loc[p, "終了条件"]
+            # 手動終了条件の抽出
+            termination_time = instance.df_operation.loc[p, "手動終了時刻"]
             # プロセスpにおける各塔の吸着計算実施
-            timestamp, variables_tower, record_dict = instance.calc_adsorption_process(instance.sim_conds,
-                                                                                   mode_list,
-                                                                                   termination_cond_str,
-                                                                                   variables_tower,
-                                                                                   record_dict,
-                                                                                   timestamp)
+            timestamp, variables_tower, record_dict = instance.calc_adsorption_process(sim_conds=instance.sim_conds,
+                                                                                       mode_list=mode_list,
+                                                                                       termination_cond_str=termination_time,
+                                                                                       variables_tower=variables_tower,
+                                                                                       record_dict=record_dict,
+                                                                                       timestamp=timestamp,
+                                                                                       manual=True)
         # 温度データの抽出
         values = {}
         num_data = len(record_dict[1]["timestamp"])

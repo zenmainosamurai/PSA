@@ -5,8 +5,8 @@ data_path: 3塔データ.csv
 operation_path: 稼働工程表_test.xlsx
 
 # 計算ステップ(min)
-dt: 0.001
-dt_eq: 0.000000000001 # 均圧モード用
+dt: 0.01
+dt_eq: 0.00000001 # 均圧モード用
 
 # 吸着塔の数
 NUM_TOWER: 3
@@ -55,8 +55,8 @@ PACKED_BED_COND: {
   dp: 0.001,          # 平均粒子径 [m]
   phi: 1,             # 形状補正係数 [-]
   vp: 0,              # 到達真空圧力 [kPaA]
-  ks_adsorp: 0.1920705563185114,       # 吸着移動係数 [1e-6/sec]
-  ks_desorp: 1.10359219332466637,       # 吸着移動係数 [1e-6/sec]
+  ks_adsorp: 0.9920705563185114,       # 吸着移動係数 [1e-6/sec]
+  ks_desorp: 0.0010359219332466637,       # 吸着移動係数 [1e-6/sec]
   # v_space: Sbed * Lbed * epsilon     # 充填層空間体積 [m3]
   vacuume_pressure: 2,  # 到達真空圧力 [kPaA]
   v_upstream: 0       # 上流空間体積 [m3]
@@ -77,7 +77,7 @@ DRUM_WALL_COND: {
   # la_drum: pi*Ddrum*Ldrum, # 容器側面積 [m2]
   coef_outair_heat: 200, # 外気熱伝達係数 [W/m2/K]
   temp_outside: 15,   # 外気温 [℃]
-  coef_hw1: 0.4739042708623337, # 1,        # 壁-層伝熱係数の補正係数
+  coef_hw1: 0.04739042708623337, # 1,        # 壁-層伝熱係数の補正係数
 }
 
 # 上下の蓋の条件

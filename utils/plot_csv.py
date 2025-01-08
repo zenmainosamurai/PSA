@@ -7,7 +7,7 @@ import math
 import glob
 from utils import const
 
-def plot_csv_outputs(tgt_foldapath, df_obs, tgt_sections, tower_num, timestamp):
+def plot_csv_outputs(tgt_foldapath, df_obs, tgt_sections, tower_num, timestamp, df_p_end):
     """ 熱バラ計算結果の可視化
 
     Args:
@@ -15,6 +15,7 @@ def plot_csv_outputs(tgt_foldapath, df_obs, tgt_sections, tower_num, timestamp):
         df_obs (pd.DataFrame): 観測値のデータフレーム
         tgt_sections (list): 可視化対象のセクション
         tower_num (int): 塔番号
+        df_p_end (pd.DataFrame): プロセス終了時刻を含むデータフレーム
     """
     ### パラメータ設定 --------------------------------------
 
@@ -52,6 +53,7 @@ def plot_csv_outputs(tgt_foldapath, df_obs, tgt_sections, tower_num, timestamp):
         plt.subplot(num_row, 2, i+1)
         # 可視化対象のcolumnsを抽出
         plt_tgt_cols = [col for col in df.columns if int(col.split("-")[-1]) in tgt_sections]
+        # 各項目のプロット
         for col in plt_tgt_cols:
             stream = int(col.split("-")[-2])
             section = int(col.split("-")[-1])
@@ -64,14 +66,26 @@ def plot_csv_outputs(tgt_foldapath, df_obs, tgt_sections, tower_num, timestamp):
         plt.grid()
         plt.legend(fontsize=12)
         plt.xlabel("timestamp")
+        # セクション到達温度のみ観測値をプロット
         if key == "セクション到達温度":
-            for stream in range(1,3):
-                plt.plot(df_obs.loc[:timestamp, f"T{tower_num}_temp_{stream}"],
-                        label=f"(str,sec) = ({stream}, {tgt_sections[i]})",
-                        linestyle = linestyle_dict[tgt_sections[i]],
-                        c = color_dict_obs[stream]
+            for section in range(1,4):
+                plt.plot(df_obs.loc[:timestamp, f"T{tower_num}_temp_{section}"],
+                        label=f"(str,sec) = (1, {tgt_sections[section-1]})",
+                        linestyle = linestyle_dict[tgt_sections[section-1]],
+                        c = "black"
                         )
-            plt.legend(fontsize=8)
+            plt.legend(fontsize=12)
+        # プロセス終了時刻の縦線をプロット
+        ax = plt.gca()
+        ymin, ymax = ax.get_ylim()
+        p_name_bfr = ""
+        for idx in df_p_end.index:
+            p_name = df_p_end.loc[idx, f"塔{tower_num}"]
+            if p_name == p_name_bfr:
+                continue
+            tgt_timestamp = df_p_end.loc[idx, "終了時刻(min)"]
+            plt.vlines(tgt_timestamp, ymin=ymin, ymax=ymax, colors="tab:orange", alpha=1)
+            p_name_bfr = p_name
     plt.savefig(output_foldapath + "heat.png", dpi=100)
     plt.close()
 
@@ -92,6 +106,7 @@ def plot_csv_outputs(tgt_foldapath, df_obs, tgt_sections, tower_num, timestamp):
         plt.subplot(num_row, 2, i+1)
         # 可視化対象のcolumnsを抽出
         plt_tgt_cols = [col for col in df.columns if int(col.split("-")[-1]) in tgt_sections]
+        # 各項目のプロット
         for col in plt_tgt_cols:
             stream = int(col.split("-")[-2])
             section = int(col.split("-")[-1])
@@ -104,6 +119,17 @@ def plot_csv_outputs(tgt_foldapath, df_obs, tgt_sections, tower_num, timestamp):
         plt.grid()
         plt.legend(fontsize=16)
         plt.xlabel("timestamp")
+        # プロセス終了時刻の縦線をプロット
+        ax = plt.gca()
+        ymin, ymax = ax.get_ylim()
+        p_name_bfr = ""
+        for idx in df_p_end.index:
+            p_name = df_p_end.loc[idx, f"塔{tower_num}"]
+            if p_name == p_name_bfr:
+                continue
+            tgt_timestamp = df_p_end.loc[idx, "終了時刻(min)"]
+            plt.vlines(tgt_timestamp, ymin=ymin, ymax=ymax, colors="tab:orange", alpha=1)
+            p_name_bfr = p_name
     plt.savefig(output_foldapath + "material.png", dpi=100)
     plt.close()
 
@@ -130,6 +156,17 @@ def plot_csv_outputs(tgt_foldapath, df_obs, tgt_sections, tower_num, timestamp):
         plt.title(title + " " + unit)
         plt.grid()
         plt.xlabel("timestamp")
+        # プロセス終了時刻の縦線をプロット
+        ax = plt.gca()
+        ymin, ymax = ax.get_ylim()
+        p_name_bfr = ""
+        for idx in df_p_end.index:
+            p_name = df_p_end.loc[idx, f"塔{tower_num}"]
+            if p_name == p_name_bfr:
+                continue
+            tgt_timestamp = df_p_end.loc[idx, "終了時刻(min)"]
+            plt.vlines(tgt_timestamp, ymin=ymin, ymax=ymax, colors="tab:orange", alpha=1)
+            p_name_bfr = p_name
     plt.savefig(output_foldapath + "heat_lid.png", dpi=100)
     plt.close()
 
@@ -145,9 +182,11 @@ def plot_csv_outputs(tgt_foldapath, df_obs, tgt_sections, tower_num, timestamp):
 
     for i, col in enumerate(df.columns):
         plt.rcParams["font.size"] = 20
+        # 各項目のプロット
         plt.subplot(num_row, 2, i+1)
         plt.plot(df[col], label="計算値")
-        if col == "total_press": # 全圧の観測値もプロット
+        # 全圧のみ観測値もプロット
+        if col == "total_press":
             plt.plot(df_obs.loc[:timestamp, f"T{tower_num}_press"], label="観測値", c="black")
         _title = const.TRANSLATION[col]
         _unit = const.UNIT[_title]
@@ -155,6 +194,17 @@ def plot_csv_outputs(tgt_foldapath, df_obs, tgt_sections, tower_num, timestamp):
         plt.legend()
         plt.grid()
         plt.xlabel("timestamp")
+        # プロセス終了時刻の縦線をプロット
+        ax = plt.gca()
+        ymin, ymax = ax.get_ylim()
+        p_name_bfr = ""
+        for idx in df_p_end.index:
+            p_name = df_p_end.loc[idx, f"塔{tower_num}"]
+            if p_name == p_name_bfr:
+                continue
+            tgt_timestamp = df_p_end.loc[idx, "終了時刻(min)"]
+            plt.vlines(tgt_timestamp, ymin=ymin, ymax=ymax, colors="tab:orange", alpha=1)
+            p_name_bfr = p_name
     plt.savefig(output_foldapath + "others.png", dpi=100)
     plt.close()
 
