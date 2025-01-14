@@ -124,27 +124,18 @@ def stop_mode(sim_conds, stream_conds, variables):
     hb_dict = {}
     hb_wall = {}
     hb_lid = {}
-    mode = 2 # 脱着
+    mode = 1 # 弁停止モード
 
     ### セル計算 --------------------------------------------------------------
 
-    # 0. 排気後圧力の計算
-    vaccume_output = base_models.total_press_after_vacuuming(sim_conds=sim_conds,
-                                                             variables=variables,
-                                                             stop_mode=True) # 排気速度=0
-    # tgt_index = df_obs.index[np.argmin(np.abs(df_obs.index - timestamp))] # 圧力を観測値で上書き
-    # vaccume_output["total_press_after_vaccume"] = df_obs.loc[tgt_index, "Pressure"] / 1000 # 圧力[Mpa]
     # 1. マテバラ・熱バラ計算
     for stream in range(1, 1+sim_conds["CELL_SPLIT"]["num_str"]):
         mb_dict[stream] = {}
         hb_dict[stream] = {}
         # sec_1は手動で実施
-        mb_dict[stream][1] = base_models.material_balance_desorp(sim_conds=sim_conds,
-                                                                 stream_conds=stream_conds,
-                                                                 stream=stream,
-                                                                 section=1,
-                                                                 variables=variables,
-                                                                 vaccume_output=vaccume_output)
+        mb_dict[stream][1] = base_models.material_balance_valve_stop(stream=stream,
+                                                                     section=1,
+                                                                     variables=variables)
         hb_dict[stream][1] = base_models.heat_balance(sim_conds=sim_conds,
                                                       stream_conds=stream_conds,
                                                       stream=stream,
@@ -153,15 +144,12 @@ def stop_mode(sim_conds, stream_conds, variables):
                                                       mode=mode,
                                                       material_output=mb_dict[stream][1],
                                                       heat_output=None,
-                                                      vaccume_output=vaccume_output)
+                                                      vaccume_output=None)
         # sec_2以降は自動で実施
         for section in range(2, 1+sim_conds["CELL_SPLIT"]["num_sec"]):
-            mb_dict[stream][section] = base_models.material_balance_desorp(sim_conds=sim_conds,
-                                                                           stream_conds=stream_conds,
-                                                                           stream=stream,
-                                                                           section=section,
-                                                                           variables=variables,
-                                                                           vaccume_output=vaccume_output)
+            mb_dict[stream][section] = base_models.material_balance_valve_stop(stream=stream,
+                                                                               section=section,
+                                                                               variables=variables)
             hb_dict[stream][section] = base_models.heat_balance(sim_conds=sim_conds,
                                                                 stream_conds=stream_conds,
                                                                 stream=stream,
@@ -170,7 +158,7 @@ def stop_mode(sim_conds, stream_conds, variables):
                                                                 mode=mode,
                                                                 material_output=mb_dict[stream][section],
                                                                 heat_output=hb_dict[stream][section-1],
-                                                                vaccume_output=vaccume_output)
+                                                                vaccume_output=None)
     # 2. 壁面熱バラ（stream = 1+sim_conds["CELL_SPLIT"]["num_str"]）
     hb_wall[1] = base_models.heat_balance_wall(sim_conds=sim_conds,
                                                stream_conds=stream_conds,
@@ -192,17 +180,12 @@ def stop_mode(sim_conds, stream_conds, variables):
                                                         variables=variables,
                                                         heat_output=hb_dict,
                                                         heat_wall_output=hb_wall)
-    # 4. 排気後モル分率計算
-    mf_after_vaccume = base_models.mf_after_vaccume(sim_conds=sim_conds,
-                                                    vaccume_output=vaccume_output,
-                                                    mb_dict=mb_dict,)
     # 出力
     output = {
         "material": mb_dict, # マテバラ
         "heat": hb_dict, # 熱バラ
         "heat_wall": hb_wall, # 熱バラ（壁面）
         "heat_lid": hb_lid, # 熱バラ（蓋）
-        "total_press_and_mf": {**vaccume_output, **mf_after_vaccume}, # 排気結果
     }
 
     return output

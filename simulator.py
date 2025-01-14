@@ -60,10 +60,13 @@ class GasAdosorption_Breakthrough_simulator():
         self.df_obs = other_utils.resample_obs_data(self.df_obs, self.sim_conds["dt"]) # リサンプリング
 
         # 稼働表の読み込み
-        filepath = const.DATA_DIR + self.sim_conds["operation_path"]
+        filepath = const.CONDITIONS_DIR + self.cond_id + "/" + self.sim_conds["operation_path"]
         self.df_operation = pd.read_excel(filepath, index_col="工程", sheet_name="工程")
 
         # その他初期化
+        # NOTE: test記録用
+        self.record_test = []
+        self.record_test2 = []
 
     def _init_variables(self):
         """ 各塔の状態変数を初期化
@@ -175,6 +178,9 @@ class GasAdosorption_Breakthrough_simulator():
         _tgt_foldapath = output_foldapath + mode
         self.df_operation["終了時刻(min)"] = p_end_dict.values()
         self.df_operation.to_csv(_tgt_foldapath + "/プロセス終了時刻.csv", encoding="shift-jis")
+        # NOTE: test用
+        pd.DataFrame(self.record_test, columns=["timestamp", "圧力差"]).to_csv(_tgt_foldapath + "/塔23圧力差.csv")
+        pd.DataFrame(self.record_test2, columns=["減圧後圧力", "減圧後CO2モル分率", "減圧後N2モル分率", "均圧配管流量", "均圧塔の圧力差"]).to_csv(_tgt_foldapath + "/塔3減圧後圧力・モル分率.csv")
 
         ### ◆(4/4) 可視化 -------------------------------------------------
         print("(3/3) png output...")
@@ -215,6 +221,8 @@ class GasAdosorption_Breakthrough_simulator():
                 _tgt_index = self.df_obs.index[np.abs(self.df_obs.index - (timestamp+timestamp_p)).argmin()]
                 for _tower_num in range(1, 1+self.sim_conds["NUM_TOWER"]):
                     variables_tower[_tower_num]["total_press"] = self.df_obs.loc[_tgt_index, f"T{_tower_num}_press"]
+                # NOTE: test記録用
+                self.record_test.append([timestamp, variables_tower[3]["total_press"] - variables_tower[2]["total_press"]])
                 # 各塔の吸着計算実施
                 variables_tower, _record_outputs_tower = self.calc_adsorption_mode_list(sim_conds,
                                                                                         mode_list,
@@ -350,21 +358,20 @@ class GasAdosorption_Breakthrough_simulator():
             _tgt_tower_num_press = mode_list.index(_tgt_mode_pre) + 1
             # NOTE: 均圧工程は計算ステップを小さくする
             _time_step = 0
-            new_variables_tower = variables_tower.copy()
             while _time_step <= self.sim_conds["dt"]:
                 # 減圧から実施
                 # NOTE: 加圧側の全圧を引数として渡す
                 new_variables_tower[_tgt_tower_num_depress], record_outputs_tower[_tgt_tower_num_depress], all_outputs\
                     = self.branch_operation_mode(sim_conds=sim_conds,
                                                 mode=_tgt_mode_dep,
-                                                variables=new_variables_tower[_tgt_tower_num_depress],
-                                                other_tower_params=new_variables_tower[_tgt_tower_num_press]["total_press"])
+                                                variables=variables_tower[_tgt_tower_num_depress],
+                                                other_tower_params=variables_tower[_tgt_tower_num_press]["total_press"])
                 # 加圧
                 # NOTE: 減圧側の均圧配管流量を引数として渡す
                 new_variables_tower[_tgt_tower_num_press], record_outputs_tower[_tgt_tower_num_press], _\
                     = self.branch_operation_mode(sim_conds=sim_conds,
                                                 mode=_tgt_mode_pre,
-                                                variables=new_variables_tower[_tgt_tower_num_press],
+                                                variables=variables_tower[_tgt_tower_num_press],
                                                 other_tower_params=all_outputs["total_press_and_mf"]["flow_amount_l"])
                 # 圧力差が0になれば均圧完了
                 if all_outputs["total_press_and_mf"]["diff_press"] == 0:
@@ -447,6 +454,8 @@ class GasAdosorption_Breakthrough_simulator():
                                                                         stream_conds=self.stream_conds,
                                                                         variables=variables,
                                                                         downflow_total_press=other_tower_params)
+            # NOTE: test記録用
+            self.record_test2.append(list(calc_output["total_press_and_mf"].values()))
         # 均圧_加圧
         elif mode == "均圧_加圧":
             calc_output = models.equalization_pressure_pressurization(sim_conds=sim_conds,
@@ -524,7 +533,8 @@ class GasAdosorption_Breakthrough_simulator():
         else:
             new_variables["total_press"] = variables["total_press"]
         # 気相モル分率
-        if mode in ["停止", "真空脱着"]:
+        # if mode in ["停止", "真空脱着"]: # NOTE: 停止モード→弁停止モードとした際にコメントアウト
+        if mode in ["真空脱着"]:
             new_variables["mf_co2"] = calc_output["total_press_and_mf"]["mf_co2_after_vaccume"]
             new_variables["mf_n2"] = calc_output["total_press_and_mf"]["mf_n2_after_vaccume"]
         elif mode in ["均圧_減圧"]:

@@ -165,7 +165,7 @@ class GasAdosorption_for_Optimize():
         except Exception as e:
             # エラーをログに記録
             # print(f"Error occurred: {e}")
-            print(f"Error occurred: {e}")
+            print(f"Error occurred: {params_dict}")
             # 試行を失敗として扱う
             return 100  # または raise
 

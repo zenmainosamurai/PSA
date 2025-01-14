@@ -225,6 +225,41 @@ def material_balance_desorp(sim_conds, stream_conds, stream, section, variables,
 
     return output
 
+def material_balance_valve_stop(stream, section, variables):
+    """ 任意セルのマテリアルバランスを計算する
+        脱着モード
+
+    Args:
+        stream (int): 対象セルのstream番号
+        section (int): 対象セルのsection番号
+        variables (dict): 温度等の状態変数
+        vaccume_output (dict): 排気後圧力計算の出力
+
+    Returns:
+        dict: 対象セルの計算結果
+    """
+    # 何の反応もしない
+    output = {
+        "inflow_fr_co2": 0,
+        "inflow_fr_n2": 0,
+        "inflow_mf_co2": 0,
+        "inflow_mf_n2": 0,
+        "gas_density": 0,
+        "gas_cp": 0,
+        "adsorp_amt_equilibrium": 0,
+        "adsorp_amt_estimate": 0,
+        "accum_adsorp_amt": variables["adsorp_amt"][stream][section],
+        "outflow_fr_co2": 0,
+        "outflow_fr_n2": 0,
+        "outflow_mf_co2": 0,
+        "outflow_mf_n2": 0,
+        "adsorp_amt_estimate_abs": 0,
+        "desorp_mw_co2": 0,
+        "p_co2": 0,
+    }
+
+    return output
+
 def heat_balance(sim_conds, stream_conds, stream, section, variables, mode,
                     material_output=None, heat_output=None, vaccume_output=None):
     """ 対象セルの熱バランスを計算する
@@ -646,8 +681,10 @@ def total_press_after_decompression(sim_conds, variables, downflow_total_press, 
     )
     # 減圧後CO2モル量 [mol]
     mw_co2_after_decompression = variables["mf_co2"] * case_inner_amount + sum_desorp_mw
+    mw_co2_after_decompression = max(0, mw_co2_after_decompression)
     # 減圧後N2モル量 [mol]
     mw_n2_after_decompression = variables["mf_n2"] * case_inner_amount
+    mw_n2_after_decompression = max(0, mw_n2_after_decompression)
     # 減圧後CO2モル分率
     mf_co2_after_decompression = mw_co2_after_decompression / (mw_co2_after_decompression + mw_n2_after_decompression)
     # 減圧後N2モル分率
@@ -681,8 +718,10 @@ def mf_after_vaccume(sim_conds, vaccume_output, mb_dict):
     ])
     # 脱着後気相CO2モル量 [mol]
     mw_co2_after_vaccume = sum_desorp_mw + vaccume_output["mw_co2_after_vaccume"]
+    mw_co2_after_vaccume = max(0, mw_co2_after_vaccume)
     # 脱着後気相N2モル量 [mol]
     mw_n2_after_vaccume = vaccume_output["mw_n2_after_vaccume"]
+    mw_n2_after_vaccume = max(0, mw_n2_after_vaccume)
     # 脱着後気相CO2モル分率
     mf_co2_after_vaccume = mw_co2_after_vaccume / (mw_co2_after_vaccume + mw_n2_after_vaccume)
     # 脱着後気相N2モル分率
