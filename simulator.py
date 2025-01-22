@@ -96,13 +96,24 @@ class GasAdosorption_Breakthrough_simulator():
                 variables_tower[_tower_num]["temp_lid"][position] = self.sim_conds["DRUM_WALL_COND"]["temp_outside"]
             # 吸着量
             variables_tower[_tower_num]["adsorp_amt"] = {}
+            P = 2
+            T = 25 + 273.15
             for stream in range(1, 1+self.num_str):
                 variables_tower[_tower_num]["adsorp_amt"][stream] = {}
                 for section in range(1, 1+self.num_sec):
                     variables_tower[_tower_num]["adsorp_amt"][stream][section] = (
-                        _equilibrium_adsorp_amt(self.df_obs.loc[0, f"T{_tower_num}_press"]*1000*self.sim_conds["INFLOW_GAS_COND"]["mf_co2"], # CO2分圧
-                                                variables_tower[_tower_num]["temp"][stream][section] + 273.15)
+                        _equilibrium_adsorp_amt(P, # CO2分圧
+                                                T)
                     )
+            # モル分率
+            variables_tower[_tower_num]["mf_co2"] = {}
+            variables_tower[_tower_num]["mf_n2"] = {}
+            for stream in range(1, 1+self.num_str):
+                variables_tower[_tower_num]["mf_co2"][stream] = {}
+                variables_tower[_tower_num]["mf_n2"][stream] = {}
+                for section in range(1, 1+self.num_sec):
+                    variables_tower[_tower_num]["mf_co2"][stream][section] = self.sim_conds["INFLOW_GAS_COND"]["mf_co2"]
+                    variables_tower[_tower_num]["mf_n2"][stream][section] = self.sim_conds["INFLOW_GAS_COND"]["mf_n2"]
             # 壁-、層伝熱係数
             variables_tower[_tower_num]["heat_t_coef"] = {} # 層伝熱係数
             variables_tower[_tower_num]["heat_t_coef_wall"] = {} # 壁-層伝熱係数
@@ -114,9 +125,6 @@ class GasAdosorption_Breakthrough_simulator():
                     variables_tower[_tower_num]["heat_t_coef_wall"][stream][section] = 14
             # 全圧
             variables_tower[_tower_num]["total_press"] = self.df_obs.loc[0, f"T{_tower_num}_press"]
-            # モル分率
-            variables_tower[_tower_num]["mf_co2"] = self.sim_conds["INFLOW_GAS_COND"]["mf_co2"]
-            variables_tower[_tower_num]["mf_n2"] = self.sim_conds["INFLOW_GAS_COND"]["mf_n2"]
 
         return variables_tower
 
@@ -179,8 +187,8 @@ class GasAdosorption_Breakthrough_simulator():
         self.df_operation["終了時刻(min)"] = p_end_dict.values()
         self.df_operation.to_csv(_tgt_foldapath + "/プロセス終了時刻.csv", encoding="shift-jis")
         # NOTE: test用
-        pd.DataFrame(self.record_test, columns=["timestamp", "圧力差"]).to_csv(_tgt_foldapath + "/塔23圧力差.csv")
-        pd.DataFrame(self.record_test2, columns=["減圧後圧力", "減圧後CO2モル分率", "減圧後N2モル分率", "均圧配管流量", "均圧塔の圧力差"]).to_csv(_tgt_foldapath + "/塔3減圧後圧力・モル分率.csv")
+        pd.DataFrame(self.record_test, columns=["Feq [m3/min]", "Feq [L/min]", "diff_press [MPaA]", "total_press [MPaA]"]).to_csv(_tgt_foldapath + "/塔23圧力差.csv")#, encoding="shift-jis")
+        # pd.DataFrame(self.record_test2, columns=["減圧後圧力", "減圧後CO2モル分率", "減圧後N2モル分率", "均圧配管流量", "均圧塔の圧力差"]).to_csv(_tgt_foldapath + "/塔3減圧後圧力・モル分率.csv")
 
         ### ◆(4/4) 可視化 -------------------------------------------------
         print("(3/3) png output...")
@@ -221,8 +229,6 @@ class GasAdosorption_Breakthrough_simulator():
                 _tgt_index = self.df_obs.index[np.abs(self.df_obs.index - (timestamp+timestamp_p)).argmin()]
                 for _tower_num in range(1, 1+self.sim_conds["NUM_TOWER"]):
                     variables_tower[_tower_num]["total_press"] = self.df_obs.loc[_tgt_index, f"T{_tower_num}_press"]
-                # NOTE: test記録用
-                self.record_test.append([timestamp, variables_tower[3]["total_press"] - variables_tower[2]["total_press"]])
                 # 各塔の吸着計算実施
                 variables_tower, _record_outputs_tower = self.calc_adsorption_mode_list(sim_conds,
                                                                                         mode_list,
@@ -372,9 +378,9 @@ class GasAdosorption_Breakthrough_simulator():
                     = self.branch_operation_mode(sim_conds=sim_conds,
                                                 mode=_tgt_mode_pre,
                                                 variables=variables_tower[_tgt_tower_num_press],
-                                                other_tower_params=all_outputs["total_press_and_mf"]["flow_amount_l"])
+                                                other_tower_params=all_outputs["total_press"]["flow_amount_l"])
                 # 圧力差が0になれば均圧完了
-                if all_outputs["total_press_and_mf"]["diff_press"] == 0:
+                if all_outputs["total_press"]["diff_press"] == 0:
                     break
                 # そうでないなら引き続き小さい計算ステップで均圧する
                 else:
@@ -454,8 +460,8 @@ class GasAdosorption_Breakthrough_simulator():
                                                                         stream_conds=self.stream_conds,
                                                                         variables=variables,
                                                                         downflow_total_press=other_tower_params)
-            # NOTE: test記録用
-            self.record_test2.append(list(calc_output["total_press_and_mf"].values()))
+            # NOTE: test用
+            self.record_test.append(list(calc_output["total_press"].values()))
         # 均圧_加圧
         elif mode == "均圧_加圧":
             calc_output = models.equalization_pressure_pressurization(sim_conds=sim_conds,
@@ -514,6 +520,37 @@ class GasAdosorption_Breakthrough_simulator():
             new_variables["adsorp_amt"][stream] = {}
             for section in range(1, 1+self.num_sec):
                 new_variables["adsorp_amt"][stream][section] = calc_output["material"][stream][section]["accum_adsorp_amt"]
+        # モル分率
+        new_variables["mf_co2"] = {}
+        new_variables["mf_n2"] = {}
+        if mode in ["初回ガス導入", "流通吸着_単独/上流", "バッチ吸着_上流", "均圧_加圧", "バッチ吸着_下流", "流通吸着_下流"]:
+            for stream in range(1, 1+self.num_str):
+                new_variables["mf_co2"][stream] = {}
+                new_variables["mf_n2"][stream] = {}
+                for section in range(1, 1+self.num_sec): # 吸着時は「流出モル分率」
+                    new_variables["mf_co2"][stream][section] = calc_output["material"][stream][section]["outflow_mf_co2"]
+                    new_variables["mf_n2"][stream][section] = calc_output["material"][stream][section]["outflow_mf_n2"]
+        elif mode in ["真空脱着"]:
+            for stream in range(1, 1+self.num_str):
+                new_variables["mf_co2"][stream] = {}
+                new_variables["mf_n2"][stream] = {}
+                for section in range(1, 1+self.num_sec): # 脱着時は「脱着後のモル分率」
+                    new_variables["mf_co2"][stream][section] = calc_output["total_press_and_mf"]["mf_co2_after_vaccume"]
+                    new_variables["mf_n2"][stream][section] = calc_output["total_press_and_mf"]["mf_n2_after_vaccume"]
+        elif mode in ["停止"]:
+            for stream in range(1, 1+self.num_str):
+                new_variables["mf_co2"][stream] = {}
+                new_variables["mf_n2"][stream] = {}
+                for section in range(1, 1+self.num_sec): # 停止時は直前のモル分率
+                    new_variables["mf_co2"][stream][section] = variables["mf_co2"][stream][section]
+                    new_variables["mf_n2"][stream][section] = variables["mf_n2"][stream][section]
+        elif mode in ["均圧_減圧"]:
+            for stream in range(1, 1+self.num_str):
+                new_variables["mf_co2"][stream] = {}
+                new_variables["mf_n2"][stream] = {}
+                for section in range(1, 1+self.num_sec): # 減圧時は減圧モードで計算されるモル分率
+                    new_variables["mf_co2"][stream][section] = calc_output["mf_after_decomp"][stream][section]["mf_co2_after_decompression"]
+                    new_variables["mf_n2"][stream][section] = calc_output["mf_after_decomp"][stream][section]["mf_n2_after_decompression"]
         # 壁―, 層伝熱係数
         new_variables["heat_t_coef"] = {}
         new_variables["heat_t_coef_wall"] = {}
@@ -526,23 +563,13 @@ class GasAdosorption_Breakthrough_simulator():
         # 全圧
         if mode in ["初回ガス導入", "バッチ吸着_上流", "均圧_加圧", "バッチ吸着_下流"]:
             new_variables["total_press"] = calc_output["total_press_after_batch_adsorp"]
-        elif mode in ["均圧_減圧"]:
-            new_variables["total_press"] = calc_output["total_press_and_mf"]["total_press_after_decompression"]
+        elif mode in ["均圧_減圧"]: # NOTE: 減圧改修により暫定的に直前時刻参照
+            # new_variables["total_press"] = calc_output["total_press_and_mf"]["total_press_after_decompression"]
+            new_variables["total_press"] = variables["total_press"]
         elif mode in ["真空脱着"]:
             new_variables["total_press"] = calc_output["total_press_and_mf"]["total_press_after_vaccume"]
         else:
-            new_variables["total_press"] = variables["total_press"]
-        # 気相モル分率
-        # if mode in ["停止", "真空脱着"]: # NOTE: 停止モード→弁停止モードとした際にコメントアウト
-        if mode in ["真空脱着"]:
-            new_variables["mf_co2"] = calc_output["total_press_and_mf"]["mf_co2_after_vaccume"]
-            new_variables["mf_n2"] = calc_output["total_press_and_mf"]["mf_n2_after_vaccume"]
-        elif mode in ["均圧_減圧"]:
-            new_variables["mf_co2"] = calc_output["total_press_and_mf"]["mf_co2_after_decompression"]
-            new_variables["mf_n2"] = calc_output["total_press_and_mf"]["mf_n2_after_decompression"]
-        else:
-            new_variables["mf_co2"] = variables["mf_co2"]
-            new_variables["mf_n2"] = variables["mf_n2"]            
+            new_variables["total_press"] = variables["total_press"]     
 
         return new_variables
 

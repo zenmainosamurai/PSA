@@ -320,7 +320,10 @@ def equalization_pressure_depressurization(sim_conds, stream_conds, variables,
 
     ### セル計算 --------------------------------------------------------------
 
-    vaccume_output = {}
+    # 0. 排気後圧力の計算
+    vaccume_output = base_models.total_press_after_decompression(sim_conds=sim_conds,
+                                                                 variables=variables,
+                                                                 downflow_total_press=downflow_total_press,)
     vaccume_output["total_press_after_vaccume"] = variables["total_press"]
     # 1. マテバラ・熱バラ計算
     for stream in range(1, 1+sim_conds["CELL_SPLIT"]["num_str"]):
@@ -381,17 +384,25 @@ def equalization_pressure_depressurization(sim_conds, stream_conds, variables,
                                                         heat_output=hb_dict,
                                                         heat_wall_output=hb_wall)
     # 4. 減圧後圧力・モル分率
-    total_press_and_mf = base_models.total_press_after_decompression(sim_conds=sim_conds,
-                                                                     variables=variables,
-                                                                     downflow_total_press=downflow_total_press,
-                                                                     mb_dict=mb_dict)
+    mf_after_decomp = {}
+    for stream in range(1, 1+sim_conds["CELL_SPLIT"]["num_str"]):
+        mf_after_decomp[stream] = {}
+        for section in range(1, 1+sim_conds["CELL_SPLIT"]["num_sec"]):
+            mf_after_decomp[stream][section] = base_models.mf_after_vaccume_decompression(sim_conds=sim_conds,
+                                                                                          stream_conds=stream_conds,
+                                                                                          stream=stream,
+                                                                                          section=section,
+                                                                                          variables=variables,
+                                                                                          vaccume_output=vaccume_output,
+                                                                                          mb_dict=mb_dict)
     # 出力
     output = {
         "material": mb_dict, # マテバラ
         "heat": hb_dict, # 熱バラ
         "heat_wall": hb_wall, # 熱バラ（壁面）
         "heat_lid": hb_lid, # 熱バラ（蓋）
-        "total_press_and_mf": total_press_and_mf, # 減圧後圧力・モル分率
+        "total_press": vaccume_output, # 減圧後圧力
+        "mf_after_decomp": mf_after_decomp, # 減圧後モル分率
     }
 
     return output
@@ -481,9 +492,9 @@ def desorption_by_vaccuming(sim_conds, stream_conds, variables):
                                                         heat_output=hb_dict,
                                                         heat_wall_output=hb_wall)
     # 4. 排気後モル分率計算
-    mf_after_vaccume = base_models.mf_after_vaccume(sim_conds=sim_conds,
-                                                    vaccume_output=vaccume_output,
-                                                    mb_dict=mb_dict)
+    mf_after_vaccume = base_models.mf_after_vaccume_vaccume(sim_conds=sim_conds,
+                                                            vaccume_output=vaccume_output,
+                                                            mb_dict=mb_dict)
     # 出力
     output = {
         "material": mb_dict, # マテバラ

@@ -158,16 +158,16 @@ def material_balance_desorp(sim_conds, stream_conds, stream, section, variables,
     Mabs = stream_conds[stream]["Mabs"] / sim_conds["CELL_SPLIT"]["num_sec"]
     # ガス密度 [kg/m3]
     gas_density = (
-        CP.PropsSI('D', 'T', T_K, 'P', P, "co2") * variables["mf_co2"]
-        + CP.PropsSI('D', 'T', T_K, 'P', P, "nitrogen") * variables["mf_n2"]
+        CP.PropsSI('D', 'T', T_K, 'P', P, "co2") * variables["mf_co2"][stream][section]
+        + CP.PropsSI('D', 'T', T_K, 'P', P, "nitrogen") * variables["mf_n2"][stream][section]
     )
     # ガス比熱 [kJ/kg/K]
     gas_cp = (
-        CP.PropsSI('C', 'T', T_K, 'P', P, "co2") * variables["mf_co2"]
-        + CP.PropsSI('C', 'T', T_K, 'P', P, "nitrogen") * variables["mf_n2"]
+        CP.PropsSI('C', 'T', T_K, 'P', P, "co2") * variables["mf_co2"][stream][section]
+        + CP.PropsSI('C', 'T', T_K, 'P', P, "nitrogen") * variables["mf_n2"][stream][section]
     )
     # CO2分圧 [MPaA]
-    p_co2 = vaccume_output["total_press_after_vaccume"] * variables["mf_co2"]
+    p_co2 = vaccume_output["total_press_after_vaccume"] * variables["mf_co2"][stream][section]
     # 現在雰囲気の平衡吸着量 [cm3/g-abs]
     P_kpa = p_co2 * 1000 # [MPaA] → [kPaA]
     adsorp_amt_equilibrium = _equilibrium_adsorp_amt(P_kpa, T_K)
@@ -544,7 +544,7 @@ def heat_balance_lid(sim_conds, position, variables, heat_output, heat_wall_outp
 
 def total_press_after_vacuuming(sim_conds, variables, stop_mode=False):
     """ 排気後圧力の計算
-        流通脱着モード
+        真空脱着モード
 
     Args:
         variables (dict): 状態変数
@@ -560,6 +560,7 @@ def total_press_after_vacuuming(sim_conds, variables, stop_mode=False):
     # 容器内部空間体積 [m3]
     case_inner_volume = (
         sim_conds["PACKED_BED_COND"]["Vbed"] * sim_conds["PACKED_BED_COND"]["epsilon"]
+        # / sim_conds["CELL_SPLIT"]["num_str"] / sim_conds["CELL_SPLIT"]["num_sec"]
     )
     # 容器内部空間物質量 [mol]
     case_inner_amount = (
@@ -589,15 +590,24 @@ def total_press_after_vacuuming(sim_conds, variables, stop_mode=False):
         vaccume_amount = vacuum_rate * sim_conds["dt"]
         # 排気後容器内部空間物質量 [mol]
         case_inner_amount_after_vaccume = case_inner_amount - vaccume_amount
+        case_inner_amount_after_vaccume = max(0, case_inner_amount_after_vaccume)
         # 排気後容器内部圧力 [MPaA]
         total_press_after_vaccume = (
             case_inner_amount_after_vaccume * 8.314 * (temp_now_mean + 273.15)
             / case_inner_volume / 1e6
         )
     # 排気後CO2モル量 [mol]
-    mw_co2_after_vaccume = variables["mf_co2"] * case_inner_amount_after_vaccume
+    mf_co2 = np.mean([
+        variables["mf_co2"][stream][section] for stream in range(1, 1+sim_conds["CELL_SPLIT"]["num_str"])
+                                             for section in range(1, 1+sim_conds["CELL_SPLIT"]["num_sec"])
+    ])
+    mw_co2_after_vaccume = mf_co2 * case_inner_amount_after_vaccume
     # 排気後N2モル量 [mol]
-    mw_n2_after_vaccume = variables["mf_n2"] * case_inner_amount_after_vaccume
+    mf_n2 = np.mean([
+        variables["mf_n2"][stream][section] for stream in range(1, 1+sim_conds["CELL_SPLIT"]["num_str"])
+                                             for section in range(1, 1+sim_conds["CELL_SPLIT"]["num_sec"])
+    ])
+    mw_n2_after_vaccume = mf_n2 * case_inner_amount_after_vaccume
 
     # 出力
     output = {
@@ -610,7 +620,7 @@ def total_press_after_vacuuming(sim_conds, variables, stop_mode=False):
 
     return output
 
-def total_press_after_decompression(sim_conds, variables, downflow_total_press, mb_dict):
+def total_press_after_decompression(sim_conds, variables, downflow_total_press):
     """ バッチ減圧後の圧力計算
         バッチ均圧(上流側)モード
 
@@ -625,25 +635,23 @@ def total_press_after_decompression(sim_conds, variables, downflow_total_press, 
         variables["temp"][stream][section] for stream in range(1,1+sim_conds["CELL_SPLIT"]["num_str"])\
                                            for section in range(1,1+sim_conds["CELL_SPLIT"]["num_sec"])
     ]) + 273.15
-    # 容器内部空間体積 [m3]
-    case_inner_volume = (
-        sim_conds["PACKED_BED_COND"]["Vbed"] * sim_conds["PACKED_BED_COND"]["epsilon"]
-    )
-    # 容器内部空間物質量 [mol]
-    case_inner_amount = (
-        variables["total_press"]*1e6 * case_inner_volume / 8.314 / T_K
-    )
-
-    ### 均圧時の配管流量計算 -----------------------------------------
     # 塔間の圧力差 [MPaA]
     diff_press = variables["total_press"] - downflow_total_press
     if diff_press <= 1e-10:
         diff_press = 0
     #　ガス粘度 [Pa・s]
     P = variables["total_press"] * 1e6 # [MPaA]→[Pa]
+    _mean_mf_co2 = np.mean([ # 平均co2分率
+        variables["mf_co2"][stream][section] for stream in range(1,1+sim_conds["CELL_SPLIT"]["num_str"])\
+                                             for section in range(1,1+sim_conds["CELL_SPLIT"]["num_sec"])
+    ])
+    _mean_mf_n2 = np.mean([ # 平均n2分率
+        variables["mf_n2"][stream][section] for stream in range(1,1+sim_conds["CELL_SPLIT"]["num_str"])\
+                                            for section in range(1,1+sim_conds["CELL_SPLIT"]["num_sec"])
+    ])
     mu = (
-        CP.PropsSI('V', 'T', T_K, 'P', P, "co2") * variables["mf_co2"]
-        + CP.PropsSI('V', 'T', T_K, 'P', P, "nitrogen") * variables["mf_n2"]
+        CP.PropsSI('V', 'T', T_K, 'P', P, "co2") * _mean_mf_co2
+        + CP.PropsSI('V', 'T', T_K, 'P', P, "nitrogen") * _mean_mf_n2
     ) / 1e6
     # 配管流速 [m/s]
     flow_rate = (
@@ -655,36 +663,69 @@ def total_press_after_decompression(sim_conds, variables, downflow_total_press, 
         sim_conds["PRESS_EQUAL_PIPE_COND"]["Spipe"] * flow_rate * 60
         * sim_conds["PRESS_EQUAL_PIPE_COND"]["coef_fr"]
     )
-    # 均圧配管流量 [L/min] (下流側への入力)
+    # 均圧配管流量 [L/min] (下流塔への入力)
     flow_amount_l = flow_amount_m3 * 1e3
+
+    # 出力
+    output = {
+        "flow_amount_m3": flow_amount_m3, # 均圧配管流量 [m3/min]
+        "flow_amount_l": flow_amount_l, # 均圧配管流量 [L/min]
+        "diff_press": diff_press, # 均圧塔の圧力差 [MPaA]
+    }
+
+    return output
+
+def mf_after_vaccume_decompression(sim_conds, stream_conds, stream, section, variables, vaccume_output, mb_dict):
+    """ バッチ減圧後の圧力計算
+        バッチ均圧(上流側)モード
+
+    Args:
+        variables (dict): 状態変数
+        vaccume_output (dict): total_press_after_decompressionの出力
+        mb_dict (dict): 各セクションのマテバラ計算結果
+
+    Returns:
+        dict: 排気後圧力と排気後CO2・N2モル量
+    """
+    # 容器内平均温度 [℃]
+    T_K = np.mean([
+        variables["temp"][stream][section] for stream in range(1,1+sim_conds["CELL_SPLIT"]["num_str"])\
+                                           for section in range(1,1+sim_conds["CELL_SPLIT"]["num_sec"])
+    ]) + 273.15
+    # 容器内部空間体積 [m3]
+    case_inner_volume = (
+        sim_conds["PACKED_BED_COND"]["Vbed"] * sim_conds["PACKED_BED_COND"]["epsilon"]
+        * stream_conds[stream]["streamratio"] / sim_conds["CELL_SPLIT"]["num_sec"]
+    )
+    # 容器内部空間物質量 [mol]
+    case_inner_amount = (
+        variables["total_press"]*1e6 * case_inner_volume / 8.314 / T_K
+    )
     # 物質移動量・流出量 [mol]
-    # NOTE: 傾きが急なので短い計算ステップで積分する
-    # time_step = 1e-7 # 計算ステップ [min]
-    # flow_amount_mol = 0
-    # time_accum = 0
-    # while time_accum <= sim_conds["dt"]:
-    #     flow_amount_mol += flow_amount_m3 * 1e3 * time_step / 22.4
-    #     time_accum += time_step
-    flow_amount_mol = flow_amount_m3 * 1e3 * sim_conds["dt_eq"] / 22.4
+    flow_amount_mol = vaccume_output["flow_amount_m3"] * 1e3 * sim_conds["dt_eq"] / 22.4
     flow_amount_mol = min(flow_amount_mol, case_inner_amount) # 内部空間物質量は超過しない
-    # -------------------------------------------------------------
+    # セクション流出量 [mol]
+    flow_amount_mol *= (stream_conds[stream]["streamratio"] / sim_conds["CELL_SPLIT"]["num_sec"])
     # 脱着による気相放出CO2モル量 [mol]
-    sum_desorp_mw = sum([
-            mb_dict[stream][section]["desorp_mw_co2"] for stream in range(1,1+sim_conds["CELL_SPLIT"]["num_str"])\
-                                                      for section in range(1,1+sim_conds["CELL_SPLIT"]["num_sec"])
-        ])
+    desorp_mw = mb_dict[stream][section]["desorp_mw_co2"]
+    # 現在CO2モル量 [mol]
+    now_amt_co2 = case_inner_amount * variables["mf_co2"][stream][section]
+    # 現在N2モル量 [mol]
+    now_amt_n2 = case_inner_amount * variables["mf_n2"][stream][section]
+    # N2容器外流出量 [mol]
+    outflow_amt_n2 = min(now_amt_n2, flow_amount_mol)
+    # CO2容器外流出量 [mol]
+    outflow_amt_co2 = flow_amount_mol - outflow_amt_n2
     # 次時刻内部空間物質量 [mol]
-    next_case_inner_amount = case_inner_amount - sum_desorp_mw - flow_amount_mol
+    next_case_inner_amount = case_inner_amount + desorp_mw - flow_amount_mol
     # 次時刻容器内部圧力(全圧) [MPaA]
     total_press_after_decompression = (
         next_case_inner_amount * 8.314 * T_K / case_inner_volume / 1e6
     )
     # 減圧後CO2モル量 [mol]
-    mw_co2_after_decompression = variables["mf_co2"] * case_inner_amount + sum_desorp_mw
-    mw_co2_after_decompression = max(0, mw_co2_after_decompression)
+    mw_co2_after_decompression = now_amt_co2 + desorp_mw - outflow_amt_co2
     # 減圧後N2モル量 [mol]
-    mw_n2_after_decompression = variables["mf_n2"] * case_inner_amount
-    mw_n2_after_decompression = max(0, mw_n2_after_decompression)
+    mw_n2_after_decompression = now_amt_n2 - outflow_amt_n2
     # 減圧後CO2モル分率
     mf_co2_after_decompression = mw_co2_after_decompression / (mw_co2_after_decompression + mw_n2_after_decompression)
     # 減圧後N2モル分率
@@ -692,16 +733,14 @@ def total_press_after_decompression(sim_conds, variables, downflow_total_press, 
 
     # 出力
     output = {
-        "total_press_after_decompression": total_press_after_decompression, # 減圧後圧力 [MPaA]
+        # "total_press_after_decompression": total_press_after_decompression, # 減圧後圧力 [MPaA]
         "mf_co2_after_decompression": mf_co2_after_decompression, # 減圧後CO2モル分率
         "mf_n2_after_decompression": mf_n2_after_decompression, # 減圧後N2モル分率
-        "flow_amount_l": flow_amount_l, # 均圧配管流量 [L/min]
-        "diff_press": diff_press, # 均圧塔の圧力差 [MPaA]
     }
 
     return output
 
-def mf_after_vaccume(sim_conds, vaccume_output, mb_dict):
+def mf_after_vaccume_vaccume(sim_conds, vaccume_output, mb_dict):
     """ 排気後モル分率の計算
 
     Args:
@@ -723,9 +762,15 @@ def mf_after_vaccume(sim_conds, vaccume_output, mb_dict):
     mw_n2_after_vaccume = vaccume_output["mw_n2_after_vaccume"]
     mw_n2_after_vaccume = max(0, mw_n2_after_vaccume)
     # 脱着後気相CO2モル分率
-    mf_co2_after_vaccume = mw_co2_after_vaccume / (mw_co2_after_vaccume + mw_n2_after_vaccume)
+    try:
+        mf_co2_after_vaccume = mw_co2_after_vaccume / (mw_co2_after_vaccume + mw_n2_after_vaccume)
+    except ZeroDivisionError:
+        mf_co2_after_vaccume = 1
     # 脱着後気相N2モル分率
-    mf_n2_after_vaccume = mw_n2_after_vaccume / (mw_co2_after_vaccume + mw_n2_after_vaccume)
+    try:
+        mf_n2_after_vaccume = mw_n2_after_vaccume / (mw_co2_after_vaccume + mw_n2_after_vaccume)
+    except ZeroDivisionError:
+        mf_n2_after_vaccume = 0
 
     output = {
         "sum_desorp_mw": sum_desorp_mw, # 脱着した気相放出CO2モル量

@@ -172,25 +172,48 @@ def plot_csv_outputs(tgt_foldapath, df_obs, tgt_sections, tower_num, timestamp, 
 
     ### 可視化（others） -------------------------------------
 
-    # csv読み込み
-    filename_list = glob.glob(tgt_foldapath + f"/csv/tower_{tower_num}/others/others.csv")
-    df = pd.read_csv(filename_list[0], index_col="timestamp")
-
-    num_row = math.ceil((len(df.columns))/2)
-    fig = plt.figure(figsize=(16*2, 5.5*num_row), tight_layout=True)
+    fig = plt.figure(figsize=(16*2, 11), tight_layout=True)
     fig.patch.set_facecolor('white')
+    plt.rcParams["font.size"] = 20
 
-    for i, col in enumerate(df.columns):
-        plt.rcParams["font.size"] = 20
+    # 1. 全圧
+    filename = tgt_foldapath + f"/csv/tower_{tower_num}/others/total_press.csv"
+    df = pd.read_csv(filename, index_col="timestamp")
+    plt.subplot(2, 2, 1)
+    plt.plot(df["total_press"], label="計算値")
+    plt.plot(df_obs.loc[:timestamp, f"T{tower_num}_press"], label="観測値", c="black") # 観測値もプロット
+    plt.title("全圧 [MPaA]")
+    plt.legend()
+    plt.grid()
+    plt.xlabel("timestamp")
+    # プロセス終了時刻の縦線をプロット
+    ax = plt.gca()
+    ymin, ymax = ax.get_ylim()
+    p_name_bfr = ""
+    for idx in df_p_end.index:
+        p_name = df_p_end.loc[idx, f"塔{tower_num}"]
+        if p_name == p_name_bfr:
+            continue
+        tgt_timestamp = df_p_end.loc[idx, "終了時刻(min)"]
+        plt.vlines(tgt_timestamp, ymin=ymin, ymax=ymax, colors="tab:orange", alpha=1)
+        p_name_bfr = p_name
+    # 2. モル分率
+    for i, _tgt_name in enumerate(["mf_co2", "mf_n2"]):
+        filename = tgt_foldapath + f"/csv/tower_{tower_num}/others/{_tgt_name}.csv"
+        df = pd.read_csv(filename, index_col="timestamp")
+        plt.subplot(2, 2, i+2)
+        # 可視化対象のcolumnsを抽出
+        plt_tgt_cols = [col for col in df.columns if int(col.split("-")[-1]) in tgt_sections]
         # 各項目のプロット
-        plt.subplot(num_row, 2, i+1)
-        plt.plot(df[col], label="計算値")
-        # 全圧のみ観測値もプロット
-        if col == "total_press":
-            plt.plot(df_obs.loc[:timestamp, f"T{tower_num}_press"], label="観測値", c="black")
-        _title = const.TRANSLATION[col]
-        _unit = const.UNIT[_title]
-        plt.title(_title + " " + _unit)
+        for col in plt_tgt_cols:
+            stream = int(col.split("-")[-2])
+            section = int(col.split("-")[-1])
+            plt.plot(df[col],
+                    label = f"(str,sec) = ({stream}, {section})",
+                    linestyle = linestyle_dict[section],
+                    c = color_dict[stream],
+                    )
+        plt.title(_tgt_name.split("_")[-1] + "モル分率")
         plt.legend()
         plt.grid()
         plt.xlabel("timestamp")
@@ -205,7 +228,7 @@ def plot_csv_outputs(tgt_foldapath, df_obs, tgt_sections, tower_num, timestamp, 
             tgt_timestamp = df_p_end.loc[idx, "終了時刻(min)"]
             plt.vlines(tgt_timestamp, ymin=ymin, ymax=ymax, colors="tab:orange", alpha=1)
             p_name_bfr = p_name
-    plt.savefig(output_foldapath + "others.png", dpi=100)
+    plt.savefig(output_foldapath + f"others.png", dpi=100)
     plt.close()
 
 
@@ -262,17 +285,37 @@ def outputs_to_csv(tgt_foldapath, record_dict, common_conds):
     df.to_csv(foldapath + "heat_lid.csv")
 
     # others
-    _tgt_name = "others"
-    _foldapath = tgt_foldapath + f"/{_tgt_name}/"
+    tgt_name = "others"
+    _foldapath = tgt_foldapath + f"/{tgt_name}/"
     os.makedirs(_foldapath, exist_ok=True)
+    # 全圧
     values = []
-    for i in range(len(record_dict[_tgt_name])):
-        values.append(list(record_dict[_tgt_name][i].values()))
-    columns = list(record_dict[_tgt_name][i].keys())
+    _tgt_col = "total_press"
+    for i in range(len(record_dict[tgt_name])):
+        values.append(record_dict[tgt_name][i][_tgt_col])
     df = pd.DataFrame(values,
-                      columns=columns,
+                      columns=[_tgt_col],
                       index=record_dict["timestamp"])
     df.index.name = "timestamp"
-    df.to_csv(_foldapath + f"{_tgt_name}.csv")
+    df.to_csv(_foldapath + f"{_tgt_col}.csv")
+    # モル分率
+    for _tgt_col in ["mf_co2", "mf_n2"]:
+        values = []
+        for i in range(len(record_dict[tgt_name])):
+            values_tmp = []
+            for stream in range(1, 1+common_conds["CELL_SPLIT"]["num_str"]):
+                for section in range(1, 1+common_conds["CELL_SPLIT"]["num_sec"]):
+                    values_tmp.append(record_dict[tgt_name][i][_tgt_col][stream][section])
+            values.append(values_tmp)
+        # カラム名の抽出
+        columns = []
+        for stream in range(1, 1+common_conds["CELL_SPLIT"]["num_str"]):
+            for section in range(1, 1+common_conds["CELL_SPLIT"]["num_sec"]):
+                columns.append(_tgt_col+"-"+str(stream).zfill(3)+"-"+str(section).zfill(3))
+        df = pd.DataFrame(values,
+                        columns=columns,
+                        index=record_dict["timestamp"])
+        df.index.name = "timestamp"
+        df.to_csv(_foldapath + f"{_tgt_col}.csv")
 
     # heat_wall
