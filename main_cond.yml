@@ -2,9 +2,9 @@
 
 # 実行モードを指定
 mode_list: [
-  # "simulation",
+  "simulation",
   # "assimilation",
-  "optimize",
+#   "optimize",
 ]
 
 # 実行したいconditionファイルを指定
@@ -17,6 +17,6 @@ cond_list: [
 
 # パラメータ最適化のパラメータ
 opt_params: {
-  num_processes: 4,
-  num_trials: 50,
+  num_processes: 8,
+  num_trials: 100,
 }

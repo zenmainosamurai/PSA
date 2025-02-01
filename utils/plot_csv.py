@@ -86,6 +86,7 @@ def plot_csv_outputs(tgt_foldapath, df_obs, tgt_sections, tower_num, timestamp, 
             tgt_timestamp = df_p_end.loc[idx, "終了時刻(min)"]
             plt.vlines(tgt_timestamp, ymin=ymin, ymax=ymax, colors="tab:orange", alpha=1)
             p_name_bfr = p_name
+        plt.legend(fontsize=12, loc='upper left', bbox_to_anchor=(1, 1))
     plt.savefig(output_foldapath + "heat.png", dpi=100)
     plt.close()
 

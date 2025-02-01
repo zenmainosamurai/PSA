@@ -56,7 +56,7 @@ PACKED_BED_COND: {
   phi: 1,             # 形状補正係数 [-]
   vp: 0,              # 到達真空圧力 [kPaA]
   ks_adsorp: 0.00138813,       # 吸着移動係数 [1e-6/sec]
-  ks_desorp: 0.9,       # 吸着移動係数 [1e-6/sec]
+  ks_desorp: 0.000000014649,       # 吸着移動係数 [1e-6/sec]
   # v_space: Sbed * Lbed * epsilon     # 充填層空間体積 [m3]
   vacuume_pressure: 2,  # 到達真空圧力 [kPaA]
   v_upstream: 0       # 上流空間体積 [m3]
