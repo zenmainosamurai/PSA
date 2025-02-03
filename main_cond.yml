@@ -12,7 +12,8 @@ cond_list: [
   # 4_10_mod_decomp,
   # 4_11_sim_process
   # 4_12_mod_init_adsorp_amt
-  4_13_mod_separate_ks_desorp
+  # 4_13_mod_separate_ks_desorp
+  4_14_mod_p_resist
 ]
 
 # パラメータ最適化のパラメータ

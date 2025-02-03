@@ -635,10 +635,6 @@ def total_press_after_decompression(sim_conds, variables, downflow_total_press):
         variables["temp"][stream][section] for stream in range(1,1+sim_conds["CELL_SPLIT"]["num_str"])\
                                            for section in range(1,1+sim_conds["CELL_SPLIT"]["num_sec"])
     ]) + 273.15
-    # 塔間の圧力差 [MPaA]
-    diff_press = variables["total_press"] - downflow_total_press
-    if diff_press <= 1e-10:
-        diff_press = 0
     #　ガス粘度 [Pa・s]
     P = variables["total_press"] * 1e6 # [MPaA]→[Pa]
     _mean_mf_co2 = np.mean([ # 平均co2分率
@@ -653,11 +649,43 @@ def total_press_after_decompression(sim_conds, variables, downflow_total_press):
         CP.PropsSI('V', 'T', T_K, 'P', P, "co2") * _mean_mf_co2
         + CP.PropsSI('V', 'T', T_K, 'P', P, "nitrogen") * _mean_mf_n2
     ) / 1e6
-    # 配管流速 [m/s]
-    flow_rate = (
-        diff_press * 1e6 * sim_conds["PRESS_EQUAL_PIPE_COND"]["Dpipe"] ** 2
-        / (32 * mu * sim_conds["PRESS_EQUAL_PIPE_COND"]["Lpipe"])
-    )
+    # ?
+    rho = (
+        CP.PropsSI('D', 'T', T_K, 'P', P, "co2") * _mean_mf_co2
+        + CP.PropsSI('D', 'T', T_K, 'P', P, "nitrogen") * _mean_mf_n2
+    ) / 1e6
+    # 均圧配管圧力損失 [MPaA]
+    _max_iteration = 100
+    P_resist = 0
+    tolerance = 1e-6
+    L = 1.0
+    for iter in range(_max_iteration):
+        P_resist_old = P_resist
+        # 塔間の圧力差 [MPaA]
+        dP = variables["total_press"] - downflow_total_press - P_resist
+        if dP <= 1e-10:
+            dP = 0
+        # 配管流速 [m/s]
+        flow_rate = (
+            dP * 1e6 * sim_conds["PRESS_EQUAL_PIPE_COND"]["Dpipe"] ** 2
+            / (32 * mu * sim_conds["PRESS_EQUAL_PIPE_COND"]["Lpipe"])
+        )
+        # ?
+        Re = (
+            rho * abs(flow_rate) * sim_conds["PRESS_EQUAL_PIPE_COND"]["Dpipe"] / mu
+        )
+        # ?
+        lambda_f = 64 / Re if Re != 0 else 0
+        # 均圧配管圧力損失 [MPaA]
+        P_resist = (
+            lambda_f * L / sim_conds["PRESS_EQUAL_PIPE_COND"]["Dpipe"]
+            * flow_rate ** 2 / (2*9.81) * 1e-6
+        )
+        # 収束判定
+        if np.abs(P_resist - P_resist_old) < tolerance:
+            break
+    if iter == _max_iteration:
+        print("収束せず")
     # 均圧配管流量 [m3/min]
     flow_amount_m3 = (
         sim_conds["PRESS_EQUAL_PIPE_COND"]["Spipe"] * flow_rate * 60
@@ -670,7 +698,7 @@ def total_press_after_decompression(sim_conds, variables, downflow_total_press):
     output = {
         "flow_amount_m3": flow_amount_m3, # 均圧配管流量 [m3/min]
         "flow_amount_l": flow_amount_l, # 均圧配管流量 [L/min]
-        "diff_press": diff_press, # 均圧塔の圧力差 [MPaA]
+        "diff_press": dP, # 均圧塔の圧力差 [MPaA]
     }
 
     return output

@@ -1,0 +1,142 @@
+# 各種初期条件・境界条件の定義
+
+# 使用データ
+data_path: 3塔データ.csv
+operation_path: 稼働工程表.xlsx
+
+# 計算ステップ(min)
+dt: 0.01
+dt_eq: 0.001 # 均圧モード用
+
+# 吸着塔の数
+NUM_TOWER: 3
+
+# セル分割
+CELL_SPLIT: {
+  num_str: 2,         # ストリーム分割数（横方向）
+  num_sec: 20,         # セクション分割数（縦方向）
+}
+
+# 各塔目標初期圧力
+GOAL_INIT_PRESSURES: {
+  p1: 0.1,      # 第1塔 [MPaA]
+  p2: 0.03,     # 第2塔 [MPaA]
+  p3: 0.03,     # 第3塔 [MPaA]
+}
+
+# 温度計の位置 [m]
+LOC_CENCER: {
+  up: 0.084,    # 上流温度計
+  mid: 0.428,   # 中流温度計
+  down: 0.774,  # 下流温度計
+}
+
+# 温度計の位置 (セクション)
+LOC_CENCER_SECTION: {
+  up: 2,    # 上流温度計
+  mid: 10,   # 中流温度計
+  down: 18,  # 下流温度計
+}
+
+# 触媒充填層の初期条件
+PACKED_BED_COND: {
+  Dbed: 0.1552,       # 充填層直径 [m]
+  # Rbed: Dbed/2,     # 充填層半径 [m]
+  # Sbed: pi*Rbed**2, # 充填層断面積 [m2]
+  Lbed: 0.86800,      # 充填高さ [m]
+  # Vbed: Sbed * Lbed,# 充填体積 [m3]
+  Mabs: 10800,        # 充填吸着材量 [g]
+  # rho_abs: Mabs/Vbed/1e6 # 吸着材かさ密度 [g/cm3]
+  lambda_col: 1.135,    # 充填層熱伝導率 [W/m/K]
+  epsilon_p: 0.3,     # 充填層粒子放射率 [-]
+  cabs: 0.8,          # 充填層粒子比率 [J/g/K]
+  # Cbed: cabs*Mabs,  # 充填層熱容量 [J/K]
+  epsilon: 0.36,      # 平均空隙率 [-]
+  dp: 0.001,          # 平均粒子径 [m]
+  phi: 1,             # 形状補正係数 [-]
+  vp: 0,              # 到達真空圧力 [kPaA]
+  ks_adsorp: 0.00138813,       # 吸着移動係数 [1e-6/sec]
+  ks_desorp: 0.000000014649,       # 吸着移動係数 [1e-6/sec]
+  # v_space: Sbed * Lbed * epsilon     # 充填層空間体積 [m3]
+  vacuume_pressure: 2,  # 到達真空圧力 [kPaA]
+  v_upstream: 0       # 上流空間体積 [m3]
+}
+
+# 容器壁条件
+DRUM_WALL_COND: {
+  Ddrum: 0.1652,      # 容器直径 [m]
+  # Rdrum: Ddrum/2,   # 容器半径 [m]
+  # Ldrum: Lbed,      # 容器高さ [m]
+  # Tdrumw: Rdrum-Rbed# 容器壁厚み [m]
+  # Sdrumw: pi*(Rdrum**2-Rbed**2), # 容器壁断面積 [m2]
+  # Vdrumw: Sdrum*Ldrum, # 容器壁体積 [m3]
+  Dense_drumw: 7.93,   # 容器壁密度 [g/cm3]
+  # Wdrumw: Dense_drumw*Vdrumw*1e6, # 容器壁総重量
+  sh_drumw: 0.59,     # 容器壁比熱 [J/g/K]
+  c_drumw: 16.7,      # 容器壁熱伝導率 [W/m/K]
+  # la_drum: pi*Ddrum*Ldrum, # 容器側面積 [m2]
+  coef_outair_heat: 200, # 外気熱伝達係数 [W/m2/K]
+  temp_outside: 15,   # 外気温 [℃]
+  coef_hw1: 0.0020985, # 1,        # 壁-層伝熱係数の補正係数
+}
+
+# 上下の蓋の条件
+LID_COND: {
+  UP: {
+    Dflange: 280,       # フランジ径 [mm]
+    Tflange: 22,        # フランジ厚 [mm]
+    PDflange_up: 34,    # 上蓋フラ内孔径 [mm]
+    # Sflange_up: ,     # 上蓋フラ面積 [m2]
+    # Vflange_up: ,     # 上蓋フラ体積 [cm3]
+    PDflange_dw: 165,   # 下蓋フラ内孔径 [mm]
+    # Vflange_dw: ,     # 下蓋フラ体積 [cm3]
+    # Mflange: ,        # フランジ重量 [g]
+  },
+  DOWN: {
+    Dflange: 280,       # フランジ径 [mm]
+    Tflange: 22,        # フランジ厚 [mm]
+    PDflange_up: 60.5,  # 下底フラ内孔径 [mm]
+    # Sflange_up: ,     # 下底フラ面積 [m2]
+    # Vflange_up: ,     # 下底フラ体積 [cm3]
+    PDflange_dw: 165,   # 上底フラ内孔径 [mm]
+    # Vflange_dw: ,     # 上底フラ体積 [cm3]
+    # Mflange: ,        # フランジ重量 [g]
+  }
+}
+
+# 導入ガス条件
+INFLOW_GAS_COND: {
+  mw_co2: 44,               # CO2分子量 [g/mol]
+  fr_co2: 10,               # CO2流量 [L/min]
+  mw_n2: 28,                # N2分子量 [g/mol]
+  fr_n2: 12,                # N2流量 [L/min]
+  # fr_all: fr_co2+fr_n2,   # 全流量 [L/min]
+  total_press: 0.0172,             # 全圧 [MPaA]
+  temp: 18.0,               # 温度 [degC]
+  # mf_co2: fr_co2/fr_all,  # CO2分率 [co2]
+  # mf_n2: fr_n2/fr_all,    # CO2分率 [nitrogen]
+  dense_co2: 1.882998074,   # CO2密度 [kg/m3]
+  dense_n2: 1.192247215,    # N2密度 [kg/m3]
+  # dense_mean: dense_co2*mf_co2+dense_n2*mf_n2, # 平均密度
+  c_co2: 0.016083292,       # CO2熱伝導率 [W/m/K]
+  c_n2: 0.025327674,        # N2熱伝導率 [W/m/K]
+  # c_mean: c_co2*mf_co2+c_n2*mf_n2 [W/m/K]
+  vi_co2: 0.0000146,        # CO2粘度 [Pas]
+  vi_n2: 0.0000175,         # N2粘度 [Pas]
+  # vi_mean: vi_co2*mf_co2+vi_co2*mf_n2, # 平均粘度 [Pas]
+  enthalpy: 411.4,          # エンタルピー [kJ/kg]
+  cp_co2: 0.84426034,       # co2比熱
+  cp_n2: 1.041366956,       # n2比熱
+  # cp_mean: cp_co2*mf_co2+cp_n2+mf_n2, # 平均比熱Cp [kJ/kg/K]
+  # C_per_hour: ~~,   # 1h熱容量 [kJ/K/h]
+  adsorp_heat_co2: 1415, # 1363.6,  # CO2吸着熱 [kJ/kg]
+  adsorp_heat_n2: 642.9,    # N2吸着熱 [kJ/kg]
+}
+
+# 均圧配管条件
+PRESS_EQUAL_PIPE_COND: {
+  Lpipe: 3,                 # 均圧配管の長さ [m]
+  Dpipe: 0.01,             # 均圧配管径 [m]
+  # Spip: np.pi() * Dpipe ** 2 / 4, # 配管断面積 [m2]
+  coef_fr: 1,               # 流速補正係数 [-]
+}
