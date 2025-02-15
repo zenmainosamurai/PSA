@@ -101,14 +101,13 @@ class GasAdosorption_Breakthrough_simulator():
                 variables_tower[_tower_num]["temp_lid"][position] = self.sim_conds[_tower_num]["DRUM_WALL_COND"]["temp_outside"]
             # 吸着量
             variables_tower[_tower_num]["adsorp_amt"] = {}
-            P = 2
+            P = {1: 2, 2: 5, 3: 5}
             T = 25 + 273.15
             for stream in range(1, 1+self.num_str):
                 variables_tower[_tower_num]["adsorp_amt"][stream] = {}
                 for section in range(1, 1+self.num_sec):
                     variables_tower[_tower_num]["adsorp_amt"][stream][section] = (
-                        _equilibrium_adsorp_amt(P, # CO2分圧
-                                                T)
+                        self.sim_conds[_tower_num]["PACKED_BED_COND"]["init_asdorp_amt"]
                     )
             # モル分率
             variables_tower[_tower_num]["mf_co2"] = {}

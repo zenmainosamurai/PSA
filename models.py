@@ -433,6 +433,8 @@ def desorption_by_vaccuming(sim_conds, stream_conds, variables):
     vaccume_output = base_models.total_press_after_vacuuming(sim_conds=sim_conds,
                                                              variables=variables,
                                                              stop_mode=False) # 排気速度が0ではない
+    # NOTE: 圧力を実測値に上書き
+    vaccume_output["total_press_after_vaccume"] = variables["total_press"]
     # 1. マテバラ・熱バラ計算
     for stream in range(1, 1+sim_conds["CELL_SPLIT"]["num_str"]):
         mb_dict[stream] = {}

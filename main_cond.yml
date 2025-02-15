@@ -2,22 +2,28 @@
 
 # 実行モードを指定
 mode_list: [
-  "simulation",
-  # "assimilation",
-#   "optimize",
+    # simulation,
+    # assimilation,
+    optimize,
 ]
 
 # 実行したいconditionファイルを指定
 cond_list: [
-  # 4_10_mod_decomp,
-  # 4_11_sim_process
-  # 4_12_mod_init_adsorp_amt
-  # 4_13_mod_separate_ks_desorp
-  4_14_mod_p_resist
+    # 4_22_opt_p10_init_adsorp_234,
+    # 4_22_opt_p10_init_adsorp_235,
+    # 4_22_opt_p10_init_adsorp_236,
+    # 4_22_opt_p10_init_adsorp_237,
+    # 4_22_opt_p10_init_adsorp_238,
+    # 4_22_opt_p10_init_adsorp_243,
+    # 4_22_opt_p10_init_adsorp_245,
+    # 4_22_opt_p10_init_adsorp_253,
+    # 4_22_opt_p10_init_adsorp_254
+    # 4_30_opt_p19_init_adrosp_235
+    test
 ]
 
 # パラメータ最適化のパラメータ
 opt_params: {
-  num_processes: 8,
-  num_trials: 100,
+  num_processes: 4,
+  num_trials: 200,
 }
