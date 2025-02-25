@@ -185,7 +185,7 @@ class GasAdosorption_for_Optimize():
             print(f"Error occurred: {e}")
             # print(f"Error occurred: {params_dict}")
             # 試行を失敗として扱う
-            return [np.nan]*self.num_objective  # または raise
+            return [np.inf]*self.num_objective  # または raise
 
     def calc_score(self, params_dict):
         """ 物理計算を通しで実行
@@ -402,7 +402,9 @@ class GasAdosorption_for_Optimize():
             for i, obj_name in enumerate(self.objective_name):
                 df_tgt = df_opt[[f"params_{p_name}" for p_name in params_list] + [f"values_{i}"]]
                 df_tgt.columns = list(params_list) + [f"values_{i}"] # 色分け用にvaluesを追加
-                df_tgt[obj_name] = pd.qcut(df_tgt[f"values_{i}"], q=4)
+                df_tgt = df_tgt.replace([np.inf, -np.inf], np.nan)
+                df_tgt.dropna()
+                df_tgt[obj_name] = pd.qcut(df_tgt[f"values_{i}"], q=5)
                 df_tgt = df_tgt.drop(columns=[f"values_{i}"])
                 plt.figure(figsize=(4*num_state, 4*num_state), tight_layout=True)
                 pp = sns.pairplot(df_tgt, hue=obj_name,

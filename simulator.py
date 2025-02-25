@@ -144,13 +144,15 @@ class GasAdosorption_Breakthrough_simulator():
             record_dict[_tower_num]["timestamp"] = []
             for _item in _record_item_list:
                 record_dict[_tower_num][_item] = []
-        # 出力用フォルダの用意
+        # 出力先フォルダの用意
         if filtered_states is None:
             mode = "simulation"
             output_foldapath = const.OUTPUT_DIR + f"{self.cond_id}/"
             os.makedirs(output_foldapath, exist_ok=True)
         else:
             mode = "assimilation"
+            output_foldapath = output_foldapath
+            os.makedirs(output_foldapath, exist_ok=True)
 
         ### ◆(2/4) シミュレーション実行 --------------------------------------
         print("(1/3) simulation...")
@@ -173,7 +175,8 @@ class GasAdosorption_Breakthrough_simulator():
                                                                                    variables_tower=variables_tower,
                                                                                    record_dict=record_dict,
                                                                                    timestamp=timestamp,
-                                                                                   manual=True)
+                                                                                   manual=True,
+                                                                                   filtered_x=filtered_states)
             print(f"プロセス {p}: done. timestamp: {round(timestamp,2)}")
             # プロセス終了時刻の記録
             p_end_dict[p] = timestamp
@@ -211,7 +214,8 @@ class GasAdosorption_Breakthrough_simulator():
                                       timestamp=timestamp,
                                       df_p_end=self.df_operation)
 
-    def calc_adsorption_process(self, mode_list, termination_cond_str, variables_tower, record_dict, timestamp, manual=False):
+    def calc_adsorption_process(self, mode_list, termination_cond_str, variables_tower,
+                                record_dict, timestamp, manual=False, filtered_x=None):
         """ プロセスpの各塔のガス吸着計算を行う
 
         Args:
@@ -220,6 +224,7 @@ class GasAdosorption_Breakthrough_simulator():
             termination_cond (str): プロセスの終了条件
             record_dict (dict): 計算結果の記録用
             timestamp (float): 時刻t
+            filtered_x (pd.DataFrame): データ同化で得られた状態変数の推移
         """
         # 手動の場合は時間経過で終了
         if manual:
@@ -227,6 +232,10 @@ class GasAdosorption_Breakthrough_simulator():
             timestamp_p = 0
             # 吸着計算
             while timestamp + timestamp_p <= termination_cond_str:
+                # 状態変数の上書き(データ同化後限定)
+                if filtered_x is not None:
+                    self._overwrite_state_vars(filtered_x = filtered_x,
+                                               timestamp = timestamp+timestamp_p)
                 # 状態変数(圧力)の上書き
                 _tgt_index = self.df_obs.index[np.abs(self.df_obs.index - (timestamp+timestamp_p)).argmin()]
                 for _tower_num in range(1, 1+self.num_tower):
@@ -578,6 +587,31 @@ class GasAdosorption_Breakthrough_simulator():
             new_variables["total_press"] = variables["total_press"]     
 
         return new_variables
+
+    def _overwrite_state_vars(self, filtered_x, timestamp):
+        """ データ同化で得られた状態変数に上書き
+
+        Args:
+            filtered_x (pd.DataFrame): 状態変数の推移
+            timestamp (float): 現在時刻
+        """
+        # 現在時刻に近いindexを抽出
+        _tgt_index = filtered_x.index[np.abs(filtered_x.index - (timestamp)).argmin()]
+        # 得られた状態変数に置換
+        # NOTE: マイナスチェックも同時に実施（smoothingの過程でマイナスになる事例あり）
+        for _tower_num in range(1, 1+self.num_tower):
+            self.sim_conds[_tower_num]["PACKED_BED_COND"]["ks_adsorp"] = np.max([
+                1e-8, filtered_x.loc[_tgt_index, f"T{_tower_num}_ks_adsorp"]
+                ])
+            self.sim_conds[_tower_num]["PACKED_BED_COND"]["ks_desorp"] = np.max([
+                1e-8, filtered_x.loc[_tgt_index, f"T{_tower_num}_ks_desorp"]
+                ])
+            self.sim_conds[_tower_num]["DRUM_WALL_COND"]["coef_hw1"] = np.max([
+                1e-8, filtered_x.loc[_tgt_index, f"T{_tower_num}_coef_hw1"]
+                ])
+            self.sim_conds[_tower_num]["INFLOW_GAS_COND"]["adsorp_heat_co2"] = np.max([
+                1e-8, filtered_x.loc[_tgt_index, f"T{_tower_num}_adsorp_heat_co2"]
+                ])
 
     def _create_termination_cond(self, termination_cond_str):
         """ 文字列の終了条件からブール値の終了条件を作成する
