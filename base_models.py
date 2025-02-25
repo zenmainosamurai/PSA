@@ -88,6 +88,10 @@ def material_balance_adsorp(sim_conds, stream_conds, stream, section, variables,
                 / sim_conds["PACKED_BED_COND"]["dp"] * (adsorp_amt_equilibrium - adsorp_amt_current)
                 * sim_conds["dt"] / 1e6 * 60
             )
+            # セクション理論新規吸着量 [cm3]
+            adsorp_amt_estimate = adsorp_amt_estimate_abs * Mabs
+            # 実際のセクション新規吸着量 [cm3]
+            adsorp_amt_estimate = min(adsorp_amt_estimate, inflow_fr_co2)
         else:
             adsorp_amt_estimate_abs = (
                 sim_conds["PACKED_BED_COND"]["ks_desorp"] ** (adsorp_amt_current / adsorp_amt_equilibrium)
@@ -96,14 +100,15 @@ def material_balance_adsorp(sim_conds, stream_conds, stream, section, variables,
                 / sim_conds["PACKED_BED_COND"]["dp"] * (adsorp_amt_equilibrium - adsorp_amt_current)
                 * sim_conds["dt"] / 1e6 * 60
             )
+            # セクション理論新規吸着量 [cm3]
+            adsorp_amt_estimate = adsorp_amt_estimate_abs * Mabs
+            # 実際のセクション新規吸着量 [cm3]
+            adsorp_amt_estimate = max(adsorp_amt_estimate, -adsorp_amt_current)
+        # 実際の新規吸着量 [cm3/g-abs]
+        adsorp_amt_estimate_abs = adsorp_amt_estimate / Mabs
     else:
+        adsorp_amt_estimate = 0
         adsorp_amt_estimate_abs = 0
-    # セクション理論新規吸着量 [cm3]
-    adsorp_amt_estimate = adsorp_amt_estimate_abs * Mabs
-    # 実際のセクション新規吸着量 [cm3]
-    adsorp_amt_estimate = min(adsorp_amt_estimate, inflow_fr_co2)
-    # 実際の新規吸着量 [cm3/g-abs]
-    adsorp_amt_estimate_abs = adsorp_amt_estimate / Mabs
     # 時間経過後吸着量 [cm3/g-abs]
     accum_adsorp_amt = adsorp_amt_current + adsorp_amt_estimate_abs
     # 下流流出CO2流量 [cm3]
@@ -182,6 +187,10 @@ def material_balance_desorp(sim_conds, stream_conds, stream, section, variables,
             / sim_conds["PACKED_BED_COND"]["dp"] * (adsorp_amt_equilibrium - adsorp_amt_current)
             * sim_conds["dt"] / 1e6 * 60
         )
+        # セクション理論新規吸着量 [cm3]
+        adsorp_amt_estimate = adsorp_amt_estimate_abs * Mabs
+        # 実際のセクション新規吸着量 [cm3]
+        adsorp_amt_estimate = min(adsorp_amt_estimate, 50)
     else:
         adsorp_amt_estimate_abs = (
             sim_conds["PACKED_BED_COND"]["ks_desorp"] ** (adsorp_amt_current / adsorp_amt_equilibrium)
@@ -190,10 +199,10 @@ def material_balance_desorp(sim_conds, stream_conds, stream, section, variables,
             / sim_conds["PACKED_BED_COND"]["dp"] * (adsorp_amt_equilibrium - adsorp_amt_current)
             * sim_conds["dt"] / 1e6 * 60
         )
-    # セクション理論新規吸着量 [cm3]
-    adsorp_amt_estimate = adsorp_amt_estimate_abs * Mabs
-    # 実際のセクション新規吸着量 [cm3]
-    adsorp_amt_estimate = max(adsorp_amt_estimate, -adsorp_amt_current)
+        # セクション理論新規吸着量 [cm3]
+        adsorp_amt_estimate = adsorp_amt_estimate_abs * Mabs
+        # 実際のセクション新規吸着量 [cm3]
+        adsorp_amt_estimate = max(adsorp_amt_estimate, -adsorp_amt_current)
     # 実際の新規吸着量 [cm3/g-abs]
     adsorp_amt_estimate_abs = adsorp_amt_estimate / Mabs
     # 時間経過後吸着量 [cm3/g-abs]
@@ -648,26 +657,26 @@ def total_press_after_decompression(sim_conds, variables, downflow_total_press):
     mu = (
         CP.PropsSI('V', 'T', T_K, 'P', P, "co2") * _mean_mf_co2
         + CP.PropsSI('V', 'T', T_K, 'P', P, "nitrogen") * _mean_mf_n2
-    ) / 1e6
+    )
     # ?
     rho = (
         CP.PropsSI('D', 'T', T_K, 'P', P, "co2") * _mean_mf_co2
         + CP.PropsSI('D', 'T', T_K, 'P', P, "nitrogen") * _mean_mf_n2
-    ) / 1e6
+    )
     # 均圧配管圧力損失 [MPaA]
-    _max_iteration = 100
+    _max_iteration = 1000
     P_resist = 0
     tolerance = 1e-6
     L = 1.0
     for iter in range(_max_iteration):
         P_resist_old = P_resist
-        # 塔間の圧力差 [MPaA]
-        dP = variables["total_press"] - downflow_total_press - P_resist
-        if dP <= 1e-10:
+        # 塔間の圧力差 [PaA]
+        dP = (variables["total_press"] - downflow_total_press - P_resist) * 1e6
+        if np.abs(dP) < 1:
             dP = 0
         # 配管流速 [m/s]
         flow_rate = (
-            dP * 1e6 * sim_conds["PRESS_EQUAL_PIPE_COND"]["Dpipe"] ** 2
+            dP * sim_conds["PRESS_EQUAL_PIPE_COND"]["Dpipe"] ** 2
             / (32 * mu * sim_conds["PRESS_EQUAL_PIPE_COND"]["Lpipe"])
         )
         # ?
@@ -684,8 +693,10 @@ def total_press_after_decompression(sim_conds, variables, downflow_total_press):
         # 収束判定
         if np.abs(P_resist - P_resist_old) < tolerance:
             break
-    if iter == _max_iteration:
-        print("収束せず")
+        if pd.isna(P_resist):
+            break
+    if iter == _max_iteration-1:
+        print("収束せず: ", np.abs(P_resist - P_resist_old))
     # 均圧配管流量 [m3/min]
     flow_amount_m3 = (
         sim_conds["PRESS_EQUAL_PIPE_COND"]["Spipe"] * flow_rate * 60
@@ -752,12 +763,20 @@ def mf_after_vaccume_decompression(sim_conds, stream_conds, stream, section, var
     )
     # 減圧後CO2モル量 [mol]
     mw_co2_after_decompression = now_amt_co2 + desorp_mw - outflow_amt_co2
+    mw_co2_after_decompression = max(0, mw_co2_after_decompression)
     # 減圧後N2モル量 [mol]
     mw_n2_after_decompression = now_amt_n2 - outflow_amt_n2
+    mw_n2_after_decompression = max(0, mw_n2_after_decompression)
     # 減圧後CO2モル分率
-    mf_co2_after_decompression = mw_co2_after_decompression / (mw_co2_after_decompression + mw_n2_after_decompression)
+    try:
+        mf_co2_after_decompression = mw_co2_after_decompression / (mw_co2_after_decompression + mw_n2_after_decompression)
+    except ZeroDivisionError:
+        mf_co2_after_decompression = 0
     # 減圧後N2モル分率
-    mf_n2_after_decompression = mw_n2_after_decompression / (mw_co2_after_decompression + mw_n2_after_decompression)
+    try:
+        mf_n2_after_decompression = mw_n2_after_decompression / (mw_co2_after_decompression + mw_n2_after_decompression)
+    except ZeroDivisionError:
+        mf_n2_after_decompression = 1
 
     # 出力
     output = {
@@ -793,12 +812,12 @@ def mf_after_vaccume_vaccume(sim_conds, vaccume_output, mb_dict):
     try:
         mf_co2_after_vaccume = mw_co2_after_vaccume / (mw_co2_after_vaccume + mw_n2_after_vaccume)
     except ZeroDivisionError:
-        mf_co2_after_vaccume = 1
+        mf_co2_after_vaccume = 0
     # 脱着後気相N2モル分率
     try:
         mf_n2_after_vaccume = mw_n2_after_vaccume / (mw_co2_after_vaccume + mw_n2_after_vaccume)
     except ZeroDivisionError:
-        mf_n2_after_vaccume = 0
+        mf_n2_after_vaccume = 1
 
     output = {
         "sum_desorp_mw": sum_desorp_mw, # 脱着した気相放出CO2モル量
