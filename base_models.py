@@ -19,7 +19,8 @@ import warnings
 warnings.simplefilter('error')
 
 
-def material_balance_adsorp(sim_conds, stream_conds, stream, section, variables, inflow_gas=None):
+def material_balance_adsorp(sim_conds, stream_conds, stream, section, variables,
+                            inflow_gas=None, flow_amt_depress=None):
     """ 任意セルのマテリアルバランスを計算する
         吸着モード
 
@@ -28,6 +29,7 @@ def material_balance_adsorp(sim_conds, stream_conds, stream, section, variables,
         section (int): 対象セルのsection番号
         variables (dict): 温度等の状態変数
         inflow_gas (dict): 上部セルの出力値
+        flow_amt_depress (float): 上流均圧菅からの全流量
 
     Returns:
         dict: 対象セルの計算結果
@@ -36,21 +38,27 @@ def material_balance_adsorp(sim_conds, stream_conds, stream, section, variables,
 
     # セクション吸着材量 [g]
     Mabs = stream_conds[stream]["Mabs"] / sim_conds["CELL_SPLIT"]["num_sec"]
-    # 流入CO2流量 [cm3]
-    if (section == 1) & (inflow_gas is None): # 最上流かつ流入ガスが導入ガス
+    # 流入CO2, N2流量 [cm3]
+    if (section == 1) & (inflow_gas is None) & (flow_amt_depress is None): # 最上流セルの流入ガスによる吸着など
         inflow_fr_co2 = (
             sim_conds["INFLOW_GAS_COND"]["fr_co2"] * sim_conds["dt"]
             * stream_conds[stream]["streamratio"] * 1000
         )
-    else :
-        inflow_fr_co2 = inflow_gas["outflow_fr_co2"]
-    # 流入N2流量 [cm3]
-    if (section == 1) & (inflow_gas is None):
         inflow_fr_n2 = (
             sim_conds["INFLOW_GAS_COND"]["fr_n2"] * sim_conds["dt"]
             * stream_conds[stream]["streamratio"] * 1000
         )
-    else:
+    elif (section == 1) & (flow_amt_depress is not None): # 減圧時の最上流セルのみ対象
+        inflow_fr_co2 = (
+            sim_conds["INFLOW_GAS_COND"]["mf_co2"] * flow_amt_depress * sim_conds["dt"]
+            * stream_conds[stream]["streamratio"] * 1000
+        )
+        inflow_fr_n2 = (
+            sim_conds["INFLOW_GAS_COND"]["mf_n2"] * flow_amt_depress * sim_conds["dt"]
+            * stream_conds[stream]["streamratio"] * 1000
+        )
+    elif inflow_gas is not None : # 下流セクションや下流塔での吸着など
+        inflow_fr_co2 = inflow_gas["outflow_fr_co2"]
         inflow_fr_n2 = inflow_gas["outflow_fr_n2"]
     # 流入CO2分率
     inflow_mf_co2 = inflow_fr_co2 / (inflow_fr_co2 + inflow_fr_n2)
@@ -629,8 +637,8 @@ def total_press_after_vacuuming(sim_conds, variables, stop_mode=False):
 
     return output
 
-def total_press_after_decompression(sim_conds, variables, downflow_total_press):
-    """ バッチ減圧後の圧力計算
+def total_press_after_depressure(sim_conds, variables, downflow_total_press):
+    """ 減圧時の上流からの均圧配管流量計算
         バッチ均圧(上流側)モード
 
     Args:
@@ -639,35 +647,38 @@ def total_press_after_decompression(sim_conds, variables, downflow_total_press):
     Returns:
         dict: 排気後圧力と排気後CO2・N2モル量
     """
+    ### 上流均圧配管流量の計算 ----------------------------------------
     # 容器内平均温度 [℃]
     T_K = np.mean([
         variables["temp"][stream][section] for stream in range(1,1+sim_conds["CELL_SPLIT"]["num_str"])\
                                            for section in range(1,1+sim_conds["CELL_SPLIT"]["num_sec"])
     ]) + 273.15
-    #　ガス粘度 [Pa・s]
+    # 全圧 [PaA]
     P = variables["total_press"] * 1e6 # [MPaA]→[Pa]
-    _mean_mf_co2 = np.mean([ # 平均co2分率
+    # 平均co2分率
+    _mean_mf_co2 = np.mean([
         variables["mf_co2"][stream][section] for stream in range(1,1+sim_conds["CELL_SPLIT"]["num_str"])\
                                              for section in range(1,1+sim_conds["CELL_SPLIT"]["num_sec"])
     ])
-    _mean_mf_n2 = np.mean([ # 平均n2分率
+    # 平均n2分率
+    _mean_mf_n2 = np.mean([
         variables["mf_n2"][stream][section] for stream in range(1,1+sim_conds["CELL_SPLIT"]["num_str"])\
                                             for section in range(1,1+sim_conds["CELL_SPLIT"]["num_sec"])
     ])
+    # 上流均圧管ガス粘度 [Pa・s]
     mu = (
         CP.PropsSI('V', 'T', T_K, 'P', P, "co2") * _mean_mf_co2
         + CP.PropsSI('V', 'T', T_K, 'P', P, "nitrogen") * _mean_mf_n2
     )
-    # ?
+    # 上流均圧管ガス密度 [kg/m3]
     rho = (
         CP.PropsSI('D', 'T', T_K, 'P', P, "co2") * _mean_mf_co2
         + CP.PropsSI('D', 'T', T_K, 'P', P, "nitrogen") * _mean_mf_n2
     )
-    # 均圧配管圧力損失 [MPaA]
+    # 上流均圧配管圧力損失 [MPaA]
     _max_iteration = 1000
     P_resist = 0
     tolerance = 1e-6
-    L = 1.0
     for iter in range(_max_iteration):
         P_resist_old = P_resist
         # 塔間の圧力差 [PaA]
@@ -679,110 +690,119 @@ def total_press_after_decompression(sim_conds, variables, downflow_total_press):
             dP * sim_conds["PRESS_EQUAL_PIPE_COND"]["Dpipe"] ** 2
             / (32 * mu * sim_conds["PRESS_EQUAL_PIPE_COND"]["Lpipe"])
         )
-        # ?
+        flow_rate = max(1e-8, flow_rate)
+        # 均圧管レイノルズ数
         Re = (
             rho * abs(flow_rate) * sim_conds["PRESS_EQUAL_PIPE_COND"]["Dpipe"] / mu
         )
-        # ?
+        # 管摩擦係数
         lambda_f = 64 / Re if Re != 0 else 0
         # 均圧配管圧力損失 [MPaA]
         P_resist = (
-            lambda_f * L / sim_conds["PRESS_EQUAL_PIPE_COND"]["Dpipe"]
-            * flow_rate ** 2 / (2*9.81) * 1e-6
-        )
+            lambda_f * sim_conds["PRESS_EQUAL_PIPE_COND"]["Lpipe"]
+            / sim_conds["PRESS_EQUAL_PIPE_COND"]["Dpipe"] * flow_rate ** 2 / (2*9.81)
+        ) * 1e-6
         # 収束判定
         if np.abs(P_resist - P_resist_old) < tolerance:
             break
         if pd.isna(P_resist):
             break
     if iter == _max_iteration-1:
-        print("収束せず: ", np.abs(P_resist - P_resist_old))
+        print("収束せず: 圧力差 =", np.abs(P_resist - P_resist_old))
     # 均圧配管流量 [m3/min]
     flow_amount_m3 = (
-        sim_conds["PRESS_EQUAL_PIPE_COND"]["Spipe"] * flow_rate * 60
+        sim_conds["PRESS_EQUAL_PIPE_COND"]["Spipe"] * flow_rate / 60
         * sim_conds["PRESS_EQUAL_PIPE_COND"]["coef_fr"]
     )
+    # 均圧配管ノルマル流量 [m3/min]
+    flow_amount_m3_N = (
+        flow_amount_m3 * variables["total_press"] / 0.1013
+    )
     # 均圧配管流量 [L/min] (下流塔への入力)
-    flow_amount_l = flow_amount_m3 * 1e3
+    flow_amount_l = flow_amount_m3_N * 1e3
+
+    ### 次時刻の圧力計算 ----------------------------------------
+    # 容器上流空間を移動する物質量 [mol]
+    mw_upper_space = (
+        flow_amount_m3_N * 1000 * sim_conds["dt"] / 22.4
+    )
+    # 上流側の合計体積 [m3]
+    V_upper_tower = sim_conds["PACKED_BED_COND"]["v_upstream"] + sim_conds["PACKED_BED_COND"]["v_space"]
+    # 上流容器圧力変化 [MPaA]
+    dP_upper = (
+        8.314 * T_K / V_upper_tower * mw_upper_space * 1e-6
+    )
+    # 次時刻の容器圧力 [MPaA]
+    total_press_after_depressure = variables["total_press"] - dP_upper
 
     # 出力
     output = {
-        "flow_amount_m3": flow_amount_m3, # 均圧配管流量 [m3/min]
+        "total_press_after_depressure": total_press_after_depressure, # 減圧後の全圧 [MPaA]
         "flow_amount_l": flow_amount_l, # 均圧配管流量 [L/min]
         "diff_press": dP, # 均圧塔の圧力差 [MPaA]
     }
 
     return output
 
-def mf_after_vaccume_decompression(sim_conds, stream_conds, stream, section, variables, vaccume_output, mb_dict):
-    """ バッチ減圧後の圧力計算
-        バッチ均圧(上流側)モード
+def downflow_fr_after_depressure(sim_conds, stream_conds, variables, mb_dict, downflow_total_press):
+    """ 減圧計算時に下流塔の圧力・流入量を計算する
+        減圧モード
 
     Args:
+        sim_conds (dict): 全体共通パラメータ
+        stream_conds (dict): ストリーム内共通パラメータ
         variables (dict): 状態変数
-        vaccume_output (dict): total_press_after_decompressionの出力
-        mb_dict (dict): 各セクションのマテバラ計算結果
+        mb_dict (dict): マテバラ計算結果
+        downflow_total_press (float): 下流塔の現在全圧
 
     Returns:
-        dict: 排気後圧力と排気後CO2・N2モル量
+        float: 減圧後の下流塔の全圧 [MPaA]
+        float: 下流塔への流出CO2流量 [cm3]
+        float: 下流塔への流出N2流量 [cm3]
     """
+    ### 下流塔の圧力計算 ----------------------------------------------
     # 容器内平均温度 [℃]
     T_K = np.mean([
         variables["temp"][stream][section] for stream in range(1,1+sim_conds["CELL_SPLIT"]["num_str"])\
                                            for section in range(1,1+sim_conds["CELL_SPLIT"]["num_sec"])
     ]) + 273.15
-    # 容器内部空間体積 [m3]
-    case_inner_volume = (
-        sim_conds["PACKED_BED_COND"]["Vbed"] * sim_conds["PACKED_BED_COND"]["epsilon"]
-        * stream_conds[stream]["streamratio"] / sim_conds["CELL_SPLIT"]["num_sec"]
+    # 下流流出量合計（最下流セクションの合計）[L]
+    most_down_section = sim_conds["CELL_SPLIT"]["num_sec"]
+    sum_outflow_fr = sum([
+        mb_dict[stream][most_down_section]["outflow_fr_co2"] + mb_dict[stream][most_down_section]["outflow_fr_n2"]
+        for stream in range(1, 1+sim_conds["CELL_SPLIT"]["num_str"])
+    ]) / 1e3
+    # 下流流出物質量 [mol]
+    sum_outflow_mol = sum_outflow_fr / 22.4
+    # 均圧下流側空間体積 [m3]
+    V_downflow = sim_conds["PRESS_EQUAL_PIPE_COND"]["Vpipe"] + sim_conds["PACKED_BED_COND"]["v_space"]
+    # 下流容器圧力変化 [MPaA]
+    dP = (
+        8.314 * T_K / V_downflow * sum_outflow_mol / 1e6
     )
-    # 容器内部空間物質量 [mol]
-    case_inner_amount = (
-        variables["total_press"]*1e6 * case_inner_volume / 8.314 / T_K
-    )
-    # 物質移動量・流出量 [mol]
-    flow_amount_mol = vaccume_output["flow_amount_m3"] * 1e3 * sim_conds["dt_eq"] / 22.4
-    flow_amount_mol = min(flow_amount_mol, case_inner_amount) # 内部空間物質量は超過しない
-    # セクション流出量 [mol]
-    flow_amount_mol *= (stream_conds[stream]["streamratio"] / sim_conds["CELL_SPLIT"]["num_sec"])
-    # 脱着による気相放出CO2モル量 [mol]
-    desorp_mw = mb_dict[stream][section]["desorp_mw_co2"]
-    # 現在CO2モル量 [mol]
-    now_amt_co2 = case_inner_amount * variables["mf_co2"][stream][section]
-    # 現在N2モル量 [mol]
-    now_amt_n2 = case_inner_amount * variables["mf_n2"][stream][section]
-    # N2容器外流出量 [mol]
-    outflow_amt_n2 = min(now_amt_n2, flow_amount_mol)
-    # CO2容器外流出量 [mol]
-    outflow_amt_co2 = flow_amount_mol - outflow_amt_n2
-    # 次時刻内部空間物質量 [mol]
-    next_case_inner_amount = case_inner_amount + desorp_mw - flow_amount_mol
-    # 次時刻容器内部圧力(全圧) [MPaA]
-    total_press_after_decompression = (
-        next_case_inner_amount * 8.314 * T_K / case_inner_volume / 1e6
-    )
-    # 減圧後CO2モル量 [mol]
-    mw_co2_after_decompression = now_amt_co2 + desorp_mw - outflow_amt_co2
-    mw_co2_after_decompression = max(0, mw_co2_after_decompression)
-    # 減圧後N2モル量 [mol]
-    mw_n2_after_decompression = now_amt_n2 - outflow_amt_n2
-    mw_n2_after_decompression = max(0, mw_n2_after_decompression)
-    # 減圧後CO2モル分率
-    try:
-        mf_co2_after_decompression = mw_co2_after_decompression / (mw_co2_after_decompression + mw_n2_after_decompression)
-    except ZeroDivisionError:
-        mf_co2_after_decompression = 0
-    # 減圧後N2モル分率
-    try:
-        mf_n2_after_decompression = mw_n2_after_decompression / (mw_co2_after_decompression + mw_n2_after_decompression)
-    except ZeroDivisionError:
-        mf_n2_after_decompression = 1
+    # 次時刻の下流容器全圧 [MPaA]
+    total_press_after_depressure_downflow = downflow_total_press + dP
+
+    ### 下流容器への流入量 --------------------------------------------
+    # 下流塔への合計流出CO2流量 [cm3]
+    sum_outflow_fr_co2 = sum([
+        mb_dict[stream][most_down_section]["outflow_fr_co2"] for stream in range(1, 1+sim_conds["CELL_SPLIT"]["num_str"])
+    ])
+    # 下流塔への合計流出N2流量 [cm3]
+    sum_outflow_fr_n2 = sum([
+        mb_dict[stream][most_down_section]["outflow_fr_n2"] for stream in range(1, 1+sim_conds["CELL_SPLIT"]["num_str"])
+    ])
+    # 下流塔への流出CO2, N2流量 [cm3]
+    outflow_fr = {}
+    for stream in range(1, 1+sim_conds["CELL_SPLIT"]["num_str"]):
+        outflow_fr[stream] = {}
+        outflow_fr[stream]["outflow_fr_co2"] = sum_outflow_fr_co2 * stream_conds[stream]["streamratio"]
+        outflow_fr[stream]["outflow_fr_n2"] = sum_outflow_fr_n2 * stream_conds[stream]["streamratio"]
 
     # 出力
     output = {
-        # "total_press_after_decompression": total_press_after_decompression, # 減圧後圧力 [MPaA]
-        "mf_co2_after_decompression": mf_co2_after_decompression, # 減圧後CO2モル分率
-        "mf_n2_after_decompression": mf_n2_after_decompression, # 減圧後N2モル分率
+        "total_press_after_depressure_downflow": total_press_after_depressure_downflow, # 減圧後の下流塔の全圧 [MPaA]
+        "outflow_fr": outflow_fr, # 下流塔への流出CO2, N2流量 [cm3]
     }
 
     return output
@@ -854,14 +874,14 @@ def total_press_after_batch_adsorp(sim_conds, variables, equalization_mode=False
     else:
         F = sim_conds["INFLOW_GAS_COND"]["fr_all"] # バッチ吸着: 導入ガスの流量
     # 圧力変化量
-    if equalization_mode: # バッチ均圧(下流): 計算ステップを小さくする
-        diff_pressure = (
-            R * temp_mean / V * (F / 22.4) * sim_conds["dt_eq"] / 1e6
-        )
-    else:
-        diff_pressure = (
-            R * temp_mean / V * (F / 22.4) * sim_conds["dt"] / 1e6
-        )
+    # if equalization_mode: # バッチ均圧(下流): 計算ステップを小さくする
+    #     diff_pressure = (
+    #         R * temp_mean / V * (F / 22.4) * sim_conds["dt_eq"] / 1e6
+    #     )
+    # else:
+    diff_pressure = (
+        R * temp_mean / V * (F / 22.4) * sim_conds["dt"] / 1e6
+    )
     # 変化後全圧
     total_press_after_batch_adsorp = variables["total_press"] + diff_pressure
 

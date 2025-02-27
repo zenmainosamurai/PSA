@@ -9,7 +9,7 @@ mode_list: [
 
 # 実行したいconditionファイルを指定
 cond_list: [
-    test_assim2
+    4_31_mod_depressure
 ]
 
 # パラメータ最適化のパラメータ

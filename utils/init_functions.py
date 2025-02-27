@@ -79,6 +79,7 @@ def add_sim_conds(sim_conds):
     # 均圧配管条件
     press_equal = sim_conds["PRESS_EQUAL_PIPE_COND"]
     press_equal["Spipe"] = np.pi * press_equal["Dpipe"]**2 / 4
+    press_equal["Vpipe"] = press_equal["Spipe"] * press_equal["Dpipe"]
 
     return sim_conds
 

@@ -55,12 +55,12 @@ PACKED_BED_COND: {
   dp: 0.001,          # 平均粒子径 [m]
   phi: 1,             # 形状補正係数 [-]
   vp: 0,              # 到達真空圧力 [kPaA]
-  ks_adsorp: 0.079449,       # 吸着移動係数 [1e-6/sec]
-  ks_desorp: 0.9,       # 吸着移動係数 [1e-6/sec]
+  ks_adsorp: 0.9,       # 吸着移動係数 [1e-6/sec]
+  ks_desorp: 1.515662,       # 吸着移動係数 [1e-6/sec]
   # v_space: Sbed * Lbed * epsilon     # 充填層空間体積 [m3]
   vacuume_pressure: 2,    # 到達真空圧力 [kPaA]
   v_upstream: 0.003,          # 上流空間体積 [m3]
-  init_asdorp_amt: 23.4,  # 初期吸着量 [cm3/g-abs] [2kpa: 16.9, 3kpa: 23.4, 4kpa: 29.0, 5kpa: 33.8]
+  init_asdorp_amt: 33.8,  # 初期吸着量 [cm3/g-abs] [2kpa: 16.9, 3kpa: 23.4, 4kpa: 29.0, 5kpa: 33.8]
 }
 
 # 容器壁条件
@@ -78,7 +78,7 @@ DRUM_WALL_COND: {
   # la_drum: pi*Ddrum*Ldrum, # 容器側面積 [m2]
   coef_outair_heat: 200, # 外気熱伝達係数 [W/m2/K]
   temp_outside: 15,   # 外気温 [℃]
-  coef_hw1: 0.01, # 1,        # 壁-層伝熱係数の補正係数
+  coef_hw1: 0.028597, # 1,        # 壁-層伝熱係数の補正係数
 }
 
 # 上下の蓋の条件
@@ -140,5 +140,4 @@ PRESS_EQUAL_PIPE_COND: {
   Dpipe: 0.01,             # 均圧配管径 [m]
   # Spip: np.pi() * Dpipe ** 2 / 4, # 配管断面積 [m2]
   coef_fr: 1,               # 流速補正係数 [-]
-  V_upper_pipe: 0.003,      # 上部空間体積 [m3]
 }

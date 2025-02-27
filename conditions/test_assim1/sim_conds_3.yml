@@ -59,7 +59,7 @@ PACKED_BED_COND: {
   ks_desorp: 3.515662,       # 吸着移動係数 [1e-6/sec]
   # v_space: Sbed * Lbed * epsilon     # 充填層空間体積 [m3]
   vacuume_pressure: 2,    # 到達真空圧力 [kPaA]
-  v_upstream: 0,          # 上流空間体積 [m3]
+  v_upstream: 0.003,          # 上流空間体積 [m3]
   init_asdorp_amt: 33.8,  # 初期吸着量 [cm3/g-abs] [2kpa: 16.9, 3kpa: 23.4, 4kpa: 29.0, 5kpa: 33.8]
 }
 
