@@ -18,7 +18,7 @@ def add_sim_conds(sim_conds):
     packed_bed["Vbed"] = packed_bed["Sbed"] * packed_bed["Lbed"]
     packed_bed["rho_abs"] = packed_bed["Mabs"] / packed_bed["Vbed"] / 1e6
     packed_bed["Cbed"] = packed_bed["cabs"] * packed_bed["Mabs"]
-    packed_bed["v_space"] = packed_bed["Lbed"] * packed_bed["Sbed"] * packed_bed["epsilon"]
+    packed_bed["v_space"] = packed_bed["Vbed"] * packed_bed["epsilon"]
 
     # 容器壁条件
     drum_wall = sim_conds["DRUM_WALL_COND"]
@@ -81,70 +81,75 @@ def add_sim_conds(sim_conds):
     press_equal["Spipe"] = np.pi * press_equal["Dpipe"]**2 / 4
     press_equal["Vpipe"] = press_equal["Spipe"] * press_equal["Dpipe"]
 
-    return sim_conds
-
-
-def update_params_by_obs(sim_conds):
-    """ 観測値によって更新されたパラメータに紐づくパラメータの更新
-
-    Args:
-        sim_conds (dict): 実験パラメータ
-
-    Returns:
-        dict: 一部更新後の実験パラメータ
-    """
-    # 導入ガス条件
-    input_gass = sim_conds["INFLOW_GAS_COND"]
-    input_gass["fr_all"] = input_gass["fr_co2"] + input_gass["fr_n2"]
-    if input_gass["fr_all"] != 0:
-        input_gass["mf_co2"] = input_gass["fr_co2"] / input_gass["fr_all"]
-        input_gass["mf_n2"] = input_gass["fr_n2"] / input_gass["fr_all"]
-    else:
-        input_gass["mf_co2"] = 0
-        input_gass["mf_n2"] = 0
-
-    # CropProp関連の物性
-    T_K = input_gass["temp"] + 273.15 # 温度 [K]
-    P = input_gass["total_press"] * 1e6 # 圧力 [Pa]
-    # CO2密度 [kg/m3]
-    input_gass["dense_co2"] = CP.PropsSI('D', 'T', T_K, 'P', P, "co2")
-    # N2密度 [kg/m3]
-    input_gass["dense_n2"] = CP.PropsSI('D', 'T', T_K, 'P', P, "nitrogen")
-    # CO2熱伝導率 [W/m/K]
-    input_gass["c_co2"] = CP.PropsSI('L', 'T', T_K, 'P', P, "co2")
-    # N2熱伝導率 [W/m/K]
-    input_gass["c_n2"] = CP.PropsSI('L', 'T', T_K, 'P', P, "nitrogen")
-    # CO2粘度 [Pa s]
-    input_gass["vi_co2"] = CP.PropsSI('V', 'T', T_K, 'P', P, "co2") * 1e6
-    # N2粘度 [Pa s]
-    input_gass["vi_n2"] = CP.PropsSI('V', 'T', T_K, 'P', P, "nitrogen") * 1e6
-    # CO2比熱容量 [kJ/kg/K]
-    input_gass["cp_co2"] = CP.PropsSI('C', 'T', T_K, 'P', P, "co2") / 1000
-    # N2比熱容量 [kJ/kg/K]
-    input_gass["cp_n2"] = CP.PropsSI('C', 'T', T_K, 'P', P, "nitrogen") / 1000
-
-    input_gass["dense_mean"] = (
-        input_gass["dense_co2"] * input_gass["mf_co2"]
-        + input_gass["dense_n2"] * input_gass["mf_n2"]
-    )
-    input_gass["c_mean"] = (
-        input_gass["c_co2"] * input_gass["mf_co2"]
-        + input_gass["c_n2"] * input_gass["mf_n2"]
-    )
-    input_gass["vi_mean"] = (
-        input_gass["vi_co2"] * input_gass["mf_co2"]
-        + input_gass["vi_n2"] * input_gass["mf_n2"]
-    )
-    input_gass["cp_mean"] = (
-        input_gass["cp_co2"] * input_gass["mf_co2"]
-        + input_gass["cp_n2"] * input_gass["mf_n2"]
-    )
-    a1 = input_gass["fr_co2"] / 22.4 * input_gass["mw_co2"] * 60 / 1000
-    a2 = input_gass["fr_n2"] / 22.4 * input_gass["mw_n2"] * 60 / 1000
-    a3 = a1 + a2
-    input_gass["C_per_hour"] = input_gass["cp_mean"] * a3
+    # 真空引き配管条件
+    vacuum_pipe = sim_conds["VACUUMING_PIPE_COND"]
+    vacuum_pipe["Spipe"] = np.pi * vacuum_pipe["Dpipe"] ** 2 / 4
+    vacuum_pipe["Vspace"] = vacuum_pipe["Vpipe"] + packed_bed["v_space"]
 
     return sim_conds
+
+
+# def update_params_by_obs(sim_conds):
+#     """ 観測値によって更新されたパラメータに紐づくパラメータの更新
+
+#     Args:
+#         sim_conds (dict): 実験パラメータ
+
+#     Returns:
+#         dict: 一部更新後の実験パラメータ
+#     """
+#     # 導入ガス条件
+#     input_gass = sim_conds["INFLOW_GAS_COND"]
+#     input_gass["fr_all"] = input_gass["fr_co2"] + input_gass["fr_n2"]
+#     if input_gass["fr_all"] != 0:
+#         input_gass["mf_co2"] = input_gass["fr_co2"] / input_gass["fr_all"]
+#         input_gass["mf_n2"] = input_gass["fr_n2"] / input_gass["fr_all"]
+#     else:
+#         input_gass["mf_co2"] = 0
+#         input_gass["mf_n2"] = 0
+
+#     # CropProp関連の物性
+#     T_K = input_gass["temp"] + 273.15 # 温度 [K]
+#     P = input_gass["total_press"] * 1e6 # 圧力 [Pa]
+#     # CO2密度 [kg/m3]
+#     input_gass["dense_co2"] = CP.PropsSI('D', 'T', T_K, 'P', P, "co2")
+#     # N2密度 [kg/m3]
+#     input_gass["dense_n2"] = CP.PropsSI('D', 'T', T_K, 'P', P, "nitrogen")
+#     # CO2熱伝導率 [W/m/K]
+#     input_gass["c_co2"] = CP.PropsSI('L', 'T', T_K, 'P', P, "co2")
+#     # N2熱伝導率 [W/m/K]
+#     input_gass["c_n2"] = CP.PropsSI('L', 'T', T_K, 'P', P, "nitrogen")
+#     # CO2粘度 [Pa s]
+#     input_gass["vi_co2"] = CP.PropsSI('V', 'T', T_K, 'P', P, "co2") * 1e6
+#     # N2粘度 [Pa s]
+#     input_gass["vi_n2"] = CP.PropsSI('V', 'T', T_K, 'P', P, "nitrogen") * 1e6
+#     # CO2比熱容量 [kJ/kg/K]
+#     input_gass["cp_co2"] = CP.PropsSI('C', 'T', T_K, 'P', P, "co2") / 1000
+#     # N2比熱容量 [kJ/kg/K]
+#     input_gass["cp_n2"] = CP.PropsSI('C', 'T', T_K, 'P', P, "nitrogen") / 1000
+
+#     input_gass["dense_mean"] = (
+#         input_gass["dense_co2"] * input_gass["mf_co2"]
+#         + input_gass["dense_n2"] * input_gass["mf_n2"]
+#     )
+#     input_gass["c_mean"] = (
+#         input_gass["c_co2"] * input_gass["mf_co2"]
+#         + input_gass["c_n2"] * input_gass["mf_n2"]
+#     )
+#     input_gass["vi_mean"] = (
+#         input_gass["vi_co2"] * input_gass["mf_co2"]
+#         + input_gass["vi_n2"] * input_gass["mf_n2"]
+#     )
+#     input_gass["cp_mean"] = (
+#         input_gass["cp_co2"] * input_gass["mf_co2"]
+#         + input_gass["cp_n2"] * input_gass["mf_n2"]
+#     )
+#     a1 = input_gass["fr_co2"] / 22.4 * input_gass["mw_co2"] * 60 / 1000
+#     a2 = input_gass["fr_n2"] / 22.4 * input_gass["mw_n2"] * 60 / 1000
+#     a3 = a1 + a2
+#     input_gass["C_per_hour"] = input_gass["cp_mean"] * a3
+
+#     return sim_conds
 
 
 def init_stream_conds(sim_conds, stream, stream_conds):

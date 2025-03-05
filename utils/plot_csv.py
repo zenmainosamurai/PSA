@@ -173,14 +173,15 @@ def plot_csv_outputs(tgt_foldapath, df_obs, tgt_sections, tower_num, timestamp, 
 
     ### 可視化（others） -------------------------------------
 
-    fig = plt.figure(figsize=(16*2, 11), tight_layout=True)
+    fig = plt.figure(figsize=(16*2, 5.5*3), tight_layout=True)
     fig.patch.set_facecolor('white')
     plt.rcParams["font.size"] = 20
+    plt_cell = 1
 
     # 1. 全圧
     filename = tgt_foldapath + f"/csv/tower_{tower_num}/others/total_press.csv"
     df = pd.read_csv(filename, index_col="timestamp")
-    plt.subplot(2, 2, 1)
+    plt.subplot(3, 2, plt_cell)
     plt.plot(df["total_press"], label="計算値")
     plt.plot(df_obs.loc[:timestamp, f"T{tower_num}_press"], label="観測値", c="black") # 観測値もプロット
     plt.title("全圧 [MPaA]")
@@ -198,11 +199,13 @@ def plot_csv_outputs(tgt_foldapath, df_obs, tgt_sections, tower_num, timestamp, 
         tgt_timestamp = df_p_end.loc[idx, "終了時刻(min)"]
         plt.vlines(tgt_timestamp, ymin=ymin, ymax=ymax, colors="tab:orange", alpha=1)
         p_name_bfr = p_name
+    plt_cell += 1
+
     # 2. モル分率
-    for i, _tgt_name in enumerate(["mf_co2", "mf_n2"]):
+    for _tgt_name in ["mf_co2", "mf_n2"]:
         filename = tgt_foldapath + f"/csv/tower_{tower_num}/others/{_tgt_name}.csv"
         df = pd.read_csv(filename, index_col="timestamp")
-        plt.subplot(2, 2, i+2)
+        plt.subplot(3, 2, plt_cell)
         # 可視化対象のcolumnsを抽出
         plt_tgt_cols = [col for col in df.columns if int(col.split("-")[-1]) in tgt_sections]
         # 各項目のプロット
@@ -229,6 +232,32 @@ def plot_csv_outputs(tgt_foldapath, df_obs, tgt_sections, tower_num, timestamp, 
             tgt_timestamp = df_p_end.loc[idx, "終了時刻(min)"]
             plt.vlines(tgt_timestamp, ymin=ymin, ymax=ymax, colors="tab:orange", alpha=1)
             p_name_bfr = p_name
+        plt_cell += 1
+
+    # 3. CO2,N2回収量
+    title_list = ["CO2回収量 [mol]", "N2回収量 [mol]", "CO2回収率 [%]"]
+    for i, _tgt_name in enumerate(["vacuum_amt_co2", "vacuum_amt_n2", "vacuum_rate_co2"]):
+        filename = tgt_foldapath + f"/csv/tower_{tower_num}/others/vacuum_amount.csv"
+        df = pd.read_csv(filename, index_col="timestamp")
+        plt.subplot(3, 2, plt_cell)
+        plt.plot(df[_tgt_name], label="計算値")
+        plt.title(title_list[i])
+        plt.legend()
+        plt.grid()
+        plt.xlabel("timestamp")
+        # プロセス終了時刻の縦線をプロット
+        ax = plt.gca()
+        ymin, ymax = ax.get_ylim()
+        p_name_bfr = ""
+        for idx in df_p_end.index:
+            p_name = df_p_end.loc[idx, f"塔{tower_num}"]
+            if p_name == p_name_bfr:
+                continue
+            tgt_timestamp = df_p_end.loc[idx, "終了時刻(min)"]
+            plt.vlines(tgt_timestamp, ymin=ymin, ymax=ymax, colors="tab:orange", alpha=1)
+            p_name_bfr = p_name
+        plt_cell += 1
+
     plt.savefig(output_foldapath + f"others.png", dpi=100)
     plt.close()
 
@@ -241,7 +270,7 @@ def outputs_to_csv(tgt_foldapath, record_dict, common_conds):
         record_dict (dict): 計算結果
         common_conds (dict): 実験パラメータ
     """
-    # heat, material
+    ### heat, material ----------------------------------------------
     for _tgt_name in ["heat", "material"]:
         _foldapath = tgt_foldapath + f"/{_tgt_name}/"
         os.makedirs(_foldapath, exist_ok=True)
@@ -285,7 +314,7 @@ def outputs_to_csv(tgt_foldapath, record_dict, common_conds):
     df.index.name = "timestamp"
     df.to_csv(foldapath + "heat_lid.csv")
 
-    # others
+    ### others ----------------------------------------------
     tgt_name = "others"
     _foldapath = tgt_foldapath + f"/{tgt_name}/"
     os.makedirs(_foldapath, exist_ok=True)
@@ -296,6 +325,25 @@ def outputs_to_csv(tgt_foldapath, record_dict, common_conds):
         values.append(record_dict[tgt_name][i][_tgt_col])
     df = pd.DataFrame(values,
                       columns=[_tgt_col],
+                      index=record_dict["timestamp"])
+    df.index.name = "timestamp"
+    df.to_csv(_foldapath + f"{_tgt_col}.csv")
+    # CO2, N2回収量
+    values = []
+    _tgt_col = "vacuum_amount"
+    for i in range(len(record_dict[tgt_name])):
+        try:
+            _vacuum_rate_co2 = (
+                record_dict[tgt_name][i]["vacuum_amt_co2"] / (
+                    record_dict[tgt_name][i]["vacuum_amt_co2"] + record_dict[tgt_name][i]["vacuum_amt_n2"]
+                )) * 100
+        except ZeroDivisionError:
+            _vacuum_rate_co2 = 0
+        values.append([_vacuum_rate_co2,
+                       record_dict[tgt_name][i]["vacuum_amt_co2"],
+                       record_dict[tgt_name][i]["vacuum_amt_n2"]])
+    df = pd.DataFrame(values,
+                      columns=["vacuum_rate_co2", "vacuum_amt_co2", "vacuum_amt_n2"],
                       index=record_dict["timestamp"])
     df.index.name = "timestamp"
     df.to_csv(_foldapath + f"{_tgt_col}.csv")

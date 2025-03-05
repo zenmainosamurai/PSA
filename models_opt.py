@@ -185,7 +185,7 @@ class GasAdosorption_for_Optimize():
             print(f"Error occurred: {e}")
             # print(f"Error occurred: {params_dict}")
             # 試行を失敗として扱う
-            return [np.inf]*self.num_objective  # または raise
+            return [30]*self.num_objective  # または raise
 
     def calc_score(self, params_dict):
         """ 物理計算を通しで実行

@@ -101,8 +101,6 @@ class GasAdosorption_Breakthrough_simulator():
                 variables_tower[_tower_num]["temp_lid"][position] = self.sim_conds[_tower_num]["DRUM_WALL_COND"]["temp_outside"]
             # 吸着量
             variables_tower[_tower_num]["adsorp_amt"] = {}
-            P = {1: 2, 2: 5, 3: 5}
-            T = 25 + 273.15
             for stream in range(1, 1+self.num_str):
                 variables_tower[_tower_num]["adsorp_amt"][stream] = {}
                 for section in range(1, 1+self.num_sec):
@@ -129,6 +127,9 @@ class GasAdosorption_Breakthrough_simulator():
                     variables_tower[_tower_num]["heat_t_coef_wall"][stream][section] = 14
             # 全圧
             variables_tower[_tower_num]["total_press"] = self.df_obs.loc[0, f"T{_tower_num}_press"]
+            # CO2, N2回収量 [mol]
+            variables_tower[_tower_num]["vacuum_amt_co2"] = 0
+            variables_tower[_tower_num]["vacuum_amt_n2"] = 0
 
         return variables_tower
 
@@ -194,6 +195,7 @@ class GasAdosorption_Breakthrough_simulator():
         self.df_operation.to_csv(_tgt_foldapath + "/プロセス終了時刻.csv", encoding="shift-jis")
         # NOTE: test用
         pd.DataFrame(self.record_test, columns=["diff_press [MPaA]"]).to_csv(_tgt_foldapath + "/塔23圧力差.csv")#, encoding="shift-jis")
+        pd.DataFrame(self.record_test2, columns=["排気後全圧 [MPaA]"]).to_csv(_tgt_foldapath + "/排気後全圧.csv")#, encoding="shift-jis")
 
         ### ◆(4/4) 可視化 -------------------------------------------------
         print("(3/3) png output...")
@@ -482,9 +484,11 @@ class GasAdosorption_Breakthrough_simulator():
                                                                       upstream_params=other_tower_params)
         # 真空脱着
         elif mode == "真空脱着":
-            calc_output = models.desorption_by_vaccuming(sim_conds=sim_conds,
+            calc_output = models.desorption_by_vacuuming(sim_conds=sim_conds,
                                                          stream_conds=stream_conds,
                                                          variables=variables)
+            # NOTE: test2用
+            self.record_test2.append(calc_output["accum_vacuum_amt"]["total_press_after_vacuum"])
 
         ### 2. 状態変数の抽出 ----------------------------------------
         new_variables = self._extract_state_vars(mode, variables, calc_output)
@@ -494,7 +498,7 @@ class GasAdosorption_Breakthrough_simulator():
         key_list = ["material", "heat", "heat_wall", "heat_lid"]
         other_outputs = {key: calc_output[key] for key in key_list}
         # b. その他状態変数
-        key_list = ["total_press", "mf_co2", "mf_n2"]
+        key_list = ["total_press", "mf_co2", "mf_n2", "vacuum_amt_co2", "vacuum_amt_n2"]
         other_outputs["others"] = {key: new_variables[key] for key in key_list}
 
         return new_variables, other_outputs, calc_output
@@ -548,8 +552,8 @@ class GasAdosorption_Breakthrough_simulator():
                 new_variables["mf_co2"][stream] = {}
                 new_variables["mf_n2"][stream] = {}
                 for section in range(1, 1+self.num_sec): # 脱着時は「脱着後のモル分率」
-                    new_variables["mf_co2"][stream][section] = calc_output["total_press_and_mf"]["mf_co2_after_vaccume"]
-                    new_variables["mf_n2"][stream][section] = calc_output["total_press_and_mf"]["mf_n2_after_vaccume"]
+                    new_variables["mf_co2"][stream][section] = calc_output["mol_fraction"][stream][section]["mf_co2_after_vacuum"]
+                    new_variables["mf_n2"][stream][section] = calc_output["mol_fraction"][stream][section]["mf_n2_after_vacuum"]
         elif mode in ["停止"]:
             for stream in range(1, 1+self.num_str):
                 new_variables["mf_co2"][stream] = {}
@@ -573,9 +577,16 @@ class GasAdosorption_Breakthrough_simulator():
             new_variables["total_press"] = calc_output["total_press"]
             # new_variables["total_press"] = variables["total_press"]
         elif mode in ["真空脱着"]:
-            new_variables["total_press"] = calc_output["total_press_and_mf"]["total_press_after_vaccume"]
+            new_variables["total_press"] = calc_output["total_press_after_desorp"]
         else:
-            new_variables["total_press"] = variables["total_press"]     
+            new_variables["total_press"] = variables["total_press"]
+        # CO2, N2回収量 [mol]
+        if mode in ["真空脱着"]:
+            new_variables["vacuum_amt_co2"] = calc_output["accum_vacuum_amt"]["accum_vacuum_amt_co2"]
+            new_variables["vacuum_amt_n2"] = calc_output["accum_vacuum_amt"]["accum_vacuum_amt_n2"]
+        else:
+            new_variables["vacuum_amt_co2"] = 0
+            new_variables["vacuum_amt_n2"] = 0
 
         return new_variables
 

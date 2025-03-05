@@ -417,6 +417,11 @@ class Assimilator():
         for _tower_num in range(1, 1+self.num_tower):
             middle_vars[_tower_num]["total_press"] = s_bfr[i]
             i+=1
+        # 10. CO2,N2回収量
+        for _tower_num in range(1, 1+self.num_tower):
+            middle_vars[_tower_num]["vacuum_amt_co2"] = s_bfr[i]
+            middle_vars[_tower_num]["vacuum_amt_n2"] = s_bfr[i]
+            i+=1
 
         return middle_vars
 
@@ -477,6 +482,10 @@ class Assimilator():
         # 9. 全圧
         for _tower_num in range(1, 1+self.num_tower):
             s.append(middle_vars[_tower_num]["total_press"])
+        # 10. CO2,N2回収量
+        for _tower_num in range(1, 1+self.num_tower):
+            s.append(middle_vars[_tower_num]["vacuum_amt_co2"])
+            s.append(middle_vars[_tower_num]["vacuum_amt_n2"])
 
         s = np.array(s)
 
