@@ -60,7 +60,7 @@ PACKED_BED_COND: {
   # v_space: Sbed * Lbed * epsilon     # 充填層空間体積 [m3]
   vacuume_pressure: 2,  # 到達真空圧力 [kPaA]
   v_upstream: 0.003,       # 上流空間体積 [m3]
-  init_asdorp_amt: 0.000001,  # 初期吸着量 [cm3/g-abs] [2kpa: 16.9, 3kpa: 23.4, 4kpa: 29.0, 5kpa: 33.8]
+  init_asdorp_amt: 16.9,  # 初期吸着量 [cm3/g-abs] [2kpa: 16.9, 3kpa: 23.4, 4kpa: 29.0, 5kpa: 33.8]
   # V_inner_space: ,      # 容器内部空間体積 [m3]
 }
 

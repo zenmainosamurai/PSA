@@ -170,12 +170,13 @@ class Assimilator():
 
         # 状態変数(x)をシミュレータのパラメータに上書き
         i = 0
+        sim_conds = self.simulator.sim_conds.copy()
         for _tower_num, tgt_tower_params in self.assim_conds["STATE_VARS"].items():
             for cond_category, tgt_conds in tgt_tower_params.items():
                 for cond_name in tgt_conds.keys():
-                    self.simulator.sim_conds[_tower_num][cond_category][cond_name] = x[i]
+                    sim_conds[_tower_num][cond_category][cond_name] = x[i]
                     i += 1
-        # 中間変数(s_bfr)をシミュレータのvariablesに上書き
+        # 中間変数(s_bfr)を辞書形式に変更
         middle_vars = self.__array_to_dict_middle_variables(s_bfr=s_bfr)
 
         ### ◆中間変数の更新 --------------------------------------
@@ -190,9 +191,9 @@ class Assimilator():
         # 各塔の稼働モード抽出
         mode_list = list(self.simulator.df_operation.loc[p, ["塔1", "塔2", "塔3"]])
         # 各塔の吸着計算実施
-        middle_vars, all_outputs = self.simulator.calc_adsorption_mode_list(mode_list,
-                                                                            middle_vars,
-                                                                            timestamp)
+        middle_vars, _ = self.simulator.calc_adsorption_mode_list(sim_conds,
+                                                                  mode_list,
+                                                                  middle_vars)
         ### ◆出力 --------------------------------
 
         # 計算結果から中間変数と観測変数を抽出

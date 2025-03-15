@@ -67,7 +67,8 @@ def material_balance_adsorp(sim_conds, stream_conds, stream, section, variables,
     # 全圧 [MPaA]
     total_press = variables["total_press"]
     # CO2分圧 [MPaA]
-    p_co2 = total_press * inflow_mf_co2
+    p_co2 = max(4.5e-3,
+                total_press * inflow_mf_co2)
     # 現在温度 [℃]
     temp = variables["temp"][stream][section]
     # ガス密度 [kg/m3]
@@ -81,42 +82,38 @@ def material_balance_adsorp(sim_conds, stream_conds, stream, section, variables,
         + sim_conds["INFLOW_GAS_COND"]["cp_n2"] * inflow_mf_n2
     )
     # 現在雰囲気の平衡吸着量 [cm3/g-abs]
-    P_kpa = p_co2 * 1000 # [kPaA]
+    P_KPA = p_co2 * 1000 # [kPaA]
     T_K = temp + 273.15 # [K]
-    adsorp_amt_equilibrium = _equilibrium_adsorp_amt(P_kpa, T_K)
+    adsorp_amt_equilibrium = max(0.1, _equilibrium_adsorp_amt(P_KPA, T_K))
     # 現在の既存吸着量 [cm3/g-abs]
     adsorp_amt_current = variables["adsorp_amt"][stream][section]
     # 理論新規吸着量 [cm3/g-abs]
-    if adsorp_amt_equilibrium != 0:
-        if adsorp_amt_equilibrium >= adsorp_amt_current:
-            adsorp_amt_estimate_abs = (
-                sim_conds["PACKED_BED_COND"]["ks_adsorp"] ** (adsorp_amt_current / adsorp_amt_equilibrium)
-                / sim_conds["PACKED_BED_COND"]["rho_abs"]
-                * 6 * (1 - sim_conds["PACKED_BED_COND"]["epsilon"]) * sim_conds["PACKED_BED_COND"]["phi"]
-                / sim_conds["PACKED_BED_COND"]["dp"] * (adsorp_amt_equilibrium - adsorp_amt_current)
-                * sim_conds["dt"] / 1e6 * 60
-            )
-            # セクション理論新規吸着量 [cm3]
-            adsorp_amt_estimate = adsorp_amt_estimate_abs * Mabs
-            # 実際のセクション新規吸着量 [cm3]
-            adsorp_amt_estimate = min(adsorp_amt_estimate, inflow_fr_co2)
-        else:
-            adsorp_amt_estimate_abs = (
-                sim_conds["PACKED_BED_COND"]["ks_desorp"] ** (adsorp_amt_current / adsorp_amt_equilibrium)
-                / sim_conds["PACKED_BED_COND"]["rho_abs"]
-                * 6 * (1 - sim_conds["PACKED_BED_COND"]["epsilon"]) * sim_conds["PACKED_BED_COND"]["phi"]
-                / sim_conds["PACKED_BED_COND"]["dp"] * (adsorp_amt_equilibrium - adsorp_amt_current)
-                * sim_conds["dt"] / 1e6 * 60
-            )
-            # セクション理論新規吸着量 [cm3]
-            adsorp_amt_estimate = adsorp_amt_estimate_abs * Mabs
-            # 実際のセクション新規吸着量 [cm3]
-            adsorp_amt_estimate = max(adsorp_amt_estimate, -adsorp_amt_current)
-        # 実際の新規吸着量 [cm3/g-abs]
-        adsorp_amt_estimate_abs = adsorp_amt_estimate / Mabs
+    if adsorp_amt_equilibrium >= adsorp_amt_current:
+        adsorp_amt_estimate_abs = (
+            sim_conds["PACKED_BED_COND"]["ks_adsorp"] ** (adsorp_amt_current / adsorp_amt_equilibrium)
+            / sim_conds["PACKED_BED_COND"]["rho_abs"]
+            * 6 * (1 - sim_conds["PACKED_BED_COND"]["epsilon"]) * sim_conds["PACKED_BED_COND"]["phi"]
+            / sim_conds["PACKED_BED_COND"]["dp"] * (adsorp_amt_equilibrium - adsorp_amt_current)
+            * sim_conds["dt"] / 1e6 * 60
+        )
+        # セクション理論新規吸着量 [cm3]
+        adsorp_amt_estimate = adsorp_amt_estimate_abs * Mabs
+        # 実際のセクション新規吸着量 [cm3]
+        adsorp_amt_estimate = min(adsorp_amt_estimate, inflow_fr_co2)
     else:
-        adsorp_amt_estimate = 0
-        adsorp_amt_estimate_abs = 0
+        adsorp_amt_estimate_abs = (
+            sim_conds["PACKED_BED_COND"]["ks_desorp"] ** (adsorp_amt_current / adsorp_amt_equilibrium)
+            / sim_conds["PACKED_BED_COND"]["rho_abs"]
+            * 6 * (1 - sim_conds["PACKED_BED_COND"]["epsilon"]) * sim_conds["PACKED_BED_COND"]["phi"]
+            / sim_conds["PACKED_BED_COND"]["dp"] * (adsorp_amt_equilibrium - adsorp_amt_current)
+            * sim_conds["dt"] / 1e6 * 60
+        )
+        # セクション理論新規吸着量 [cm3]
+        adsorp_amt_estimate = adsorp_amt_estimate_abs * Mabs
+        # 実際のセクション新規吸着量 [cm3]
+        adsorp_amt_estimate = max(adsorp_amt_estimate, -adsorp_amt_current)
+    # 実際の新規吸着量 [cm3/g-abs]
+    adsorp_amt_estimate_abs = adsorp_amt_estimate / Mabs
     # 時間経過後吸着量 [cm3/g-abs]
     accum_adsorp_amt = adsorp_amt_current + adsorp_amt_estimate_abs
     # 下流流出CO2流量 [cm3]
@@ -186,12 +183,13 @@ def material_balance_desorp(sim_conds, stream_conds, stream, section, variables,
     mf_co2 = variables["mf_co2"][stream][section]
     mf_n2 = variables["mf_n2"][stream][section]
     # CO2分圧 [MPaA]
-    p_co2 = vacuum_output["total_press_after_vacuum"] * mf_co2
+    p_co2 = max(2.5e-3,
+                vacuum_output["total_press_after_vacuum"] * mf_co2)
     # セクション吸着材量 [g]
     Mabs = stream_conds[stream]["Mabs"] / sim_conds["CELL_SPLIT"]["num_sec"]
     # 現在雰囲気の平衡吸着量 [cm3/g-abs]
     P_KPA = p_co2 * 1000 # [MPaA] → [kPaA]
-    adsorp_amt_equilibrium = _equilibrium_adsorp_amt(P_KPA, T_K)
+    adsorp_amt_equilibrium = max(0.1, _equilibrium_adsorp_amt(P_KPA, T_K))
     # 現在の既存吸着量 [cm3/g-abs]
     adsorp_amt_current = variables["adsorp_amt"][stream][section]
     # 理論新規吸着量 [cm3/g-abs]
@@ -244,15 +242,17 @@ def material_balance_desorp(sim_conds, stream_conds, stream, section, variables,
 
     ### その他（熱バラ渡す用） ---------------------------------------
     P = vacuum_output["total_press_after_vacuum"] * 1e6
+    P_ATM = 0.101325 * 1e6
     # ガス密度 [kg/m3]
     gas_density = (
         CP.PropsSI('D', 'T', T_K, 'P', P, "co2") * mf_co2
         + CP.PropsSI('D', 'T', T_K, 'P', P, "nitrogen") * mf_n2
     )
     # ガス比熱 [kJ/kg/K]
+    # NOTE: 比熱と熱伝導率と粘度は大気圧を使用
     gas_cp = (
-        CP.PropsSI('CPMASS', 'T', T_K, 'P', P, "co2") * mf_co2
-        + CP.PropsSI('CPMASS', 'T', T_K, 'P', P, "nitrogen") * mf_n2
+        CP.PropsSI('CPMASS', 'T', T_K, 'P', P_ATM, "co2") * mf_co2
+        + CP.PropsSI('CPMASS', 'T', T_K, 'P', P_ATM, "nitrogen") * mf_n2
     ) * 1e-3
 
     # 出力
@@ -632,9 +632,11 @@ def total_press_after_vacuum(sim_conds, variables):
                                             for section in range(1,1+sim_conds["CELL_SPLIT"]["num_sec"])
     ])
     # 真空ポンプ排気ガス粘度 [Pa・s]
+    # NOTE: 比熱と熱伝導率と粘度は大気圧を使用
+    P_ATM = 0.101325 * 1e6
     mu = (
-        CP.PropsSI('V', 'T', T_K, 'P', P, "co2") * _mean_mf_co2
-        + CP.PropsSI('V', 'T', T_K, 'P', P, "nitrogen") * _mean_mf_n2
+        CP.PropsSI('V', 'T', T_K, 'P', P_ATM, "co2") * _mean_mf_co2
+        + CP.PropsSI('V', 'T', T_K, 'P', P_ATM, "nitrogen") * _mean_mf_n2
     )
     # 真空ポンプ排気ガス密度 [kg/m3]
     rho = (
@@ -756,9 +758,11 @@ def total_press_after_depressure(sim_conds, variables, downflow_total_press):
                                             for section in range(1,1+sim_conds["CELL_SPLIT"]["num_sec"])
     ])
     # 上流均圧管ガス粘度 [Pa・s]
+    # NOTE: 比熱と熱伝導率と粘度は大気圧を使用
+    P_ATM = 0.101325 * 1e6
     mu = (
-        CP.PropsSI('V', 'T', T_K, 'P', P, "co2") * _mean_mf_co2
-        + CP.PropsSI('V', 'T', T_K, 'P', P, "nitrogen") * _mean_mf_n2
+        CP.PropsSI('V', 'T', T_K, 'P', P_ATM, "co2") * _mean_mf_co2
+        + CP.PropsSI('V', 'T', T_K, 'P', P_ATM, "nitrogen") * _mean_mf_n2
     )
     # 上流均圧管ガス密度 [kg/m3]
     rho = (
@@ -802,7 +806,7 @@ def total_press_after_depressure(sim_conds, variables, downflow_total_press):
     # 均圧配管流量 [m3/min]
     flow_amount_m3 = (
         sim_conds["PRESS_EQUAL_PIPE_COND"]["Spipe"] * flow_rate / 60
-        * sim_conds["PRESS_EQUAL_PIPE_COND"]["coef_fr"]
+        * sim_conds["PRESS_EQUAL_PIPE_COND"]["coef_fr"] * 100
     )
     # 均圧配管ノルマル流量 [m3/min]
     flow_amount_m3_N = (
@@ -989,9 +993,11 @@ def _heat_transfer_coef(sim_conds, stream_conds, stream, section, temp_now, mode
         mf_co2 = variables["mf_co2"][stream][section] # 気相中のCO2モル分率
         mf_n2 = variables["mf_n2"][stream][section] # 気相中のN2モル分率
     # 導入気体の熱伝導率 [W/m/K]
+    # NOTE: 比熱と熱伝導率と粘度は大気圧を使用
+    P_ATM = 0.101325 * 1e6
     kf = (
-        CP.PropsSI('L', 'T', T_K, 'P', P, "co2") * mf_co2
-        + CP.PropsSI('L', 'T', T_K, 'P', P, "nitrogen") * mf_n2
+        CP.PropsSI('L', 'T', T_K, 'P', P_ATM, "co2") * mf_co2
+        + CP.PropsSI('L', 'T', T_K, 'P', P_ATM, "nitrogen") * mf_n2
     ) / 1000
     # 充填剤の熱伝導率 [W/m/K]
     kp = sim_conds["PACKED_BED_COND"]["lambda_col"]
@@ -1035,9 +1041,11 @@ def _heat_transfer_coef(sim_conds, stream_conds, stream, section, temp_now, mode
     # ストリーム換算直径 [m]
     d1 = 2 * (stream_conds[stream]["Sstream"] / math.pi)**0.5
     # 気体粘度 [Pas]
+    # NOTE: 比熱と熱伝導率と粘度は大気圧を使用
+    P_ATM = 0.101325 * 1e6
     mu = (
-        CP.PropsSI('V', 'T', T_K, 'P', P, "co2") * mf_co2
-        + CP.PropsSI('V', 'T', T_K, 'P', P, "nitrogen") * mf_n2
+        CP.PropsSI('V', 'T', T_K, 'P', P_ATM, "co2") * mf_co2
+        + CP.PropsSI('V', 'T', T_K, 'P', P_ATM, "nitrogen") * mf_n2
     )
     # プラントル数
     Pr = mu * 1000 * material_output["gas_cp"] / kf

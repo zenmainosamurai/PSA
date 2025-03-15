@@ -2,7 +2,6 @@ import os
 import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
-import japanize_matplotlib
 import math
 import glob
 from utils import const
@@ -50,6 +49,7 @@ def plot_csv_outputs(tgt_foldapath, df_obs, tgt_sections, tower_num, timestamp, 
 
     for i, (key, df) in enumerate(df_dict.items()):
         plt.rcParams["font.size"] = 20
+        plt.rcParams['font.family'] = "Meiryo"
         plt.subplot(num_row, 2, i+1)
         # 可視化対象のcolumnsを抽出
         plt_tgt_cols = [col for col in df.columns if int(col.split("-")[-1]) in tgt_sections]
@@ -104,6 +104,7 @@ def plot_csv_outputs(tgt_foldapath, df_obs, tgt_sections, tower_num, timestamp, 
 
     for i, (key, df) in enumerate(df_dict.items()):
         plt.rcParams["font.size"] = 20
+        plt.rcParams['font.family'] = "Meiryo"
         plt.subplot(num_row, 2, i+1)
         # 可視化対象のcolumnsを抽出
         plt_tgt_cols = [col for col in df.columns if int(col.split("-")[-1]) in tgt_sections]
@@ -146,6 +147,7 @@ def plot_csv_outputs(tgt_foldapath, df_obs, tgt_sections, tower_num, timestamp, 
 
     for i, col in enumerate(df.columns):
         plt.rcParams["font.size"] = 20
+        plt.rcParams['font.family'] = "Meiryo"
         plt.subplot(num_row, 2, i+1)
         plt.plot(df[col])
         title = const.TRANSLATION[col.split("-")[0]]
@@ -176,6 +178,7 @@ def plot_csv_outputs(tgt_foldapath, df_obs, tgt_sections, tower_num, timestamp, 
     fig = plt.figure(figsize=(16*2, 5.5*3), tight_layout=True)
     fig.patch.set_facecolor('white')
     plt.rcParams["font.size"] = 20
+    plt.rcParams['font.family'] = "Meiryo"
     plt_cell = 1
 
     # 1. 全圧

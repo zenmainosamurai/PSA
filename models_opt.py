@@ -79,25 +79,31 @@ class GasAdosorption_for_Optimize():
             params_dict = {
                 1: {"PACKED_BED_COND": {
                         "ks_adsorp": df_tgt["params_ks_adsorp_1"],
-                        "ks_desorp": df_tgt["params_ks_desorp_1"],},
-                    "DRUM_WALL_COND": {
-                        "coef_hw1": df_tgt["params_coef_hw1"],},
+                        "ks_desorp": df_tgt["params_ks_desorp_1"],
+                        "vacuume_pressure": df_tgt["vacuume_pressure_1"]
+                        },
+                    # "DRUM_WALL_COND": {
+                    #     "coef_hw1": df_tgt["params_coef_hw1"],},
                     "INFLOW_GAS_COND": {
                         "adsorp_heat_co2": df_tgt["params_adsorp_heat_co2"],},
                     },
                 2: {"PACKED_BED_COND": {
                         "ks_adsorp": df_tgt["params_ks_adsorp_2"],
-                        "ks_desorp": df_tgt["params_ks_desorp_2"],},
-                    "DRUM_WALL_COND": {
-                        "coef_hw1": df_tgt["params_coef_hw1"],},
+                        "ks_desorp": df_tgt["params_ks_desorp_2"],
+                        "vacuume_pressure": df_tgt["vacuume_pressure_2"]
+                        },
+                    # "DRUM_WALL_COND": {
+                    #     "coef_hw1": df_tgt["params_coef_hw1"],},
                     "INFLOW_GAS_COND": {
                         "adsorp_heat_co2": df_tgt["params_adsorp_heat_co2"],},
                     },
                 3: {"PACKED_BED_COND": {
                         "ks_adsorp": df_tgt["params_ks_adsorp_3"],
-                        "ks_desorp": df_tgt["params_ks_desorp_3"],},
-                    "DRUM_WALL_COND": {
-                        "coef_hw1": df_tgt["params_coef_hw1"],},
+                        "ks_desorp": df_tgt["params_ks_desorp_3"],
+                        "vacuume_pressure": df_tgt["vacuume_pressure_3"]
+                        },
+                    # "DRUM_WALL_COND": {
+                    #     "coef_hw1": df_tgt["params_coef_hw1"],},
                     "INFLOW_GAS_COND": {
                         "adsorp_heat_co2": df_tgt["params_adsorp_heat_co2"],},
                     },
@@ -150,28 +156,34 @@ class GasAdosorption_for_Optimize():
         # 最適化条件
         params_dict = {
             1: {"PACKED_BED_COND": {
-                    "ks_adsorp": trial.suggest_float("ks_adsorp_1", 1e-8, 5e2, log=True),
-                    "ks_desorp": trial.suggest_float("ks_desorp_1", 1e-8, 5e2, log=True)},
-                "DRUM_WALL_COND": {
-                    "coef_hw1": trial.suggest_float("coef_hw1", 1e-5, 1e1, log=True),},
+                    "ks_adsorp": trial.suggest_float("ks_adsorp_1", 1e-8, 1e3, log=True),
+                    "ks_desorp": trial.suggest_float("ks_desorp_1", 1e-8, 1e3, log=True),
+                    "vacuume_pressure": trial.suggest_uniform("vacuume_pressure_1", 1, 10)
+                    },
+                # "DRUM_WALL_COND": {
+                #     "coef_hw1": trial.suggest_float("coef_hw1", 1e-5, 1e1, log=True),},
                 "INFLOW_GAS_COND": {
-                    "adsorp_heat_co2": trial.suggest_float("adsorp_heat_co2", 100, 3000, log=True),},
+                    "adsorp_heat_co2": trial.suggest_float("adsorp_heat_co2", 100, 3000),},
                 },
             2: {"PACKED_BED_COND": {
-                    "ks_adsorp": trial.suggest_float("ks_adsorp_2", 1e-8, 5e2, log=True),
-                    "ks_desorp": trial.suggest_float("ks_desorp_2", 1e-8, 5e2, log=True)},
-                "DRUM_WALL_COND": {
-                    "coef_hw1": trial.suggest_float("coef_hw1", 1e-5, 1e1, log=True),},
+                    "ks_adsorp": trial.suggest_float("ks_adsorp_2", 1e-8, 1e3, log=True),
+                    "ks_desorp": trial.suggest_float("ks_desorp_2", 1e-8, 1e3, log=True),
+                    "vacuume_pressure": trial.suggest_uniform("vacuume_pressure_2", 1, 10)
+                    },
+                # "DRUM_WALL_COND": {
+                #     "coef_hw1": trial.suggest_float("coef_hw1", 1e-5, 1e1, log=True),},
                 "INFLOW_GAS_COND": {
-                    "adsorp_heat_co2": trial.suggest_float("adsorp_heat_co2", 100, 3000, log=True),},
+                    "adsorp_heat_co2": trial.suggest_float("adsorp_heat_co2", 100, 3000),},
                 },
             3: {"PACKED_BED_COND": {
-                    "ks_adsorp": trial.suggest_float("ks_adsorp_3", 1e-8, 5e2, log=True),
-                    "ks_desorp": trial.suggest_float("ks_desorp_3", 5e-2, 5e2, log=True)},
-                "DRUM_WALL_COND": {
-                    "coef_hw1": trial.suggest_float("coef_hw1", 1e-5, 1e1, log=True),},
+                    "ks_adsorp": trial.suggest_float("ks_adsorp_3", 1e-8, 1e3, log=True),
+                    "ks_desorp": trial.suggest_float("ks_desorp_3", 5e-2, 1e3, log=True),
+                    "vacuume_pressure": trial.suggest_uniform("vacuume_pressure_3", 1, 10)
+                    },
+                # "DRUM_WALL_COND": {
+                #     "coef_hw1": trial.suggest_float("coef_hw1", 1e-5, 1e1, log=True),},
                 "INFLOW_GAS_COND": {
-                    "adsorp_heat_co2": trial.suggest_float("adsorp_heat_co2", 100, 3000, log=True),},
+                    "adsorp_heat_co2": trial.suggest_float("adsorp_heat_co2", 100, 3000),},
                 },
         }
         # score計算
@@ -290,6 +302,7 @@ class GasAdosorption_for_Optimize():
             print(f"{e.__class__.__name__}: {e}") # ZeroDivisionError: division by zero
             import sys
             sys.exit()
+
 
     def _plot_outputs(self, study, df_opt):
         """ 最適化結果をpng出力する
