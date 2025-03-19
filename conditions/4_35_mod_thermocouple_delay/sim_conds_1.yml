@@ -152,3 +152,10 @@ VACUUMING_PIPE_COND: {
   Vpipe: 0.003,   # 真空排気ライン空間体積 [m3]
   # Vspace: ,     # 真空排気空間容積 [m3]
 }
+
+# 熱電対条件
+THERMOCOUPLE_COND: {
+  cp: 0.4,      # 熱電対比熱 [J/g/K]
+  weight: 1,    # 熱電対重量 [g]
+  coef_heat_transfer: 1,  # 熱電対伝熱補正係数
+}

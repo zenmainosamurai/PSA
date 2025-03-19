@@ -99,6 +99,13 @@ class GasAdosorption_Breakthrough_simulator():
             variables_tower[_tower_num]["temp_lid"] = {}
             for position in ["up", "down"]:
                 variables_tower[_tower_num]["temp_lid"][position] = self.sim_conds[_tower_num]["DRUM_WALL_COND"]["temp_outside"]
+            # 各セルの熱電対温度
+            variables_tower[_tower_num]["temp_thermo"] = {}
+            for stream in range(1, 1+self.num_str):
+                variables_tower[_tower_num]["temp_thermo"][stream] = {}
+                for section in range(1, 1+self.num_sec):
+                    variables_tower[_tower_num]["temp_thermo"][stream][section] = \
+                        self.sim_conds[_tower_num]["DRUM_WALL_COND"]["temp_outside"]
             # 吸着量
             P = self.sim_conds[_tower_num]["PACKED_BED_COND"]["vacuume_pressure"]
             T = self.sim_conds[_tower_num]["DRUM_WALL_COND"]["temp_outside"] + 273.15
@@ -537,6 +544,12 @@ class GasAdosorption_Breakthrough_simulator():
         new_variables["temp_lid"] = {}
         for position in ["up", "down"]:
             new_variables["temp_lid"][position] = calc_output["heat_lid"][position]["temp_reached"]
+        # 熱電対温度
+        new_variables["temp_thermo"] = {}
+        for stream in range(1, 1+self.num_str):
+            new_variables["temp_thermo"][stream] = {}
+            for section in range(1, 1+self.num_sec):
+                new_variables["temp_thermo"][stream][section] = calc_output["heat"][stream][section]["temp_thermocouple_reached"]
         # 既存吸着量
         new_variables["adsorp_amt"] = {}
         for stream in range(1, 1+self.num_str):

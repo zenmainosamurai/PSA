@@ -458,8 +458,39 @@ def heat_balance(sim_conds, stream_conds, stream, section, variables, mode,
     }
     temp_reached = optimize.newton(__optimize_temp_reached, temp_now, args=args.values())
 
+    ### 熱電対温度の計算 --------------------------------------------------------------
+
+    # 熱電対熱容量 [J/K]
+    heat_capacity = (
+        sim_conds["THERMOCOUPLE_COND"]["cp"] * sim_conds["THERMOCOUPLE_COND"]["weight"]
+    )
+    # 熱電対側面積 [m2]
+    S_side = 0.004 * np.pi * 0.1
+    # 熱電対伝熱係数 [W/m2/K]
+    heat_transfer = hw1
+    # 熱電対熱流束 [W]
+    if mode != 2:
+        heat_flux = (
+            heat_transfer * sim_conds["THERMOCOUPLE_COND"]["coef_heat_transfer"] * S_side
+            * (variables["temp"][stream][section] - variables["temp_thermo"][stream][section])
+        )
+    else:
+        heat_flux = (
+            heat_transfer * 100 * S_side
+            * (variables["temp"][stream][section] - variables["temp_thermo"][stream][section])
+        )
+    # 熱電対上昇温度 [℃]
+    temp_increase = (
+        heat_flux * sim_conds["dt"] * 60 / heat_capacity
+    )
+    # 次時刻熱電対温度 [℃]
+    temp_thermocouple_reached = (
+        variables["temp_thermo"][stream][section] + temp_increase
+    )
+
     output = {
         "temp_reached": temp_reached,
+        "temp_thermocouple_reached": temp_thermocouple_reached,
         "hw1": hw1, # 壁-層伝熱係数
         "Hroof": Hroof,
         "Hbb": Hbb, # 下流セルへの熱流束 [J]
@@ -1037,7 +1068,7 @@ def _heat_transfer_coef(sim_conds, stream_conds, stream, section, temp_now, mode
         / (1 / ksi + 2 * kf / 3 / kp)
     )
     # 静止充填層有効熱伝導率 [W/m/K]
-    ke0 = kf * ke0_kf        
+    ke0 = kf * ke0_kf
     # ストリーム換算直径 [m]
     d1 = 2 * (stream_conds[stream]["Sstream"] / math.pi)**0.5
     # 気体粘度 [Pas]

@@ -27,6 +27,7 @@ OPERATION_MODE = {
 TRANSLATION = {
     # 出力値
     "temp_reached": "セクション到達温度",
+    "temp_thermocouple_reached": "熱電対温度",
     "hw1": "壁-層伝熱係数",
     "Hbb": "下流セルへの熱流束",
     "inflow_fr_co2": "流入CO2流量",
@@ -67,6 +68,7 @@ TRANSLATION = {
 
 UNIT = {
     "セクション到達温度": "[℃]",
+    "熱電対温度": "[℃]",
     "壁-層伝熱係数": "[W/m2/K]",
     "下流セルへの熱流束": "[J]",
     "流入CO2流量": "[cm3]",

@@ -67,7 +67,7 @@ def plot_csv_outputs(tgt_foldapath, df_obs, tgt_sections, tower_num, timestamp, 
         plt.legend(fontsize=12)
         plt.xlabel("timestamp")
         # セクション到達温度のみ観測値をプロット
-        if key == "セクション到達温度":
+        if key in ["セクション到達温度", "熱電対温度"]:
             for section in range(1,4):
                 plt.plot(df_obs.loc[:timestamp, f"T{tower_num}_temp_{section}"],
                         label=f"(str,sec) = (1, {tgt_sections[section-1]})",
