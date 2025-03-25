@@ -64,6 +64,7 @@ TRANSLATION = {
     "mf_co2": "気相CO2モル分率",
     "mf_n2": "気相N2モル分率",
     "p_co2": "CO2分圧",
+    "outflow_pco2": "流出CO2分圧",
 }
 
 UNIT = {
@@ -103,6 +104,7 @@ UNIT = {
     "気相CO2モル分率": "",
     "気相N2モル分率": "",
     "CO2分圧": "[MPaA]",
+    "流出CO2分圧": "[MPaA]",
 }
 
 TRANSLATION_PARAMS = {

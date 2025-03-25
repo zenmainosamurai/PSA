@@ -20,7 +20,7 @@ warnings.simplefilter('error')
 
 
 def material_balance_adsorp(sim_conds, stream_conds, stream, section, variables,
-                            inflow_gas=None, flow_amt_depress=None):
+                            inflow_gas=None, flow_amt_depress=None, stagnant_mode=None):
     """ 任意セルのマテリアルバランスを計算する
         吸着モード
 
@@ -60,15 +60,17 @@ def material_balance_adsorp(sim_conds, stream_conds, stream, section, variables,
     elif inflow_gas is not None : # 下流セクションや下流塔での吸着など
         inflow_fr_co2 = inflow_gas["outflow_fr_co2"]
         inflow_fr_n2 = inflow_gas["outflow_fr_n2"]
-    # 流入CO2分率
-    inflow_mf_co2 = inflow_fr_co2 / (inflow_fr_co2 + inflow_fr_n2)
-    # 流入N2分率
-    inflow_mf_n2 = inflow_fr_n2 / (inflow_fr_co2 + inflow_fr_n2)
+    # 流入ガスモル分率
+    if (stagnant_mode is None) | (section != 1):
+        inflow_mf_co2 = inflow_fr_co2 / (inflow_fr_co2 + inflow_fr_n2)
+        inflow_mf_n2 = inflow_fr_n2 / (inflow_fr_co2 + inflow_fr_n2)
+    else:
+        inflow_mf_co2 = stagnant_mode[stream][1]["inflow_mf_co2"]
+        inflow_mf_n2 = stagnant_mode[stream][1]["inflow_mf_n2"]
     # 全圧 [MPaA]
     total_press = variables["total_press"]
     # CO2分圧 [MPaA]
-    p_co2 = max(4.5e-3,
-                total_press * inflow_mf_co2)
+    p_co2 = total_press * inflow_mf_co2
     # 現在温度 [℃]
     temp = variables["temp"][stream][section]
     # ガス密度 [kg/m3]
@@ -125,6 +127,54 @@ def material_balance_adsorp(sim_conds, stream_conds, stream, section, variables,
     # 流出N2分率
     outflow_mf_n2 = outflow_fr_n2 / (outflow_fr_co2 + outflow_fr_n2)
 
+    ### 流出CO2分圧のつじつま合わせ ------------------------------
+
+    # 流出CO2分圧 [MPaA]
+    outflow_pco2 = total_press * outflow_mf_co2
+    # 直前値より低い場合は直前値と同じになるように吸着量を変更
+    if p_co2 >= variables["outflow_pco2"][stream][section]:
+        if outflow_pco2 < variables["outflow_pco2"][stream][section]:
+            # 直前値に置換
+            outflow_pco2 = variables["outflow_pco2"][stream][section]
+            # セクション新規吸着量とそれに伴う各変数を逆算
+            adsorp_amt_estimate = (
+                inflow_fr_co2 - outflow_pco2 * inflow_fr_n2
+                / (total_press - outflow_pco2)
+            )
+            # 実際の新規吸着量 [cm3/g-abs]
+            adsorp_amt_estimate_abs = adsorp_amt_estimate / Mabs
+            # 時間経過後吸着量 [cm3/g-abs]
+            accum_adsorp_amt = adsorp_amt_current + adsorp_amt_estimate_abs
+            # 下流流出CO2流量 [cm3]
+            outflow_fr_co2 = inflow_fr_co2 - adsorp_amt_estimate
+            # 下流流出N2流量 [cm3]
+            outflow_fr_n2 = inflow_fr_n2
+            # 流出CO2分率
+            outflow_mf_co2 = outflow_fr_co2 / (outflow_fr_co2 + outflow_fr_n2)
+            # 流出N2分率
+            outflow_mf_n2 = outflow_fr_n2 / (outflow_fr_co2 + outflow_fr_n2)
+    else:
+        if outflow_pco2 < p_co2:
+            # co2分圧に置換
+            outflow_pco2 = p_co2
+            # セクション新規吸着量とそれに伴う各変数を逆算
+            adsorp_amt_estimate = (
+                inflow_fr_co2 - outflow_pco2 * inflow_fr_n2
+                / (total_press - outflow_pco2)
+            )
+            # 実際の新規吸着量 [cm3/g-abs]
+            adsorp_amt_estimate_abs = adsorp_amt_estimate / Mabs
+            # 時間経過後吸着量 [cm3/g-abs]
+            accum_adsorp_amt = adsorp_amt_current + adsorp_amt_estimate_abs
+            # 下流流出CO2流量 [cm3]
+            outflow_fr_co2 = inflow_fr_co2 - adsorp_amt_estimate
+            # 下流流出N2流量 [cm3]
+            outflow_fr_n2 = inflow_fr_n2
+            # 流出CO2分率
+            outflow_mf_co2 = outflow_fr_co2 / (outflow_fr_co2 + outflow_fr_n2)
+            # 流出N2分率
+            outflow_mf_n2 = outflow_fr_n2 / (outflow_fr_co2 + outflow_fr_n2)
+
     output = {
         "inflow_fr_co2": inflow_fr_co2,
         "inflow_fr_n2": inflow_fr_n2,
@@ -141,6 +191,7 @@ def material_balance_adsorp(sim_conds, stream_conds, stream, section, variables,
         "outflow_mf_n2": outflow_mf_n2,
         "adsorp_amt_estimate_abs": adsorp_amt_estimate_abs,
         "p_co2": p_co2,
+        "outflow_pco2": outflow_pco2,
     }
 
     return output
@@ -272,6 +323,7 @@ def material_balance_desorp(sim_conds, stream_conds, stream, section, variables,
         "outflow_mf_n2": 0,
         "adsorp_amt_estimate_abs": adsorp_amt_estimate_abs,
         "p_co2": p_co2,
+        "outflow_pco2": variables["outflow_pco2"][stream][section],
     }
 
     # 出力２（モル分率）
@@ -313,6 +365,7 @@ def material_balance_valve_stop(stream, section, variables):
         "outflow_mf_n2": 0,
         "adsorp_amt_estimate_abs": 0,
         "p_co2": 0,
+        "outflow_pco2": variables["outflow_pco2"][stream][section],
     }
 
     return output

@@ -610,7 +610,7 @@ def equalization_pressure_pressurization(sim_conds, stream_conds, variables,
     return output
 
 def batch_adsorption_downstream(sim_conds, stream_conds, variables,
-                                inflow_gas):
+                                inflow_gas, stagnant_mf):
     """ バッチ吸着（下流）
         説明: ２つの吸着塔のバッチ吸着における下流側（下流側の圧力回復が目的）
         ベースモデル: バッチ吸着モデル
@@ -646,7 +646,8 @@ def batch_adsorption_downstream(sim_conds, stream_conds, variables,
                                                                  stream=stream,
                                                                  section=1,
                                                                  variables=variables,
-                                                                 inflow_gas=inflow_gas[stream][sim_conds["CELL_SPLIT"]["num_sec"]])
+                                                                 inflow_gas=inflow_gas[stream][sim_conds["CELL_SPLIT"]["num_sec"]],
+                                                                 stagnant_mode=stagnant_mf)
         hb_dict[stream][1] = base_models.heat_balance(sim_conds=sim_conds,
                                                       stream_conds=stream_conds,
                                                       stream=stream,

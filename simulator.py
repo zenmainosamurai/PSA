@@ -141,6 +141,13 @@ class GasAdosorption_Breakthrough_simulator():
             # CO2, N2回収量 [mol]
             variables_tower[_tower_num]["vacuum_amt_co2"] = 0
             variables_tower[_tower_num]["vacuum_amt_n2"] = 0
+            # 流出CO2分圧
+            variables_tower[_tower_num]["outflow_pco2"] = {}
+            for stream in range(1, 1+self.num_str):
+                variables_tower[_tower_num]["outflow_pco2"][stream] = {}
+                for section in range(1, 1+self.num_sec):
+                    variables_tower[_tower_num]["outflow_pco2"][stream][section] = \
+                        variables_tower[_tower_num]["total_press"]
 
         return variables_tower
 
@@ -481,7 +488,8 @@ class GasAdosorption_Breakthrough_simulator():
             calc_output = models.batch_adsorption_downstream(sim_conds=sim_conds,
                                                              stream_conds=stream_conds,
                                                              variables=variables,
-                                                             inflow_gas=other_tower_params)
+                                                             inflow_gas=other_tower_params,
+                                                             stagnant_mf=self.stagnant_mf)
         # 均圧_減圧
         elif mode == "均圧_減圧":
             calc_output = models.equalization_pressure_depressurization(sim_conds=sim_conds,
@@ -496,6 +504,7 @@ class GasAdosorption_Breakthrough_simulator():
                                                                       stream_conds=stream_conds,
                                                                       variables=variables,
                                                                       upstream_params=other_tower_params)
+            self.stagnant_mf = calc_output["material"]
         # 真空脱着
         elif mode == "真空脱着":
             calc_output = models.desorption_by_vacuuming(sim_conds=sim_conds,
@@ -607,6 +616,13 @@ class GasAdosorption_Breakthrough_simulator():
         else:
             new_variables["vacuum_amt_co2"] = 0
             new_variables["vacuum_amt_n2"] = 0
+        # 流出CO2分圧
+        new_variables["outflow_pco2"] = {}
+        for stream in range(1, 1+self.num_str):
+            new_variables["outflow_pco2"][stream] = {}
+            for section in range(1, 1+self.num_sec):
+                new_variables["outflow_pco2"][stream][section] = \
+                    calc_output["material"][stream][section]["outflow_pco2"]
 
         return new_variables
 
