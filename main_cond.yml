@@ -9,12 +9,7 @@ mode_list: [
 
 # 実行したいconditionファイルを指定
 cond_list: [
-  # 4_33_mod_init_adsorp_and_co2_press,
-  # 4_33_opt_cycle2,
-  # 4_34_opt_urabesan
-  # 4_35_mod_thermocouple_delay
-  # 4_36_mod_stagnant_gas,
-  4_37_mod_outflow_pco2
+  5_01_mod_conds_adjust,
   # test
 ]
 

@@ -281,15 +281,15 @@ def outputs_to_csv(tgt_foldapath, record_dict, common_conds):
         values = []
         for i in range(len(record_dict[_tgt_name])):
             values_tmp = []
-            for stream in range(1, 1+common_conds["CELL_SPLIT"]["num_str"]):
-                for section in range(1, 1+common_conds["CELL_SPLIT"]["num_sec"]):
+            for stream in range(1, 1+common_conds["NUM_STR"]):
+                for section in range(1, 1+common_conds["NUM_SEC"]):
                     for value in record_dict[_tgt_name][i][stream][section].values():
                         values_tmp.append(value)
             values.append(values_tmp)
         # カラム名の抽出
         columns = []
-        for stream in range(1, 1+common_conds["CELL_SPLIT"]["num_str"]):
-            for section in range(1, 1+common_conds["CELL_SPLIT"]["num_sec"]):
+        for stream in range(1, 1+common_conds["NUM_STR"]):
+            for section in range(1, 1+common_conds["NUM_SEC"]):
                 for key in record_dict[_tgt_name][i][stream][section].keys():
                     columns.append(key+"-"+str(stream).zfill(3)+"-"+str(section).zfill(3))
         # df化
@@ -355,14 +355,14 @@ def outputs_to_csv(tgt_foldapath, record_dict, common_conds):
         values = []
         for i in range(len(record_dict[tgt_name])):
             values_tmp = []
-            for stream in range(1, 1+common_conds["CELL_SPLIT"]["num_str"]):
-                for section in range(1, 1+common_conds["CELL_SPLIT"]["num_sec"]):
+            for stream in range(1, 1+common_conds["NUM_STR"]):
+                for section in range(1, 1+common_conds["NUM_SEC"]):
                     values_tmp.append(record_dict[tgt_name][i][_tgt_col][stream][section])
             values.append(values_tmp)
         # カラム名の抽出
         columns = []
-        for stream in range(1, 1+common_conds["CELL_SPLIT"]["num_str"]):
-            for section in range(1, 1+common_conds["CELL_SPLIT"]["num_sec"]):
+        for stream in range(1, 1+common_conds["NUM_STR"]):
+            for section in range(1, 1+common_conds["NUM_SEC"]):
                 columns.append(_tgt_col+"-"+str(stream).zfill(3)+"-"+str(section).zfill(3))
         df = pd.DataFrame(values,
                         columns=columns,

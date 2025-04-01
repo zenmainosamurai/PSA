@@ -37,8 +37,8 @@ class GasAdosorption_Breakthrough_simulator():
             with open(const.CONDITIONS_DIR + self.cond_id + f"/sim_conds_{_tower_num}.yml", encoding="utf-8") as f:
                 self.sim_conds[_tower_num] = yaml.safe_load(f)
         self.num_tower = self.sim_conds[1]["NUM_TOWER"]
-        self.num_str = self.sim_conds[1]["CELL_SPLIT"]["num_str"]
-        self.num_sec = self.sim_conds[1]["CELL_SPLIT"]["num_sec"]
+        self.num_str = self.sim_conds[1]["NUM_STR"]
+        self.num_sec = self.sim_conds[1]["NUM_SEC"]
 
         # 追加の初期化
         for _tower_num in [1,2,3]:
@@ -57,7 +57,7 @@ class GasAdosorption_Breakthrough_simulator():
             )
 
         # 観測値(data)の読み込み
-        filepath = const.DATA_DIR + self.sim_conds[1]["data_path"]
+        filepath = const.DATA_DIR + "3塔データ.csv"
         if filepath[-3:] == "csv":
             self.df_obs = pd.read_csv(filepath, index_col=0)
         else:
@@ -65,7 +65,7 @@ class GasAdosorption_Breakthrough_simulator():
         self.df_obs = other_utils.resample_obs_data(self.df_obs, self.sim_conds[1]["dt"]) # リサンプリング
 
         # 稼働表の読み込み
-        filepath = const.CONDITIONS_DIR + self.cond_id + "/" + self.sim_conds[1]["operation_path"]
+        filepath = const.CONDITIONS_DIR + self.cond_id + "/" + "稼働工程表.xlsx"
         self.df_operation = pd.read_excel(filepath, index_col="工程", sheet_name="工程")
 
         # その他初期化
@@ -218,12 +218,7 @@ class GasAdosorption_Breakthrough_simulator():
         ### ◆(4/4) 可視化 -------------------------------------------------
         print("(3/3) png output...")
         # 可視化対象のセルを算出
-        plot_target_sec = []
-        loc_cells = np.arange(0, self.sim_conds[1]["PACKED_BED_COND"]["Lbed"],
-                              self.sim_conds[1]["PACKED_BED_COND"]["Lbed"] / self.num_sec) # 各セルの位置
-        loc_cells += self.sim_conds[1]["PACKED_BED_COND"]["Lbed"] / self.num_sec / 2 # セルの半径を加算
-        for value in self.sim_conds[1]["LOC_CENCER"].values(): # 温度計に最も近いセルを算出
-            plot_target_sec.append(1 + np.argmin(np.abs(loc_cells - value)))
+        plot_target_sec = [2, 10, 18]
         # record_dictの可視化
         for _tower_num in range(1, 1+self.num_tower):
             tgt_foldapath = output_foldapath
@@ -686,9 +681,9 @@ class GasAdosorption_Breakthrough_simulator():
             _target_temp = 50.0
             def termination_cond_1(variables_tower, timestamp_p): # 終了条件(ブール値)
                 # 下流温度
-                temp_down = variables_tower[_tower_num]["temp"][1][self.sim_conds[1]["LOC_CENCER_SECTION"]["down"]]
+                temp_down = variables_tower[_tower_num]["temp"][1][17] # 下流センサーの位置（sec18）
                 # 中流温度
-                temp_mid = variables_tower[_tower_num]["temp"][1][self.sim_conds[1]["LOC_CENCER_SECTION"]["mid"]]
+                temp_mid = variables_tower[_tower_num]["temp"][1][9] # 下流センサーの位置（sec10）
                 return temp_down <= temp_mid
             # 条件２：時間経過
             cond2 = termination_cond_str.split("/")[1] # 時間経過

@@ -171,12 +171,12 @@ def init_stream_conds(sim_conds, stream, stream_conds):
     # 外側境界半径座標
     if stream == 1:
         tgt_stream_conds["r_out"] = (
-            sim_conds["PACKED_BED_COND"]["Rbed"] / sim_conds["CELL_SPLIT"]["num_str"]
+            sim_conds["PACKED_BED_COND"]["Rbed"] / sim_conds["NUM_STR"]
             * stream + tgt_stream_conds["r_in"]
         )
     else:
         tgt_stream_conds["r_out"] = (
-            sim_conds["PACKED_BED_COND"]["Rbed"] / sim_conds["CELL_SPLIT"]["num_str"]
+            sim_conds["PACKED_BED_COND"]["Rbed"] / sim_conds["NUM_STR"]
             * stream + stream_conds[stream-1]["r_in"]
         )
     # ストリーム断面積
@@ -211,7 +211,7 @@ def init_drum_wall_conds(sim_conds, stream_conds):
     """
     tgt_stream_conds = {}
     # 内側境界半径座標(軸中心0)
-    tgt_stream_conds["r_in"] = stream_conds[sim_conds["CELL_SPLIT"]["num_str"]]["r_out"]
+    tgt_stream_conds["r_in"] = stream_conds[sim_conds["NUM_STR"]]["r_out"]
     # 外側境界半径座標
     tgt_stream_conds["r_out"] = sim_conds["DRUM_WALL_COND"]["Rdrum"]
     # ストリーム断面積
