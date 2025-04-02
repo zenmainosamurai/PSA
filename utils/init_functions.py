@@ -2,6 +2,69 @@ import numpy as np
 import math
 import CoolProp.CoolProp as CP
 
+def read_sim_conds(df_sim_conds):
+    """ sim_conds.xlsxを辞書形式に変換する
+
+    Args:
+        df_sim_conds (pd.DataFrame): 実験条件のxlsxファイル
+    """
+    sim_conds = {1: {}, 2: {}, 3: {}}
+    for tower_num in [1,2,3]:
+        # 共通パラメータ
+        sim_conds[tower_num]["dt"] = df_sim_conds["共通"].iloc[4,3]
+        sim_conds[tower_num]["NUM_STR"] = int(df_sim_conds["共通"].iloc[5,3])
+        sim_conds[tower_num]["NUM_SEC"] = int(df_sim_conds["共通"].iloc[6,3])
+        # 触媒充填層条件
+        sim_conds[tower_num]["PACKED_BED_COND"] = {}
+        for idx in range(3,23):
+            key = df_sim_conds[f"塔{tower_num}"].iloc[idx,2]
+            val = df_sim_conds[f"塔{tower_num}"].iloc[idx,3]
+            sim_conds[tower_num]["PACKED_BED_COND"][key] = val
+        # 容器壁条件
+        sim_conds[tower_num]["DRUM_WALL_COND"] = {}
+        for idx in range(3,17):
+            key = df_sim_conds[f"塔{tower_num}"].iloc[idx,6]
+            val = df_sim_conds[f"塔{tower_num}"].iloc[idx,7]
+            sim_conds[tower_num]["DRUM_WALL_COND"][key] = val
+        # 上蓋の条件
+        sim_conds[tower_num]["LID_COND"] = {}
+        sim_conds[tower_num]["LID_COND"]["UP"] = {}
+        for idx in range(3,11):
+            key = df_sim_conds[f"塔{tower_num}"].iloc[idx,10]
+            val = df_sim_conds[f"塔{tower_num}"].iloc[idx,11]
+            sim_conds[tower_num]["LID_COND"]["UP"][key] = val
+        # 下蓋の条件
+        sim_conds[tower_num]["LID_COND"]["DOWN"] = {}
+        for idx in range(13,21):
+            key = df_sim_conds[f"塔{tower_num}"].iloc[idx,10]
+            val = df_sim_conds[f"塔{tower_num}"].iloc[idx,11]
+            sim_conds[tower_num]["LID_COND"]["DOWN"][key] = val
+        # 導入ガス条件
+        sim_conds[tower_num]["INFLOW_GAS_COND"] = {}
+        for idx in range(3,28):
+            key = df_sim_conds[f"塔{tower_num}"].iloc[idx,14]
+            val = df_sim_conds[f"塔{tower_num}"].iloc[idx,15]
+            sim_conds[tower_num]["INFLOW_GAS_COND"][key] = val
+        # 均圧配管条件
+        sim_conds[tower_num]["PRESS_EQUAL_PIPE_COND"] = {}
+        for idx in range(3,9):
+            key = df_sim_conds[f"塔{tower_num}"].iloc[idx,18]
+            val = df_sim_conds[f"塔{tower_num}"].iloc[idx,19]
+            sim_conds[tower_num]["PRESS_EQUAL_PIPE_COND"][key] = val
+        # 真空引き配管条件
+        sim_conds[tower_num]["VACUUMING_PIPE_COND"] = {}
+        for idx in range(11,16):
+            key = df_sim_conds[f"塔{tower_num}"].iloc[idx,18]
+            val = df_sim_conds[f"塔{tower_num}"].iloc[idx,19]
+            sim_conds[tower_num]["VACUUMING_PIPE_COND"][key] = val
+        # 熱電対条件
+        sim_conds[tower_num]["THERMOCOUPLE_COND"] = {}
+        for idx in range(18,21):
+            key = df_sim_conds[f"塔{tower_num}"].iloc[idx,18]
+            val = df_sim_conds[f"塔{tower_num}"].iloc[idx,19]
+            sim_conds[tower_num]["THERMOCOUPLE_COND"][key] = val
+
+    return sim_conds
 
 def add_sim_conds(sim_conds):
     """ 全体共通パラメータの追加定義
@@ -88,70 +151,6 @@ def add_sim_conds(sim_conds):
 
     return sim_conds
 
-
-# def update_params_by_obs(sim_conds):
-#     """ 観測値によって更新されたパラメータに紐づくパラメータの更新
-
-#     Args:
-#         sim_conds (dict): 実験パラメータ
-
-#     Returns:
-#         dict: 一部更新後の実験パラメータ
-#     """
-#     # 導入ガス条件
-#     input_gass = sim_conds["INFLOW_GAS_COND"]
-#     input_gass["fr_all"] = input_gass["fr_co2"] + input_gass["fr_n2"]
-#     if input_gass["fr_all"] != 0:
-#         input_gass["mf_co2"] = input_gass["fr_co2"] / input_gass["fr_all"]
-#         input_gass["mf_n2"] = input_gass["fr_n2"] / input_gass["fr_all"]
-#     else:
-#         input_gass["mf_co2"] = 0
-#         input_gass["mf_n2"] = 0
-
-#     # CropProp関連の物性
-#     T_K = input_gass["temp"] + 273.15 # 温度 [K]
-#     P = input_gass["total_press"] * 1e6 # 圧力 [Pa]
-#     # CO2密度 [kg/m3]
-#     input_gass["dense_co2"] = CP.PropsSI('D', 'T', T_K, 'P', P, "co2")
-#     # N2密度 [kg/m3]
-#     input_gass["dense_n2"] = CP.PropsSI('D', 'T', T_K, 'P', P, "nitrogen")
-#     # CO2熱伝導率 [W/m/K]
-#     input_gass["c_co2"] = CP.PropsSI('L', 'T', T_K, 'P', P, "co2")
-#     # N2熱伝導率 [W/m/K]
-#     input_gass["c_n2"] = CP.PropsSI('L', 'T', T_K, 'P', P, "nitrogen")
-#     # CO2粘度 [Pa s]
-#     input_gass["vi_co2"] = CP.PropsSI('V', 'T', T_K, 'P', P, "co2") * 1e6
-#     # N2粘度 [Pa s]
-#     input_gass["vi_n2"] = CP.PropsSI('V', 'T', T_K, 'P', P, "nitrogen") * 1e6
-#     # CO2比熱容量 [kJ/kg/K]
-#     input_gass["cp_co2"] = CP.PropsSI('C', 'T', T_K, 'P', P, "co2") / 1000
-#     # N2比熱容量 [kJ/kg/K]
-#     input_gass["cp_n2"] = CP.PropsSI('C', 'T', T_K, 'P', P, "nitrogen") / 1000
-
-#     input_gass["dense_mean"] = (
-#         input_gass["dense_co2"] * input_gass["mf_co2"]
-#         + input_gass["dense_n2"] * input_gass["mf_n2"]
-#     )
-#     input_gass["c_mean"] = (
-#         input_gass["c_co2"] * input_gass["mf_co2"]
-#         + input_gass["c_n2"] * input_gass["mf_n2"]
-#     )
-#     input_gass["vi_mean"] = (
-#         input_gass["vi_co2"] * input_gass["mf_co2"]
-#         + input_gass["vi_n2"] * input_gass["mf_n2"]
-#     )
-#     input_gass["cp_mean"] = (
-#         input_gass["cp_co2"] * input_gass["mf_co2"]
-#         + input_gass["cp_n2"] * input_gass["mf_n2"]
-#     )
-#     a1 = input_gass["fr_co2"] / 22.4 * input_gass["mw_co2"] * 60 / 1000
-#     a2 = input_gass["fr_n2"] / 22.4 * input_gass["mw_n2"] * 60 / 1000
-#     a3 = a1 + a2
-#     input_gass["C_per_hour"] = input_gass["cp_mean"] * a3
-
-#     return sim_conds
-
-
 def init_stream_conds(sim_conds, stream, stream_conds):
     """ 全体条件から各ストリーム条件を算出する
 
@@ -201,7 +200,7 @@ def init_stream_conds(sim_conds, stream, stream_conds):
 
 
 def init_drum_wall_conds(sim_conds, stream_conds):
-    """ 全体条件から各ストリーム条件を算出する
+    """ 全体条件から壁面条件を算出する
 
         Args:
             sim_conds (dict): 全体共通パラメータ群

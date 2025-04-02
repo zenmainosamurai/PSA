@@ -3,8 +3,6 @@
 # 計算ステップ(min)
 dt: 0.01
 
-# 吸着塔の数
-NUM_TOWER: 3
 
 # セル分割
 NUM_STR: 2  # ストリーム分割数（横方向）
@@ -26,7 +24,6 @@ PACKED_BED_COND: {
   epsilon: 0.36,      # 平均空隙率 [-]
   dp: 0.001,          # 平均粒子径 [m]
   phi: 1,             # 形状補正係数 [-]
-  vp: 0,              # 到達真空圧力 [kPaA]
   ks_adsorp: 3.5,       # 吸着移動係数 [1e-6/sec]
   ks_desorp: 0.7,       # 吸着移動係数 [1e-6/sec]
   # v_space: Sbed * Lbed * epsilon     # 充填層空間体積 [m3]

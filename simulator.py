@@ -32,17 +32,13 @@ class GasAdosorption_Breakthrough_simulator():
         self.cond_id = cond_id
 
         # 実験条件(conditions)の読み込み
-        self.sim_conds = {}
-        for _tower_num in [1,2,3]:
-            with open(const.CONDITIONS_DIR + self.cond_id + f"/sim_conds_{_tower_num}.yml", encoding="utf-8") as f:
-                self.sim_conds[_tower_num] = yaml.safe_load(f)
-        self.num_tower = self.sim_conds[1]["NUM_TOWER"]
+        df_sim_conds = pd.read_excel(const.CONDITIONS_DIR + self.cond_id + "/sim_conds.xlsx",
+                                     sheet_name=["共通", "塔1", "塔2", "塔3"])
+        self.sim_conds = init_functions.read_sim_conds(df_sim_conds)
+
+        self.num_tower = 3
         self.num_str = self.sim_conds[1]["NUM_STR"]
         self.num_sec = self.sim_conds[1]["NUM_SEC"]
-
-        # 追加の初期化
-        for _tower_num in [1,2,3]:
-            self.sim_conds[_tower_num] = init_functions.add_sim_conds(self.sim_conds[_tower_num])
 
         # stream条件の初期化
         self.stream_conds = {}
