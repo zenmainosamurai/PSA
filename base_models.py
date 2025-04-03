@@ -735,14 +735,10 @@ def total_press_after_vacuum(sim_conds, variables):
     for iter in range(_max_iteration):
         P_resist_old = P_resist
         # ポンプ見せかけの全圧 [PaA]
-        P_PUMP= (variables["total_press"] - P_resist) * 1e6
+        P_PUMP = (variables["total_press"] - P_resist) * 1e6
+        P_PUMP = max(1e-6, P_PUMP)
         # 真空ポンプ排気速度 [m3/min]
-        if P_PUMP < 100:
-            vacuum_rate = 0
-        elif (P_PUMP >= 100) & (P_PUMP < 900):
-            vacuum_rate = 0.085 * np.log(P_PUMP)
-        else:
-            vacuum_rate = 0.57
+        vacuum_rate = 15 * (sim_conds["VACUUMING_PIPE_COND"]["Dpipe"] ** 4) * P_PUMP / 2
         # 真空ポンプ排気ノルマル流量 [m3/min]
         vacuum_rate_N = vacuum_rate / 0.1013 * P_PUMP * 1e-6
         # 真空ポンプ排気線流速 [m/3]
@@ -787,7 +783,8 @@ def total_press_after_vacuum(sim_conds, variables):
     ### 排気後圧力計算 --------------------------------
     # 排気"前"の真空排気空間の現在物質量 [mol]
     case_inner_mol_amt = (
-        P_PUMP * sim_conds["VACUUMING_PIPE_COND"]["Vspace"]
+        # P_PUMP * sim_conds["VACUUMING_PIPE_COND"]["Vspace"]
+        (P_PUMP + P_resist*1e6) * sim_conds["VACUUMING_PIPE_COND"]["Vspace"]
         / 8.314 / T_K
     )
     # 排気"後"の現在物質量 [mol]
@@ -890,7 +887,7 @@ def total_press_after_depressure(sim_conds, variables, downflow_total_press):
     # 均圧配管流量 [m3/min]
     flow_amount_m3 = (
         sim_conds["PRESS_EQUAL_PIPE_COND"]["Spipe"] * flow_rate / 60
-        * sim_conds["PRESS_EQUAL_PIPE_COND"]["coef_fr"] * 100
+        * sim_conds["PRESS_EQUAL_PIPE_COND"]["coef_fr"] * 5
     )
     # 均圧配管ノルマル流量 [m3/min]
     flow_amount_m3_N = (

@@ -10,8 +10,8 @@ mode_list: [
 # 実行したいconditionファイルを指定
 cond_list: [
   # 5_01_mod_conds_adjust,
-  5_01_mod_conds_yaml2xlsx
-  # test
+  # 5_01_mod_conds_yaml2xlsx
+  5_02_mod_pressure_obs2calc
 ]
 
 # パラメータ最適化のパラメータ

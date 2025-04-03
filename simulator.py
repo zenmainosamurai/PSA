@@ -248,9 +248,9 @@ class GasAdosorption_Breakthrough_simulator():
                     self._overwrite_state_vars(filtered_x = filtered_x,
                                                timestamp = timestamp+timestamp_p)
                 # 状態変数(圧力)の上書き
-                _tgt_index = self.df_obs.index[np.abs(self.df_obs.index - (timestamp+timestamp_p)).argmin()]
-                for _tower_num in range(1, 1+self.num_tower):
-                    variables_tower[_tower_num]["total_press"] = self.df_obs.loc[_tgt_index, f"T{_tower_num}_press"]
+                # _tgt_index = self.df_obs.index[np.abs(self.df_obs.index - (timestamp+timestamp_p)).argmin()]
+                # for _tower_num in range(1, 1+self.num_tower):
+                #     variables_tower[_tower_num]["total_press"] = self.df_obs.loc[_tgt_index, f"T{_tower_num}_press"]
                 # 各塔の吸着計算実施
                 variables_tower, _record_outputs_tower = self.calc_adsorption_mode_list(self.sim_conds,
                                                                                         mode_list,
@@ -272,9 +272,9 @@ class GasAdosorption_Breakthrough_simulator():
             # 終了条件１
             while termination_cond_1(variables_tower, timestamp_p):
                 # 状態変数(圧力)の上書き
-                _tgt_index = self.df_obs.index[np.abs(self.df_obs.index - (timestamp+timestamp_p)).argmin()]
-                for _tower_num in range(1, 1+self.num_tower):
-                    variables_tower[_tower_num]["total_press"] = self.df_obs.loc[_tgt_index, f"T{_tower_num}_press"]
+                # _tgt_index = self.df_obs.index[np.abs(self.df_obs.index - (timestamp+timestamp_p)).argmin()]
+                # for _tower_num in range(1, 1+self.num_tower):
+                #     variables_tower[_tower_num]["total_press"] = self.df_obs.loc[_tgt_index, f"T{_tower_num}_press"]
                 # 各塔の吸着計算実施
                 variables_tower, _record_outputs_tower = self.calc_adsorption_mode_list(self.sim_conds,
                                                                                         mode_list,
@@ -295,9 +295,9 @@ class GasAdosorption_Breakthrough_simulator():
                 timestamp_p = 0
                 while termination_cond_2(timestamp_p):
                     # 状態変数(圧力)の上書き
-                    _tgt_index = self.df_obs.index[np.abs(self.df_obs.index - (timestamp+timestamp_p)).argmin()]
-                    for _tower_num in range(1, 1+self.num_tower):
-                        variables_tower[_tower_num]["total_press"] = self.df_obs.loc[_tgt_index, f"T{_tower_num}_press"]
+                    # _tgt_index = self.df_obs.index[np.abs(self.df_obs.index - (timestamp+timestamp_p)).argmin()]
+                    # for _tower_num in range(1, 1+self.num_tower):
+                    #     variables_tower[_tower_num]["total_press"] = self.df_obs.loc[_tgt_index, f"T{_tower_num}_press"]
                     # 各塔の吸着計算実施
                     variables_tower, _record_outputs_tower = self.calc_adsorption_mode_list(self.sim_conds,
                                                                                             mode_list,
