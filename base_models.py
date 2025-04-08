@@ -736,9 +736,9 @@ def total_press_after_vacuum(sim_conds, variables):
         P_resist_old = P_resist
         # ポンプ見せかけの全圧 [PaA]
         P_PUMP = (variables["total_press"] - P_resist) * 1e6
-        P_PUMP = max(1e-6, P_PUMP)
+        P_PUMP = max(2000, P_PUMP)
         # 真空ポンプ排気速度 [m3/min]
-        vacuum_rate = 15 * (sim_conds["VACUUMING_PIPE_COND"]["Dpipe"] ** 4) * P_PUMP / 2
+        vacuum_rate = 15 * (sim_conds["VACUUMING_PIPE_COND"]["Dpipe"] ** 4) * (P_PUMP - 2000) / 2
         # 真空ポンプ排気ノルマル流量 [m3/min]
         vacuum_rate_N = vacuum_rate / 0.1013 * P_PUMP * 1e-6
         # 真空ポンプ排気線流速 [m/3]
@@ -788,9 +788,7 @@ def total_press_after_vacuum(sim_conds, variables):
         / 8.314 / T_K
     )
     # 排気"後"の現在物質量 [mol]
-    case_inner_mol_amt_after_vacuum = (
-        case_inner_mol_amt - vacuum_amt
-    )
+    case_inner_mol_amt_after_vacuum = max(0, case_inner_mol_amt - vacuum_amt)
     # 排気"後"の容器内部圧力 [MPaA]
     total_press_after_vacuum = (
         case_inner_mol_amt_after_vacuum * 8.314 * T_K
@@ -1145,7 +1143,10 @@ def _heat_transfer_coef(sim_conds, stream_conds, stream, section, temp_now, mode
     # 気体動粘度 [m2/s]
     nu = mu / material_output["gas_density"]
     # 粒子レイノルズ数
-    Rep = vcol * sim_conds["PACKED_BED_COND"]["dp"] / nu
+    if vcol == 0:
+        Rep = 1
+    else:
+        Rep = vcol * sim_conds["PACKED_BED_COND"]["dp"] / nu
     # 充填層有効熱伝導率 1
     psi_beta = (
         1.0985 * (sim_conds["PACKED_BED_COND"]["dp"] / d1)**2

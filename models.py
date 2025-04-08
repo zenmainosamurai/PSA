@@ -272,12 +272,16 @@ def flow_adsorption_single_or_upstream(sim_conds, stream_conds, variables):
                                                              variables=variables,
                                                              heat_output=hb_dict,
                                                              heat_wall_output=hb_wall)
+    # 4. 圧力計算
+    total_press_after_flow_adsorp = sim_conds["INFLOW_GAS_COND"]["total_press"]
+
     # 出力
     output = {
         "material": mb_dict, # マテバラ
         "heat": hb_dict, # 熱バラ
         "heat_wall": hb_wall, # 熱バラ（壁面）
         "heat_lid": hb_lid, # 熱バラ（蓋）
+        "total_press": total_press_after_flow_adsorp, # 圧力
     }
 
     return output
@@ -794,12 +798,16 @@ def flow_adsorption_downstream(sim_conds, stream_conds, variables,
                                                         variables=variables,
                                                         heat_output=hb_dict,
                                                         heat_wall_output=hb_wall)
+    # 4. 全圧
+    total_press_after_flow_adsorp = sim_conds["INFLOW_GAS_COND"]["total_press"]
+
     # 出力
     output = {
         "material": mb_dict, # マテバラ
         "heat": hb_dict, # 熱バラ
         "heat_wall": hb_wall, # 熱バラ（壁面）
         "heat_lid": hb_lid, # 熱バラ（蓋）
+        "total_press": total_press_after_flow_adsorp, # 全圧
     }
 
     return output

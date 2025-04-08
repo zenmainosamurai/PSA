@@ -593,13 +593,13 @@ class GasAdosorption_Breakthrough_simulator():
         # 全圧
         if mode in ["初回ガス導入", "バッチ吸着_上流", "均圧_加圧", "バッチ吸着_下流"]:
             new_variables["total_press"] = calc_output["total_press_after_batch_adsorp"]
-        elif mode in ["均圧_減圧"]: # NOTE: 減圧改修により暫定的に直前時刻参照
+        elif mode in ["均圧_減圧", "流通吸着_単独/上流", "流通吸着_下流"]:
             new_variables["total_press"] = calc_output["total_press"]
-            # new_variables["total_press"] = variables["total_press"]
         elif mode in ["真空脱着"]:
             new_variables["total_press"] = calc_output["total_press_after_desorp"]
         else:
             new_variables["total_press"] = variables["total_press"]
+        # new_variables["total_press"] = min(0.1, new_variables["total_press"])
         # CO2, N2回収量 [mol]
         if mode in ["真空脱着"]:
             new_variables["vacuum_amt_co2"] = calc_output["accum_vacuum_amt"]["accum_vacuum_amt_co2"]
