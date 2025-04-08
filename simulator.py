@@ -35,10 +35,9 @@ class GasAdosorption_Breakthrough_simulator():
         df_sim_conds = pd.read_excel(const.CONDITIONS_DIR + self.cond_id + "/sim_conds.xlsx",
                                      sheet_name=["共通", "塔1", "塔2", "塔3"])
         self.sim_conds = init_functions.read_sim_conds(df_sim_conds)
-
-        self.num_tower = 3
-        self.num_str = self.sim_conds[1]["NUM_STR"]
-        self.num_sec = self.sim_conds[1]["NUM_SEC"]
+        self.num_tower = 3 # 塔数
+        self.num_str = self.sim_conds[1]["NUM_STR"] # ストリーム分割数
+        self.num_sec = self.sim_conds[1]["NUM_SEC"] # セクション分割数
 
         # stream条件の初期化
         self.stream_conds = {}
@@ -237,20 +236,32 @@ class GasAdosorption_Breakthrough_simulator():
             timestamp (float): 時刻t
             filtered_x (pd.DataFrame): データ同化で得られた状態変数の推移
         """
+        # プロセス開始後経過時間
+        timestamp_p = 0
         # 手動の場合は時間経過で終了
         if manual:
-            # プロセス開始後経過時間
-            timestamp_p = 0
-            # 吸着計算
+            # 初回限定処理の実施
+            if "バッチ吸着_上流" in mode_list:
+                tower_num_up = mode_list.index("バッチ吸着_上流") + 1
+                tower_num_dw = mode_list.index("バッチ吸着_下流") + 1
+                # 圧力の平均化
+                total_press_mean = (
+                    (variables_tower[tower_num_up]["total_press"]
+                     * self.sim_conds[tower_num_up]["PACKED_BED_COND"]["v_space"]
+                     + variables_tower[tower_num_dw]["total_press"]
+                     * self.sim_conds[tower_num_dw]["PACKED_BED_COND"]["v_space"]
+                    )
+                    / (self.sim_conds[tower_num_up]["PACKED_BED_COND"]["v_space"]
+                       + self.sim_conds[tower_num_dw]["PACKED_BED_COND"]["v_space"])
+                )
+                variables_tower[tower_num_up]["total_press"] = total_press_mean
+                variables_tower[tower_num_dw]["total_press"] = total_press_mean
+            # 逐次吸着計算
             while timestamp + timestamp_p <= termination_cond_str:
                 # 状態変数の上書き(データ同化後限定)
                 if filtered_x is not None:
                     self._overwrite_state_vars(filtered_x = filtered_x,
                                                timestamp = timestamp+timestamp_p)
-                # 状態変数(圧力)の上書き
-                # _tgt_index = self.df_obs.index[np.abs(self.df_obs.index - (timestamp+timestamp_p)).argmin()]
-                # for _tower_num in range(1, 1+self.num_tower):
-                #     variables_tower[_tower_num]["total_press"] = self.df_obs.loc[_tgt_index, f"T{_tower_num}_press"]
                 # 各塔の吸着計算実施
                 variables_tower, _record_outputs_tower = self.calc_adsorption_mode_list(self.sim_conds,
                                                                                         mode_list,
@@ -271,10 +282,6 @@ class GasAdosorption_Breakthrough_simulator():
             # 吸着計算
             # 終了条件１
             while termination_cond_1(variables_tower, timestamp_p):
-                # 状態変数(圧力)の上書き
-                # _tgt_index = self.df_obs.index[np.abs(self.df_obs.index - (timestamp+timestamp_p)).argmin()]
-                # for _tower_num in range(1, 1+self.num_tower):
-                #     variables_tower[_tower_num]["total_press"] = self.df_obs.loc[_tgt_index, f"T{_tower_num}_press"]
                 # 各塔の吸着計算実施
                 variables_tower, _record_outputs_tower = self.calc_adsorption_mode_list(self.sim_conds,
                                                                                         mode_list,
