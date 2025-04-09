@@ -7,3 +7,4 @@ test0_free.ipynb
 dist/
 build/
 *.spec
+~*
