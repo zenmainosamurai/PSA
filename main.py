@@ -5,14 +5,14 @@ from simulator import GasAdosorption_Breakthrough_simulator
 from assimilator import Assimilator
 from models_opt import GasAdosorption_for_Optimize
 
-if __name__ == '__main__':
+if __name__ == "__main__":
 
     # try:
     # 実行条件の読み込み
     with open("./main_cond.yml", encoding="utf-8") as f:
         main_cond = yaml.safe_load(f)
 
-    start = time.time() # 時間計測
+    start = time.time()  # 時間計測
 
     # 計算実行
     print("計算開始----------------------------------")
@@ -38,11 +38,11 @@ if __name__ == '__main__':
                 print("cond = ", cond_id)
                 instance = GasAdosorption_for_Optimize(cond_id, main_cond["opt_params"])
                 instance.optimize_params()
-    end = time.time() # 時間計測
+    end = time.time()  # 時間計測
     ptime = end - start
-    ptime_hour = int(ptime//3600)
-    ptime_min = int(ptime%3600//60)
-    ptime_s = int(ptime%3600%60)
+    ptime_hour = int(ptime // 3600)
+    ptime_min = int(ptime % 3600 // 60)
+    ptime_s = int(ptime % 3600 % 60)
     print(f"実行時間: {ptime_hour} h {ptime_min} m {ptime_s}s")
 
     print("complete!")

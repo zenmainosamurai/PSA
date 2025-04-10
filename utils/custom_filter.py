@@ -2,6 +2,7 @@ from copy import deepcopy
 from concurrent.futures import ThreadPoolExecutor
 
 import numpy as np
+
 # オリジナルのプログラムに合わせた形でインポート
 from numpy import eye, dot, isscalar
 
@@ -9,33 +10,48 @@ from filterpy.kalman import UnscentedKalmanFilter, unscented_transform
 
 
 class CustomUKF(UnscentedKalmanFilter):
-    '''
+    """
     filterpyのUnscentedKalmanFilterを拡張したクラス
 
     以下を拡張
     * 状態変数、中間変数、観測変数が扱えるように拡張
     * 観測変数が1次元でも処理が行えるように拡張
-    '''
+    """
 
-    def __init__(self, dim_x, dim_z, dt, hx, fx, gx, points,
-                 sqrt_fn=None, x_mean_fn=None, z_mean_fn=None,
-                 residual_x=None, residual_z=None, state_add=None,
-                 max_workers=0):
-        '''
+    def __init__(
+        self,
+        dim_x,
+        dim_z,
+        dt,
+        hx,
+        fx,
+        gx,
+        points,
+        sqrt_fn=None,
+        x_mean_fn=None,
+        z_mean_fn=None,
+        residual_x=None,
+        residual_z=None,
+        state_add=None,
+        max_workers=0,
+    ):
+        """
         コンストラクタ
-        '''
+        """
 
-        super().__init__(dim_x=dim_x,
-                         dim_z=dim_z,
-                         dt=dt,
-                         hx=hx,
-                         fx=fx,
-                         points=points,
-                         sqrt_fn=sqrt_fn,
-                         x_mean_fn=x_mean_fn,
-                         z_mean_fn=z_mean_fn,
-                         residual_x=residual_x,
-                         residual_z=residual_z)
+        super().__init__(
+            dim_x=dim_x,
+            dim_z=dim_z,
+            dt=dt,
+            hx=hx,
+            fx=fx,
+            points=points,
+            sqrt_fn=sqrt_fn,
+            x_mean_fn=x_mean_fn,
+            z_mean_fn=z_mean_fn,
+            residual_x=residual_x,
+            residual_z=residual_z,
+        )
 
         # Hidden states between x and z
         self.s = None
@@ -67,7 +83,7 @@ class CustomUKF(UnscentedKalmanFilter):
     def call_gx(self, sigmas):
         x = sigmas[0]
         s = sigmas[1]
-        return self.gx(x, s, multi_thread='', **self.gx_args)
+        return self.gx(x, s, multi_thread="", **self.gx_args)
 
     def update(self, z, R=None, UT=None, hx=None, gx=None, hx_args={}, gx_args={}):
 
@@ -106,7 +122,7 @@ class CustomUKF(UnscentedKalmanFilter):
             #             print(i, s_)
 
         if z is None:
-            self.z = np.array([[None]*self._dim_z]).T
+            self.z = np.array([[None] * self._dim_z]).T
             self.x_post = self.x.copy()
             self.P_post = self.P.copy()
             return
@@ -147,8 +163,8 @@ class CustomUKF(UnscentedKalmanFilter):
 
         # compute cross variance of the state and the measurements
         Pxz = self.cross_variance(self.x, zp, self.sigmas_f, self.sigmas_h)
-        self.K = dot(Pxz, self.SI)        # Kalman gain
-        self.y = self.residual_z(z, zp)   # residual
+        self.K = dot(Pxz, self.SI)  # Kalman gain
+        self.y = self.residual_z(z, zp)  # residual
 
         # update Gaussian state estimate (x, P)
         self.x = self.state_add(self.x, dot(self.K, self.y))

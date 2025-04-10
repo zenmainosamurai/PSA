@@ -3,7 +3,7 @@ import pandas as pd
 
 
 def resample_obs_data(df_obs, simulation_step):
-    """ 観測値を計算粒度に合うようにリサンプリングする
+    """観測値を計算粒度に合うようにリサンプリングする
 
     Args:
         df_obs (pd.DataFrame): 観測値のデータフレーム
@@ -15,7 +15,7 @@ def resample_obs_data(df_obs, simulation_step):
     obs_step = df_obs.index[1] - df_obs.index[0]
     # ステップ分割数を計算
     num_split = obs_step / simulation_step
-    num_split = int(np.ceil(num_split)) # 切り上げ
+    num_split = int(np.ceil(num_split))  # 切り上げ
     # 新しいindexを用意
     new_index = []
     for idx in df_obs.index:

@@ -6,8 +6,9 @@ import math
 import glob
 from utils import const
 
+
 def plot_csv_outputs(tgt_foldapath, df_obs, tgt_sections, tower_num, timestamp, df_p_end):
-    """ 熱バラ計算結果の可視化
+    """熱バラ計算結果の可視化
 
     Args:
         tgt_foldapath (str): 出力先フォルダパス
@@ -18,17 +19,17 @@ def plot_csv_outputs(tgt_foldapath, df_obs, tgt_sections, tower_num, timestamp, 
     """
     ### パラメータ設定 --------------------------------------
 
-    linestyle_dict = { # section
+    linestyle_dict = {  # section
         tgt_sections[0]: "-",
         tgt_sections[1]: "--",
         tgt_sections[2]: ":",
     }
-    color_dict = { # stream
+    color_dict = {  # stream
         1: "tab:red",
         2: "tab:blue",
         3: "tab:green",
     }
-    color_dict_obs = { # stream (観測値)
+    color_dict_obs = {  # stream (観測値)
         1: "black",
         2: "dimgrey",
     }
@@ -43,37 +44,39 @@ def plot_csv_outputs(tgt_foldapath, df_obs, tgt_sections, tower_num, timestamp, 
     for filename in filename_list:
         df_dict[filename.split("/")[-1][:-4].split("\\")[1]] = pd.read_csv(filename, index_col="timestamp")
 
-    num_row = math.ceil((len(df_dict))/2)
-    fig = plt.figure(figsize=(16*2, 5.5*num_row), tight_layout=True)
-    fig.patch.set_facecolor('white')
+    num_row = math.ceil((len(df_dict)) / 2)
+    fig = plt.figure(figsize=(16 * 2, 5.5 * num_row), tight_layout=True)
+    fig.patch.set_facecolor("white")
 
     for i, (key, df) in enumerate(df_dict.items()):
         plt.rcParams["font.size"] = 20
-        plt.rcParams['font.family'] = "Meiryo"
-        plt.subplot(num_row, 2, i+1)
+        plt.rcParams["font.family"] = "Meiryo"
+        plt.subplot(num_row, 2, i + 1)
         # 可視化対象のcolumnsを抽出
         plt_tgt_cols = [col for col in df.columns if int(col.split("-")[-1]) in tgt_sections]
         # 各項目のプロット
         for col in plt_tgt_cols:
             stream = int(col.split("-")[-2])
             section = int(col.split("-")[-1])
-            plt.plot(df[col],
-                    label = f"(str,sec) = ({stream}, {section})",
-                    linestyle = linestyle_dict[section],
-                    c = color_dict[stream],
-                    )
+            plt.plot(
+                df[col],
+                label=f"(str,sec) = ({stream}, {section})",
+                linestyle=linestyle_dict[section],
+                c=color_dict[stream],
+            )
         plt.title(key + " " + const.UNIT[key])
         plt.grid()
         plt.legend(fontsize=12)
         plt.xlabel("timestamp")
         # セクション到達温度のみ観測値をプロット
         if key in ["セクション到達温度", "熱電対温度"]:
-            for section in range(1,4):
-                plt.plot(df_obs.loc[:timestamp, f"T{tower_num}_temp_{section}"],
-                        label=f"(str,sec) = (1, {tgt_sections[section-1]})",
-                        linestyle = linestyle_dict[tgt_sections[section-1]],
-                        c = "black"
-                        )
+            for section in range(1, 4):
+                plt.plot(
+                    df_obs.loc[:timestamp, f"T{tower_num}_temp_{section}"],
+                    label=f"(str,sec) = (1, {tgt_sections[section-1]})",
+                    linestyle=linestyle_dict[tgt_sections[section - 1]],
+                    c="black",
+                )
             plt.legend(fontsize=12)
         # プロセス終了時刻の縦線をプロット
         ax = plt.gca()
@@ -86,7 +89,7 @@ def plot_csv_outputs(tgt_foldapath, df_obs, tgt_sections, tower_num, timestamp, 
             tgt_timestamp = df_p_end.loc[idx, "終了時刻(min)"]
             plt.vlines(tgt_timestamp, ymin=ymin, ymax=ymax, colors="tab:orange", alpha=1)
             p_name_bfr = p_name
-        plt.legend(fontsize=12, loc='upper left', bbox_to_anchor=(1, 1))
+        plt.legend(fontsize=12, loc="upper left", bbox_to_anchor=(1, 1))
     plt.savefig(output_foldapath + "heat.png", dpi=100)
     plt.close()
 
@@ -98,25 +101,26 @@ def plot_csv_outputs(tgt_foldapath, df_obs, tgt_sections, tower_num, timestamp, 
     for filename in filename_list:
         df_dict[filename.split("/")[-1][:-4].split("\\")[1]] = pd.read_csv(filename, index_col="timestamp")
 
-    num_row = math.ceil((len(df_dict))/2)
-    fig = plt.figure(figsize=(16*2, 5.5*num_row), tight_layout=True)
-    fig.patch.set_facecolor('white')
+    num_row = math.ceil((len(df_dict)) / 2)
+    fig = plt.figure(figsize=(16 * 2, 5.5 * num_row), tight_layout=True)
+    fig.patch.set_facecolor("white")
 
     for i, (key, df) in enumerate(df_dict.items()):
         plt.rcParams["font.size"] = 20
-        plt.rcParams['font.family'] = "Meiryo"
-        plt.subplot(num_row, 2, i+1)
+        plt.rcParams["font.family"] = "Meiryo"
+        plt.subplot(num_row, 2, i + 1)
         # 可視化対象のcolumnsを抽出
         plt_tgt_cols = [col for col in df.columns if int(col.split("-")[-1]) in tgt_sections]
         # 各項目のプロット
         for col in plt_tgt_cols:
             stream = int(col.split("-")[-2])
             section = int(col.split("-")[-1])
-            plt.plot(df[col],
-                    label = f"(str,sec) = ({stream}, {section})",
-                    linestyle = linestyle_dict[section],
-                    c = color_dict[stream],
-                    )
+            plt.plot(
+                df[col],
+                label=f"(str,sec) = ({stream}, {section})",
+                linestyle=linestyle_dict[section],
+                c=color_dict[stream],
+            )
         plt.title(key + " " + const.UNIT[key])
         plt.grid()
         plt.legend(fontsize=16)
@@ -141,14 +145,14 @@ def plot_csv_outputs(tgt_foldapath, df_obs, tgt_sections, tower_num, timestamp, 
     filename_list = glob.glob(tgt_foldapath + f"/csv/tower_{tower_num}/heat_lid/heat_lid.csv")
     df = pd.read_csv(filename_list[0], index_col="timestamp")
 
-    num_row = math.ceil((len(df.columns))/2)
-    fig = plt.figure(figsize=(16*2, 5.5*num_row), tight_layout=True)
-    fig.patch.set_facecolor('white')
+    num_row = math.ceil((len(df.columns)) / 2)
+    fig = plt.figure(figsize=(16 * 2, 5.5 * num_row), tight_layout=True)
+    fig.patch.set_facecolor("white")
 
     for i, col in enumerate(df.columns):
         plt.rcParams["font.size"] = 20
-        plt.rcParams['font.family'] = "Meiryo"
-        plt.subplot(num_row, 2, i+1)
+        plt.rcParams["font.family"] = "Meiryo"
+        plt.subplot(num_row, 2, i + 1)
         plt.plot(df[col])
         title = const.TRANSLATION[col.split("-")[0]]
         unit = const.UNIT[title]
@@ -175,10 +179,10 @@ def plot_csv_outputs(tgt_foldapath, df_obs, tgt_sections, tower_num, timestamp, 
 
     ### 可視化（others） -------------------------------------
 
-    fig = plt.figure(figsize=(16*2, 5.5*3), tight_layout=True)
-    fig.patch.set_facecolor('white')
+    fig = plt.figure(figsize=(16 * 2, 5.5 * 3), tight_layout=True)
+    fig.patch.set_facecolor("white")
     plt.rcParams["font.size"] = 20
-    plt.rcParams['font.family'] = "Meiryo"
+    plt.rcParams["font.family"] = "Meiryo"
     plt_cell = 1
 
     # 1. 全圧
@@ -186,7 +190,7 @@ def plot_csv_outputs(tgt_foldapath, df_obs, tgt_sections, tower_num, timestamp, 
     df = pd.read_csv(filename, index_col="timestamp")
     plt.subplot(3, 2, plt_cell)
     plt.plot(df["total_press"], label="計算値")
-    plt.plot(df_obs.loc[:timestamp, f"T{tower_num}_press"], label="観測値", c="black") # 観測値もプロット
+    plt.plot(df_obs.loc[:timestamp, f"T{tower_num}_press"], label="観測値", c="black")  # 観測値もプロット
     plt.title("全圧 [MPaA]")
     plt.legend()
     plt.grid()
@@ -215,11 +219,12 @@ def plot_csv_outputs(tgt_foldapath, df_obs, tgt_sections, tower_num, timestamp, 
         for col in plt_tgt_cols:
             stream = int(col.split("-")[-2])
             section = int(col.split("-")[-1])
-            plt.plot(df[col],
-                    label = f"(str,sec) = ({stream}, {section})",
-                    linestyle = linestyle_dict[section],
-                    c = color_dict[stream],
-                    )
+            plt.plot(
+                df[col],
+                label=f"(str,sec) = ({stream}, {section})",
+                linestyle=linestyle_dict[section],
+                c=color_dict[stream],
+            )
         plt.title(_tgt_name.split("_")[-1] + "モル分率")
         plt.legend()
         plt.grid()
@@ -266,7 +271,7 @@ def plot_csv_outputs(tgt_foldapath, df_obs, tgt_sections, tower_num, timestamp, 
 
 
 def outputs_to_csv(tgt_foldapath, record_dict, common_conds):
-    """ 計算結果をcsv出力する
+    """計算結果をcsv出力する
 
     Args:
         tgt_foldapath (str): 出力先フォルダパス
@@ -281,23 +286,21 @@ def outputs_to_csv(tgt_foldapath, record_dict, common_conds):
         values = []
         for i in range(len(record_dict[_tgt_name])):
             values_tmp = []
-            for stream in range(1, 1+common_conds["NUM_STR"]):
-                for section in range(1, 1+common_conds["NUM_SEC"]):
+            for stream in range(1, 1 + common_conds["NUM_STR"]):
+                for section in range(1, 1 + common_conds["NUM_SEC"]):
                     for value in record_dict[_tgt_name][i][stream][section].values():
                         values_tmp.append(value)
             values.append(values_tmp)
         # カラム名の抽出
         columns = []
-        for stream in range(1, 1+common_conds["NUM_STR"]):
-            for section in range(1, 1+common_conds["NUM_SEC"]):
+        for stream in range(1, 1 + common_conds["NUM_STR"]):
+            for section in range(1, 1 + common_conds["NUM_SEC"]):
                 for key in record_dict[_tgt_name][i][stream][section].keys():
-                    columns.append(key+"-"+str(stream).zfill(3)+"-"+str(section).zfill(3))
+                    columns.append(key + "-" + str(stream).zfill(3) + "-" + str(section).zfill(3))
         # df化
         for key in record_dict[_tgt_name][i][stream][section].keys():
             idx = [columns.index(col) for col in columns if key in col]
-            df = pd.DataFrame(np.array(values)[:, idx],
-                                columns=np.array(columns)[idx],
-                                index=record_dict["timestamp"])
+            df = pd.DataFrame(np.array(values)[:, idx], columns=np.array(columns)[idx], index=record_dict["timestamp"])
             df.index.name = "timestamp"
             df.to_csv(_foldapath + const.TRANSLATION[key] + ".csv")
 
@@ -306,14 +309,11 @@ def outputs_to_csv(tgt_foldapath, record_dict, common_conds):
     os.makedirs(foldapath, exist_ok=True)
     values = []
     for i in range(len(record_dict["heat_lid"])):
-        values.append([
-            record_dict["heat_lid"][i]["up"]["temp_reached"],
-            record_dict["heat_lid"][i]["down"]["temp_reached"]
-        ])
+        values.append(
+            [record_dict["heat_lid"][i]["up"]["temp_reached"], record_dict["heat_lid"][i]["down"]["temp_reached"]]
+        )
     columns = ["temp_reached-up", "temp_reached-down"]
-    df = pd.DataFrame(values,
-                        columns=columns,
-                        index=record_dict["timestamp"])
+    df = pd.DataFrame(values, columns=columns, index=record_dict["timestamp"])
     df.index.name = "timestamp"
     df.to_csv(foldapath + "heat_lid.csv")
 
@@ -326,9 +326,7 @@ def outputs_to_csv(tgt_foldapath, record_dict, common_conds):
     _tgt_col = "total_press"
     for i in range(len(record_dict[tgt_name])):
         values.append(record_dict[tgt_name][i][_tgt_col])
-    df = pd.DataFrame(values,
-                      columns=[_tgt_col],
-                      index=record_dict["timestamp"])
+    df = pd.DataFrame(values, columns=[_tgt_col], index=record_dict["timestamp"])
     df.index.name = "timestamp"
     df.to_csv(_foldapath + f"{_tgt_col}.csv")
     # CO2, N2回収量
@@ -337,17 +335,17 @@ def outputs_to_csv(tgt_foldapath, record_dict, common_conds):
     for i in range(len(record_dict[tgt_name])):
         try:
             _vacuum_rate_co2 = (
-                record_dict[tgt_name][i]["vacuum_amt_co2"] / (
-                    record_dict[tgt_name][i]["vacuum_amt_co2"] + record_dict[tgt_name][i]["vacuum_amt_n2"]
-                )) * 100
+                record_dict[tgt_name][i]["vacuum_amt_co2"]
+                / (record_dict[tgt_name][i]["vacuum_amt_co2"] + record_dict[tgt_name][i]["vacuum_amt_n2"])
+            ) * 100
         except ZeroDivisionError:
             _vacuum_rate_co2 = 0
-        values.append([_vacuum_rate_co2,
-                       record_dict[tgt_name][i]["vacuum_amt_co2"],
-                       record_dict[tgt_name][i]["vacuum_amt_n2"]])
-    df = pd.DataFrame(values,
-                      columns=["vacuum_rate_co2", "vacuum_amt_co2", "vacuum_amt_n2"],
-                      index=record_dict["timestamp"])
+        values.append(
+            [_vacuum_rate_co2, record_dict[tgt_name][i]["vacuum_amt_co2"], record_dict[tgt_name][i]["vacuum_amt_n2"]]
+        )
+    df = pd.DataFrame(
+        values, columns=["vacuum_rate_co2", "vacuum_amt_co2", "vacuum_amt_n2"], index=record_dict["timestamp"]
+    )
     df.index.name = "timestamp"
     df.to_csv(_foldapath + f"{_tgt_col}.csv")
     # モル分率
@@ -355,18 +353,16 @@ def outputs_to_csv(tgt_foldapath, record_dict, common_conds):
         values = []
         for i in range(len(record_dict[tgt_name])):
             values_tmp = []
-            for stream in range(1, 1+common_conds["NUM_STR"]):
-                for section in range(1, 1+common_conds["NUM_SEC"]):
+            for stream in range(1, 1 + common_conds["NUM_STR"]):
+                for section in range(1, 1 + common_conds["NUM_SEC"]):
                     values_tmp.append(record_dict[tgt_name][i][_tgt_col][stream][section])
             values.append(values_tmp)
         # カラム名の抽出
         columns = []
-        for stream in range(1, 1+common_conds["NUM_STR"]):
-            for section in range(1, 1+common_conds["NUM_SEC"]):
-                columns.append(_tgt_col+"-"+str(stream).zfill(3)+"-"+str(section).zfill(3))
-        df = pd.DataFrame(values,
-                        columns=columns,
-                        index=record_dict["timestamp"])
+        for stream in range(1, 1 + common_conds["NUM_STR"]):
+            for section in range(1, 1 + common_conds["NUM_SEC"]):
+                columns.append(_tgt_col + "-" + str(stream).zfill(3) + "-" + str(section).zfill(3))
+        df = pd.DataFrame(values, columns=columns, index=record_dict["timestamp"])
         df.index.name = "timestamp"
         df.to_csv(_foldapath + f"{_tgt_col}.csv")
 
