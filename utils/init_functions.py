@@ -47,19 +47,19 @@ def read_sim_conds(df_sim_conds):
             sim_conds[tower_num]["INFLOW_GAS_COND"][key] = val
         # 均圧配管条件
         sim_conds[tower_num]["PRESS_EQUAL_PIPE_COND"] = {}
-        for idx in range(3,9):
+        for idx in range(3,10):
             key = df_sim_conds[f"塔{tower_num}"].iloc[idx,18]
             val = df_sim_conds[f"塔{tower_num}"].iloc[idx,19]
             sim_conds[tower_num]["PRESS_EQUAL_PIPE_COND"][key] = val
         # 真空引き配管条件
         sim_conds[tower_num]["VACUUMING_PIPE_COND"] = {}
-        for idx in range(11,16):
+        for idx in range(12,17):
             key = df_sim_conds[f"塔{tower_num}"].iloc[idx,18]
             val = df_sim_conds[f"塔{tower_num}"].iloc[idx,19]
             sim_conds[tower_num]["VACUUMING_PIPE_COND"][key] = val
         # 熱電対条件
         sim_conds[tower_num]["THERMOCOUPLE_COND"] = {}
-        for idx in range(18,21):
+        for idx in range(19,22):
             key = df_sim_conds[f"塔{tower_num}"].iloc[idx,18]
             val = df_sim_conds[f"塔{tower_num}"].iloc[idx,19]
             sim_conds[tower_num]["THERMOCOUPLE_COND"][key] = val
@@ -142,7 +142,7 @@ def add_sim_conds(sim_conds):
     # 均圧配管条件
     press_equal = sim_conds["PRESS_EQUAL_PIPE_COND"]
     press_equal["Spipe"] = np.pi * press_equal["Dpipe"]**2 / 4
-    press_equal["Vpipe"] = press_equal["Spipe"] * press_equal["Dpipe"]
+    press_equal["Vpipe"] = press_equal["Spipe"] * press_equal["Lpipe"] + press_equal["V_equalpipespace"]
 
     # 真空引き配管条件
     vacuum_pipe = sim_conds["VACUUMING_PIPE_COND"]

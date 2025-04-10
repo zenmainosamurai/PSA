@@ -1033,7 +1033,7 @@ def total_press_after_batch_adsorp(sim_conds, variables, series):
     if series:
         V = (
             (sim_conds["PACKED_BED_COND"]["v_space"] + sim_conds["PACKED_BED_COND"]["v_pipespace"]) * 2
-            + sim_conds["PACKED_BED_COND"]["v_upstream"]
+            + sim_conds["PACKED_BED_COND"]["v_upstream"] + sim_conds["PRESS_EQUAL_PIPE_COND"]["Vpipe"]
         )
     else:
         V = (
