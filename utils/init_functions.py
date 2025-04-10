@@ -16,7 +16,7 @@ def read_sim_conds(df_sim_conds):
         sim_conds[tower_num]["NUM_SEC"] = int(df_sim_conds["共通"].iloc[6,3])
         # 触媒充填層条件
         sim_conds[tower_num]["PACKED_BED_COND"] = {}
-        for idx in range(3,23):
+        for idx in range(3,24):
             key = df_sim_conds[f"塔{tower_num}"].iloc[idx,2]
             val = df_sim_conds[f"塔{tower_num}"].iloc[idx,3]
             sim_conds[tower_num]["PACKED_BED_COND"][key] = val

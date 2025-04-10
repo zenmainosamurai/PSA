@@ -102,16 +102,12 @@ class GasAdosorption_Breakthrough_simulator():
                     variables_tower[_tower_num]["temp_thermo"][stream][section] = \
                         self.sim_conds[_tower_num]["DRUM_WALL_COND"]["temp_outside"]
             # 吸着量
-            P = self.sim_conds[_tower_num]["PACKED_BED_COND"]["vacuume_pressure"]
-            T = self.sim_conds[_tower_num]["DRUM_WALL_COND"]["temp_outside"] + 273.15
-            _init_adsorp_amt = _equilibrium_adsorp_amt(P, T)
             variables_tower[_tower_num]["adsorp_amt"] = {}
             for stream in range(1, 1+self.num_str):
                 variables_tower[_tower_num]["adsorp_amt"][stream] = {}
                 for section in range(1, 1+self.num_sec):
                     variables_tower[_tower_num]["adsorp_amt"][stream][section] = (
-                        self.sim_conds[_tower_num]["PACKED_BED_COND"]["init_asdorp_amt"]
-                        # _init_adsorp_amt
+                        self.sim_conds[_tower_num]["PACKED_BED_COND"]["init_adsorp_amt"]
                     )
             # モル分率
             variables_tower[_tower_num]["mf_co2"] = {}
@@ -480,12 +476,14 @@ class GasAdosorption_Breakthrough_simulator():
         elif mode == "バッチ吸着_上流":
             calc_output = models.batch_adsorption_upstream(sim_conds=sim_conds,
                                                            stream_conds=stream_conds,
-                                                           variables=variables)
+                                                           variables=variables,
+                                                           series=True)
         # バッチ吸着_下流
         elif mode == "バッチ吸着_下流":
             calc_output = models.batch_adsorption_downstream(sim_conds=sim_conds,
                                                              stream_conds=stream_conds,
                                                              variables=variables,
+                                                             series=True,
                                                              inflow_gas=other_tower_params,
                                                              stagnant_mf=self.stagnant_mf)
         # 均圧_減圧

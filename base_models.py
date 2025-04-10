@@ -900,7 +900,7 @@ def total_press_after_depressure(sim_conds, variables, downflow_total_press):
         flow_amount_m3_N * 1000 * sim_conds["dt"] / 22.4
     )
     # 上流側の合計体積 [m3]
-    V_upper_tower = sim_conds["PACKED_BED_COND"]["v_upstream"] + sim_conds["PACKED_BED_COND"]["v_space"]
+    V_upper_tower = sim_conds["PACKED_BED_COND"]["v_pipespace"] + sim_conds["PACKED_BED_COND"]["v_space"]
     # 上流容器圧力変化 [MPaA]
     dP_upper = (
         8.314 * T_K / V_upper_tower * mw_upper_space * 1e-6
@@ -948,7 +948,10 @@ def downflow_fr_after_depressure(sim_conds, stream_conds, variables, mb_dict, do
     # 下流流出物質量 [mol]
     sum_outflow_mol = sum_outflow_fr / 22.4
     # 均圧下流側空間体積 [m3]
-    V_downflow = sim_conds["PRESS_EQUAL_PIPE_COND"]["Vpipe"] + sim_conds["PACKED_BED_COND"]["v_space"]
+    V_downflow = (
+        sim_conds["PRESS_EQUAL_PIPE_COND"]["Vpipe"] + sim_conds["PACKED_BED_COND"]["v_space"]
+        + sim_conds["PACKED_BED_COND"]["v_pipespace"]
+    )
     # 下流容器圧力変化 [MPaA]
     dP = (
         8.314 * T_K / V_downflow * sum_outflow_mol / 1e6
@@ -1007,7 +1010,7 @@ def total_press_after_desorp(sim_conds, variables, mf_dict):
 
     return total_press_after_desorp
 
-def total_press_after_batch_adsorp(sim_conds, variables, equalization_mode=False, upstream_flow_amount=None):
+def total_press_after_batch_adsorp(sim_conds, variables, series):
     """ バッチ吸着における圧力変化
 
     Args:
@@ -1027,18 +1030,19 @@ def total_press_after_batch_adsorp(sim_conds, variables, equalization_mode=False
     temp_mean = np.mean(temp_mean)
     temp_mean += 273.15
     # 空間体積（配管含む）
-    V = sim_conds["PACKED_BED_COND"]["v_space"] + sim_conds["PACKED_BED_COND"]["v_upstream"]
-    # ノルマル体積流量
-    if equalization_mode: # バッチ均圧(下流): 上流側の均圧菅流量
-        F = upstream_flow_amount
+    if series:
+        V = (
+            (sim_conds["PACKED_BED_COND"]["v_space"] + sim_conds["PACKED_BED_COND"]["v_pipespace"]) * 2
+            + sim_conds["PACKED_BED_COND"]["v_upstream"]
+        )
     else:
-        F = sim_conds["INFLOW_GAS_COND"]["fr_all"] # バッチ吸着: 導入ガスの流量
+        V = (
+            sim_conds["PACKED_BED_COND"]["v_space"] + sim_conds["PACKED_BED_COND"]["v_pipespace"]
+            + sim_conds["PACKED_BED_COND"]["v_upstream"]
+        )
+    # ノルマル体積流量
+    F = sim_conds["INFLOW_GAS_COND"]["fr_all"] # バッチ吸着: 導入ガスの流量
     # 圧力変化量
-    # if equalization_mode: # バッチ均圧(下流): 計算ステップを小さくする
-    #     diff_pressure = (
-    #         R * temp_mean / V * (F / 22.4) * sim_conds["dt_eq"] / 1e6
-    #     )
-    # else:
     diff_pressure = (
         R * temp_mean / V * (F / 22.4) * sim_conds["dt"] / 1e6
     )

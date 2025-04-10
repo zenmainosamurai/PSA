@@ -11,7 +11,8 @@ mode_list: [
 cond_list: [
   # 5_01_mod_conds_adjust,
   # 5_01_mod_conds_yaml2xlsx
-  5_02_mod_pressure_obs2calc
+  # 5_02_mod_pressure_obs2calc,
+  5_03_mod_batch_adsorp
 ]
 
 # パラメータ最適化のパラメータ

@@ -7,7 +7,7 @@ import warnings
 warnings.simplefilter('ignore')
 
 
-def initial_adsorption(sim_conds, stream_conds, variables):
+def initial_adsorption(sim_conds, stream_conds, variables, series=False):
     """ 吸着開始時の圧力調整 
         説明: 規定圧力に達するまでガスを導入する（吸着も起こる）
         ベースモデル: バッチ吸着モデル
@@ -16,9 +16,8 @@ def initial_adsorption(sim_conds, stream_conds, variables):
     Args:
         sim_conds (dict): 実験条件
         stream_conds (dict): 実験条件から定義された各stream条件
-        df_obs (pd.DataFrame): 観測値
         variables (dict): 状態変数
-        timestamp (float): 時刻
+        series (bool): 直列か単独か
 
     Returns:
         output (dict): 各モデルの計算結果
@@ -91,7 +90,8 @@ def initial_adsorption(sim_conds, stream_conds, variables):
                                                         heat_wall_output=hb_wall)
     # 4. バッチ吸着後圧力変化
     total_press_after_batch_adsorp = base_models.total_press_after_batch_adsorp(sim_conds=sim_conds,
-                                                                                variables=variables)
+                                                                                variables=variables,
+                                                                                series=series)
     # 出力
     output = {
         "material": mb_dict, # マテバラ
@@ -286,7 +286,7 @@ def flow_adsorption_single_or_upstream(sim_conds, stream_conds, variables):
 
     return output
 
-def batch_adsorption_upstream(sim_conds, stream_conds, variables):
+def batch_adsorption_upstream(sim_conds, stream_conds, variables, series):
     """ バッチ吸着_上流
         説明: ２つの吸着塔のバッチ吸着における上流側（下流側の圧力回復が目的）
         ベースモデル: バッチ吸着モデル
@@ -295,12 +295,10 @@ def batch_adsorption_upstream(sim_conds, stream_conds, variables):
     Args:
         sim_conds (dict): 実験条件
         stream_conds (dict): 実験条件から定義された各stream条件
-        df_obs (pd.DataFrame): 観測値
-        variables (dict): 状態変数
         timestamp (float): 時刻
     """
     # 初期のバッチ吸着と同じ仕組み
-    return initial_adsorption(sim_conds, stream_conds, variables)
+    return initial_adsorption(sim_conds, stream_conds, variables, series)
 
 
 def equalization_pressure_depressurization(sim_conds, stream_conds, variables,
@@ -613,7 +611,7 @@ def equalization_pressure_pressurization(sim_conds, stream_conds, variables,
 
     return output
 
-def batch_adsorption_downstream(sim_conds, stream_conds, variables,
+def batch_adsorption_downstream(sim_conds, stream_conds, variables, series,
                                 inflow_gas, stagnant_mf):
     """ バッチ吸着（下流）
         説明: ２つの吸着塔のバッチ吸着における下流側（下流側の圧力回復が目的）
@@ -624,9 +622,8 @@ def batch_adsorption_downstream(sim_conds, stream_conds, variables,
     Args:
         sim_conds (dict): 実験条件
         stream_conds (dict): 実験条件から定義された各stream条件
-        df_obs (pd.DataFrame): 観測値
         variables (dict): 状態変数
-        timestamp (float): 時刻
+        series (bool): 直列か単独か
 
     Returns:
         output (dict): 各モデルの計算結果
@@ -701,7 +698,8 @@ def batch_adsorption_downstream(sim_conds, stream_conds, variables,
                                                         heat_wall_output=hb_wall)
     # 4. バッチ吸着後圧力変化
     total_press_after_batch_adsorp = base_models.total_press_after_batch_adsorp(sim_conds=sim_conds,
-                                                                                variables=variables)
+                                                                                variables=variables,
+                                                                                series=series)
     # 出力
     output = {
         "material": mb_dict, # マテバラ
