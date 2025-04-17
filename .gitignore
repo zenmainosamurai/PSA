@@ -1,5 +1,6 @@
 __pycache__/
 .venv/
+.pj493env/
 .vscode/
 output/
 test0_free.ipynb

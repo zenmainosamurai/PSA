@@ -498,7 +498,8 @@ def desorption_by_vacuuming(sim_conds, stream_conds, variables):
     # 4. 脱着後の全圧
     total_press_after_desorp = base_models.total_press_after_desorp(sim_conds=sim_conds,
                                                                     variables=variables,
-                                                                    mf_dict=mf_dict)
+                                                                    mf_dict=mf_dict,
+                                                                    vacuum_output=vacuum_output)
     # 出力
     output = {
         "material": mb_dict, # マテバラ
