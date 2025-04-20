@@ -200,18 +200,15 @@ class GasAdosorption_Breakthrough_simulator:
         for p in self.df_operation.index:
             # 各塔の稼働モード抽出
             mode_list = list(self.df_operation.loc[p, ["塔1", "塔2", "塔3"]])
-            # # 終了条件(文字列)の抽出
-            # termination_cond_str = self.df_operation.loc[p, "終了条件"]
-            # 手動終了条件の抽出
-            termination_time = self.df_operation.loc[p, "手動終了時刻"]
+            # 終了条件(文字列)の抽出
+            termination_cond = self.df_operation.loc[p, "終了条件"]
             # プロセスpにおける各塔の吸着計算実施
             timestamp, variables_tower, record_dict = self.calc_adsorption_process(
                 mode_list=mode_list,
-                termination_cond_str=termination_time,
+                termination_cond_str=termination_cond,
                 variables_tower=variables_tower,
                 record_dict=record_dict,
                 timestamp=timestamp,
-                manual=True,
                 filtered_x=filtered_states,
             )
             print(f"プロセス {p}: done. timestamp: {round(timestamp,2)}")
@@ -264,7 +261,6 @@ class GasAdosorption_Breakthrough_simulator:
         variables_tower,
         record_dict,
         timestamp,
-        manual=False,
         filtered_x=None,
     ):
         """プロセスpの各塔のガス吸着計算を行う
@@ -279,91 +275,54 @@ class GasAdosorption_Breakthrough_simulator:
         """
         # プロセス開始後経過時間
         timestamp_p = 0
-        # 手動の場合は時間経過で終了
-        if manual:
-            # 初回限定処理の実施
-            if "バッチ吸着_上流" in mode_list:
-                tower_num_up = mode_list.index("バッチ吸着_上流") + 1
-                tower_num_dw = mode_list.index("バッチ吸着_下流") + 1
-                # 圧力の平均化
-                total_press_mean = (
-                    variables_tower[tower_num_up]["total_press"]
-                    * self.sim_conds[tower_num_up]["PACKED_BED_COND"]["v_space"]
-                    + variables_tower[tower_num_dw]["total_press"]
-                    * self.sim_conds[tower_num_dw]["PACKED_BED_COND"]["v_space"]
-                ) / (
-                    self.sim_conds[tower_num_up]["PACKED_BED_COND"]["v_space"]
-                    + self.sim_conds[tower_num_dw]["PACKED_BED_COND"]["v_space"]
-                )
-                variables_tower[tower_num_up]["total_press"] = total_press_mean
-                variables_tower[tower_num_dw]["total_press"] = total_press_mean
-            # 逐次吸着計算
-            while timestamp + timestamp_p <= termination_cond_str:
-                # 状態変数の上書き(データ同化後限定)
-                if filtered_x is not None:
-                    self._overwrite_state_vars(
-                        filtered_x=filtered_x, timestamp=timestamp + timestamp_p
-                    )
-                # 各塔の吸着計算実施
-                variables_tower, _record_outputs_tower = self.calc_adsorption_mode_list(
-                    self.sim_conds, mode_list, variables_tower
-                )
-                # timestamp_p更新
-                timestamp_p += self.sim_conds[1]["dt"]
-                # 記録
-                for _tower_num in range(1, 1 + self.num_tower):
-                    record_dict[_tower_num]["timestamp"].append(timestamp + timestamp_p)
-                    for key, values in _record_outputs_tower[_tower_num].items():
-                        record_dict[_tower_num][key].append(values)
-        # 終了条件を読み込む場合
-        else:
-            # プロセス開始後経過時間
-            timestamp_p = 0
-            # 終了条件関数の抽出
-            termination_cond_1, termination_cond_2 = self._create_termination_cond(
-                termination_cond_str
+        # 初回限定処理の実施
+        if "バッチ吸着_上流" in mode_list:
+            tower_num_up = mode_list.index("バッチ吸着_上流") + 1
+            tower_num_dw = mode_list.index("バッチ吸着_下流") + 1
+            # 圧力の平均化
+            total_press_mean = (
+                variables_tower[tower_num_up]["total_press"]
+                * self.sim_conds[tower_num_up]["PACKED_BED_COND"]["v_space"]
+                + variables_tower[tower_num_dw]["total_press"]
+                * self.sim_conds[tower_num_dw]["PACKED_BED_COND"]["v_space"]
+            ) / (
+                self.sim_conds[tower_num_up]["PACKED_BED_COND"]["v_space"]
+                + self.sim_conds[tower_num_dw]["PACKED_BED_COND"]["v_space"]
             )
-            # 吸着計算
-            # 終了条件１
-            while termination_cond_1(variables_tower, timestamp_p):
-                # 各塔の吸着計算実施
-                variables_tower, _record_outputs_tower = self.calc_adsorption_mode_list(
-                    self.sim_conds, mode_list, variables_tower
-                )
-                # timestamp_p更新
-                timestamp_p += self.sim_conds[1]["dt"]
-                # 記録
-                for _tower_num in range(1, 1 + self.num_tower):
-                    record_dict[_tower_num]["timestamp"].append(timestamp + timestamp_p)
-                    for key, values in _record_outputs_tower[_tower_num].items():
-                        record_dict[_tower_num][key].append(values)
-                # # 強制終了
-                if timestamp_p >= 10:
-                    break
-            # 終了条件２（あれば実行）
-            if termination_cond_2 is not None:
-                timestamp += timestamp_p
-                timestamp_p = 0
-                while termination_cond_2(timestamp_p):
-                    # 状態変数(圧力)の上書き
-                    # _tgt_index = self.df_obs.index[np.abs(self.df_obs.index - (timestamp+timestamp_p)).argmin()]
-                    # for _tower_num in range(1, 1+self.num_tower):
-                    #     variables_tower[_tower_num]["total_press"] = self.df_obs.loc[_tgt_index, f"T{_tower_num}_press"]
-                    # 各塔の吸着計算実施
-                    variables_tower, _record_outputs_tower = (
-                        self.calc_adsorption_mode_list(
-                            self.sim_conds, mode_list, variables_tower
-                        )
-                    )
-                    # timestamp_p更新
-                    timestamp_p += self.sim_conds[1]["dt"]
-                    # 記録
-                    for _tower_num in range(1, 1 + self.num_tower):
-                        record_dict[_tower_num]["timestamp"].append(
-                            timestamp + timestamp_p
-                        )
-                        for key, values in _record_outputs_tower[_tower_num].items():
-                            record_dict[_tower_num][key].append(values)
+            variables_tower[tower_num_up]["total_press"] = total_press_mean
+            variables_tower[tower_num_dw]["total_press"] = total_press_mean
+        # 終了条件の抽出
+        termination_cond = self._create_termination_cond(
+            termination_cond_str,
+            variables_tower,
+            timestamp,
+            timestamp_p,
+        )
+        # 逐次吸着計算
+        while termination_cond:
+            # 各塔の吸着計算実施
+            variables_tower, _record_outputs_tower = self.calc_adsorption_mode_list(
+                self.sim_conds, mode_list, variables_tower
+            )
+            # timestamp_p更新
+            timestamp_p += self.sim_conds[1]["dt"]
+            # 記録
+            for _tower_num in range(1, 1 + self.num_tower):
+                record_dict[_tower_num]["timestamp"].append(timestamp + timestamp_p)
+                for key, values in _record_outputs_tower[_tower_num].items():
+                    record_dict[_tower_num][key].append(values)
+            # 終了条件の更新
+            termination_cond = self._create_termination_cond(
+                termination_cond_str,
+                variables_tower,
+                timestamp,
+                timestamp_p,
+            )
+            # 強制終了
+            time_threshold = 20
+            if timestamp_p >= time_threshold:
+                print(f"{time_threshold}分以内に終了しなかったため強制終了")
+                break
 
         return timestamp + timestamp_p, variables_tower, record_dict
 
@@ -483,12 +442,6 @@ class GasAdosorption_Breakthrough_simulator:
                 variables=variables_tower[_tgt_tower_num_press],
                 other_tower_params=all_outputs["downflow_params"],
             )
-            # # 圧力差が0になれば均圧完了
-            # if all_outputs["diff_press"] == 0:
-            #     break
-            # # そうでないなら引き続き小さい計算ステップで均圧する
-            # else:
-            #     _time_step += sim_conds[1]["dt_eq"]
             # 残りの塔
             for tgt_tower_num in range(1, 1 + self.num_tower):
                 # 加圧・減圧はスキップ
@@ -744,7 +697,6 @@ class GasAdosorption_Breakthrough_simulator:
             new_variables["total_press"] = calc_output["total_press_after_desorp"]
         else:
             new_variables["total_press"] = variables["total_press"]
-        # new_variables["total_press"] = min(0.1, new_variables["total_press"])
         # CO2, N2回収量 [mol]
         if mode in ["真空脱着"]:
             new_variables["vacuum_amt_co2"] = calc_output["accum_vacuum_amt"][
@@ -792,68 +744,37 @@ class GasAdosorption_Breakthrough_simulator:
                 [1e-8, filtered_x.loc[_tgt_index, f"T{_tower_num}_adsorp_heat_co2"]]
             )
 
-    def _create_termination_cond(self, termination_cond_str):
+    def _create_termination_cond(self, termination_cond_str, variables_tower, timestamp, timestamp_p):
         """文字列の終了条件からブール値の終了条件を作成する
 
         Args:
             termination_cond_str (_type_): _description_
         """
-        # 終了条件の数
-        num_cond = len(termination_cond_str.split("/"))
-        # 終了条件が1つのとき
-        if num_cond == 1:
-            cond_list = termination_cond_str.split("_")
-            if cond_list[0] == "圧力到達":
-                _tower_num = int(cond_list[1][-1])  # 塔番号
-                _target_press = float(cond_list[2])  # 目標圧力
+        cond_list = termination_cond_str.split("_")
+        if cond_list[0] == "圧力到達":
+            tower_num = int(cond_list[1][-1])  # 塔番号
+            target_press = float(cond_list[2])  # 目標圧力
+            return variables_tower[tower_num]["total_press"] < target_press
 
-                def termination_cond(
-                    variables_tower, timestamp_p
-                ):  # 終了条件(ブール値)
-                    return variables_tower[_tower_num]["total_press"] <= _target_press
+        elif cond_list[0] == "温度到達":
+            tower_num = int(cond_list[1][-1])  # 塔番号
+            target_temp = float(cond_list[2])  # 目標温度
+            target_section = self.num_sec # 温度測定するセクション
+            temp_now = np.mean(
+                [variables_tower[tower_num]["temp"][stream][target_section]
+                for stream in range(1, 1 + self.num_str)
+                ]
+            )
+            return temp_now < target_temp
 
-                return termination_cond, None
-            elif cond_list[0] == "時間経過":
-                _time = float(cond_list[1])  # 目標経過時間
-                _unit = cond_list[2]  # 単位
-                if _unit == "s":
-                    _time /= 60  # 単位をminに合わせる
+        elif cond_list[0] == "時間経過":
+            time = float(cond_list[1])  # 目標経過時間
+            # 単位変換（minに合わせる）
+            unit = cond_list[2]  # 単位
+            if unit == "s":
+                time /= 60
+            return timestamp_p < time
 
-                def termination_cond(
-                    variables_tower, timestamp_p
-                ):  # 終了条件(ブール値)
-                    return timestamp_p <= _time
-
-                return termination_cond, None
-        # 終了条件が2つのとき
-        # NOTE: 今のところは「温度上昇/時間経過」のみ
-        elif num_cond == 2:
-            # 条件１：温度上昇
-            cond1 = termination_cond_str.split("/")[0]  # 温度上昇
-            cond_list = cond1.split("_")
-            _tower_num = int(cond_list[1][-1])  # 塔番号
-            _target_temp = 50.0
-
-            def termination_cond_1(variables_tower, timestamp_p):  # 終了条件(ブール値)
-                # 下流温度
-                temp_down = variables_tower[_tower_num]["temp"][1][
-                    17
-                ]  # 下流センサーの位置（sec18）
-                # 中流温度
-                temp_mid = variables_tower[_tower_num]["temp"][1][
-                    9
-                ]  # 下流センサーの位置（sec10）
-                return temp_down <= temp_mid
-
-            # 条件２：時間経過
-            cond2 = termination_cond_str.split("/")[1]  # 時間経過
-            cond_list = cond2.split("_")
-            _time = float(cond_list[1])  # 目標経過時間
-            _unit = cond_list[2]  # 単位
-            if _unit == "s":
-                _time /= 60  # 単位をminに合わせる
-
-            def termination_cond_2(timestamp_p):  # 終了条件(ブール値)
-                return timestamp_p <= _time
-
-            return termination_cond_1, termination_cond_2
+        elif cond_list[0] == "時間到達":
+            time = float(cond_list[1])  # 目標到達時間
+            return timestamp + timestamp_p < time
