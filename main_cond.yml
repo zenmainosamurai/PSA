@@ -9,13 +9,9 @@ mode_list: [
 
 # 実行したいconditionファイルを指定
 cond_list: [
-  # 5_01_mod_conds_adjust,
-  # 5_01_mod_conds_yaml2xlsx
-  # 5_02_mod_pressure_obs2calc,
-  # 5_03_mod_batch_adsorp,
-  # 5_04_mod_press_in_vacuum,
   # 5_05_mod_termination_conds,
-  5_06_mod_termination_conds2
+  # 5_06_mod_termination_conds2,
+  5_07_mod_simconds
 ]
 
 # パラメータ最適化のパラメータ

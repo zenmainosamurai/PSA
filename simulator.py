@@ -33,12 +33,24 @@ class GasAdosorption_Breakthrough_simulator:
         # 実験条件(conditions)の読み込み
         df_sim_conds = pd.read_excel(
             const.CONDITIONS_DIR + self.cond_id + "/sim_conds.xlsx",
-            sheet_name=["共通", "塔1", "塔2", "塔3"],
+            sheet_name=[
+                "共通",
+                "触媒充填層条件",
+                "導入ガス条件",
+                "容器壁条件",
+                "上蓋の条件",
+                "下蓋の条件",
+                "均圧配管条件",
+                "真空引き配管条件",
+                "熱電対条件",
+            ],
+            index_col=1,
         )
         self.sim_conds = init_functions.read_sim_conds(df_sim_conds)
         self.num_tower = 3  # 塔数
-        self.num_str = self.sim_conds[1]["NUM_STR"]  # ストリーム分割数
-        self.num_sec = self.sim_conds[1]["NUM_SEC"]  # セクション分割数
+        self.dt = self.sim_conds[1]["COMMON_COND"]["dt"]  # dt
+        self.num_str = self.sim_conds[1]["COMMON_COND"]["NUM_STR"]  # ストリーム分割数
+        self.num_sec = self.sim_conds[1]["COMMON_COND"]["NUM_SEC"]  # セクション分割数
 
         # stream条件の初期化
         self.stream_conds = {}
@@ -67,7 +79,7 @@ class GasAdosorption_Breakthrough_simulator:
                 filepath, sheet_name=self.sim_conds[1]["sheet_name"], index_col="time"
             )
         self.df_obs = other_utils.resample_obs_data(
-            self.df_obs, self.sim_conds[1]["dt"]
+            self.df_obs, self.dt
         )  # リサンプリング
 
         # 稼働表の読み込み
@@ -222,7 +234,9 @@ class GasAdosorption_Breakthrough_simulator:
             _tgt_foldapath = output_foldapath + f"/csv/tower_{_tower_num}/"
             os.makedirs(_tgt_foldapath, exist_ok=True)
             plot_csv.outputs_to_csv(
-                _tgt_foldapath, record_dict[_tower_num], self.sim_conds[_tower_num]
+                _tgt_foldapath,
+                record_dict[_tower_num],
+                self.sim_conds[_tower_num]["COMMON_COND"],
             )
         # プロセス終了時刻
         _tgt_foldapath = output_foldapath
@@ -305,7 +319,7 @@ class GasAdosorption_Breakthrough_simulator:
                 self.sim_conds, mode_list, variables_tower
             )
             # timestamp_p更新
-            timestamp_p += self.sim_conds[1]["dt"]
+            timestamp_p += self.dt
             # 記録
             for _tower_num in range(1, 1 + self.num_tower):
                 record_dict[_tower_num]["timestamp"].append(timestamp + timestamp_p)
@@ -744,7 +758,9 @@ class GasAdosorption_Breakthrough_simulator:
                 [1e-8, filtered_x.loc[_tgt_index, f"T{_tower_num}_adsorp_heat_co2"]]
             )
 
-    def _create_termination_cond(self, termination_cond_str, variables_tower, timestamp, timestamp_p):
+    def _create_termination_cond(
+        self, termination_cond_str, variables_tower, timestamp, timestamp_p
+    ):
         """文字列の終了条件からブール値の終了条件を作成する
 
         Args:
@@ -759,10 +775,11 @@ class GasAdosorption_Breakthrough_simulator:
         elif cond_list[0] == "温度到達":
             tower_num = int(cond_list[1][-1])  # 塔番号
             target_temp = float(cond_list[2])  # 目標温度
-            target_section = self.num_sec # 温度測定するセクション
+            target_section = self.num_sec  # 温度測定するセクション
             temp_now = np.mean(
-                [variables_tower[tower_num]["temp"][stream][target_section]
-                for stream in range(1, 1 + self.num_str)
+                [
+                    variables_tower[tower_num]["temp"][stream][target_section]
+                    for stream in range(1, 1 + self.num_str)
                 ]
             )
             return temp_now < target_temp

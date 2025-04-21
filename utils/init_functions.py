@@ -9,61 +9,35 @@ def read_sim_conds(df_sim_conds):
     Args:
         df_sim_conds (pd.DataFrame): 実験条件のxlsxファイル
     """
+    correspondence_dict = {
+        "共通": "COMMON_COND",
+        "触媒充填層条件": "PACKED_BED_COND",
+        "導入ガス条件": "INFLOW_GAS_COND",
+        "容器壁条件": "DRUM_WALL_COND",
+        "上蓋の条件": "LID_COND_UP",
+        "下蓋の条件": "LID_COND_DOWN",
+        "均圧配管条件": "PRESS_EQUAL_PIPE_COND",
+        "真空引き配管条件": "VACUUMING_PIPE_COND",
+        "熱電対条件": "THERMOCOUPLE_COND",
+    }
+    # パラメータ読み込み
     sim_conds = {1: {}, 2: {}, 3: {}}
-    for tower_num in [1, 2, 3]:
-        # 共通パラメータ
-        sim_conds[tower_num]["dt"] = df_sim_conds["共通"].iloc[4, 3]
-        sim_conds[tower_num]["NUM_STR"] = int(df_sim_conds["共通"].iloc[5, 3])
-        sim_conds[tower_num]["NUM_SEC"] = int(df_sim_conds["共通"].iloc[6, 3])
-        # 触媒充填層条件
-        sim_conds[tower_num]["PACKED_BED_COND"] = {}
-        for idx in range(3, 24):
-            key = df_sim_conds[f"塔{tower_num}"].iloc[idx, 2]
-            val = df_sim_conds[f"塔{tower_num}"].iloc[idx, 3]
-            sim_conds[tower_num]["PACKED_BED_COND"][key] = val
-        # 容器壁条件
-        sim_conds[tower_num]["DRUM_WALL_COND"] = {}
-        for idx in range(3, 17):
-            key = df_sim_conds[f"塔{tower_num}"].iloc[idx, 6]
-            val = df_sim_conds[f"塔{tower_num}"].iloc[idx, 7]
-            sim_conds[tower_num]["DRUM_WALL_COND"][key] = val
-        # 上蓋の条件
-        sim_conds[tower_num]["LID_COND"] = {}
-        sim_conds[tower_num]["LID_COND"]["UP"] = {}
-        for idx in range(3, 11):
-            key = df_sim_conds[f"塔{tower_num}"].iloc[idx, 10]
-            val = df_sim_conds[f"塔{tower_num}"].iloc[idx, 11]
-            sim_conds[tower_num]["LID_COND"]["UP"][key] = val
-        # 下蓋の条件
-        sim_conds[tower_num]["LID_COND"]["DOWN"] = {}
-        for idx in range(13, 21):
-            key = df_sim_conds[f"塔{tower_num}"].iloc[idx, 10]
-            val = df_sim_conds[f"塔{tower_num}"].iloc[idx, 11]
-            sim_conds[tower_num]["LID_COND"]["DOWN"][key] = val
-        # 導入ガス条件
-        sim_conds[tower_num]["INFLOW_GAS_COND"] = {}
-        for idx in range(3, 28):
-            key = df_sim_conds[f"塔{tower_num}"].iloc[idx, 14]
-            val = df_sim_conds[f"塔{tower_num}"].iloc[idx, 15]
-            sim_conds[tower_num]["INFLOW_GAS_COND"][key] = val
-        # 均圧配管条件
-        sim_conds[tower_num]["PRESS_EQUAL_PIPE_COND"] = {}
-        for idx in range(3, 10):
-            key = df_sim_conds[f"塔{tower_num}"].iloc[idx, 18]
-            val = df_sim_conds[f"塔{tower_num}"].iloc[idx, 19]
-            sim_conds[tower_num]["PRESS_EQUAL_PIPE_COND"][key] = val
-        # 真空引き配管条件
-        sim_conds[tower_num]["VACUUMING_PIPE_COND"] = {}
-        for idx in range(12, 17):
-            key = df_sim_conds[f"塔{tower_num}"].iloc[idx, 18]
-            val = df_sim_conds[f"塔{tower_num}"].iloc[idx, 19]
-            sim_conds[tower_num]["VACUUMING_PIPE_COND"][key] = val
-        # 熱電対条件
-        sim_conds[tower_num]["THERMOCOUPLE_COND"] = {}
-        for idx in range(19, 22):
-            key = df_sim_conds[f"塔{tower_num}"].iloc[idx, 18]
-            val = df_sim_conds[f"塔{tower_num}"].iloc[idx, 19]
-            sim_conds[tower_num]["THERMOCOUPLE_COND"][key] = val
+    for cond_name, df in df_sim_conds.items():
+        # 日本語→英語に変換
+        key = correspondence_dict[cond_name]
+        for tower_num in range(1, 4):
+            sim_conds[tower_num][key] = {}
+            # 各パラメータを収録
+            for param in df.index:
+                sim_conds[tower_num][key][param] = df.loc[param, f"塔{tower_num}"]
+    # 前処理
+    for tower_num in range(1, 4):
+        sim_conds[tower_num]["COMMON_COND"]["NUM_STR"] = int(
+            sim_conds[tower_num]["COMMON_COND"]["NUM_STR"]
+        )
+        sim_conds[tower_num]["COMMON_COND"]["NUM_SEC"] = int(
+            sim_conds[tower_num]["COMMON_COND"]["NUM_SEC"]
+        )
 
     return sim_conds
 
@@ -87,12 +61,16 @@ def init_stream_conds(sim_conds, stream, stream_conds):
     # 外側境界半径座標
     if stream == 1:
         tgt_stream_conds["r_out"] = (
-            sim_conds["PACKED_BED_COND"]["Rbed"] / sim_conds["NUM_STR"] * stream
+            sim_conds["PACKED_BED_COND"]["Rbed"]
+            / sim_conds["COMMON_COND"]["NUM_STR"]
+            * stream
             + tgt_stream_conds["r_in"]
         )
     else:
         tgt_stream_conds["r_out"] = (
-            sim_conds["PACKED_BED_COND"]["Rbed"] / sim_conds["NUM_STR"] * stream
+            sim_conds["PACKED_BED_COND"]["Rbed"]
+            / sim_conds["COMMON_COND"]["NUM_STR"]
+            * stream
             + stream_conds[stream - 1]["r_in"]
         )
     # ストリーム断面積
@@ -134,7 +112,9 @@ def init_drum_wall_conds(sim_conds, stream_conds):
     """
     tgt_stream_conds = {}
     # 内側境界半径座標(軸中心0)
-    tgt_stream_conds["r_in"] = stream_conds[sim_conds["NUM_STR"]]["r_out"]
+    tgt_stream_conds["r_in"] = stream_conds[sim_conds["COMMON_COND"]["NUM_STR"]][
+        "r_out"
+    ]
     # 外側境界半径座標
     tgt_stream_conds["r_out"] = sim_conds["DRUM_WALL_COND"]["Rdrum"]
     # ストリーム断面積

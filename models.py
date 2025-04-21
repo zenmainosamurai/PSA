@@ -4,11 +4,12 @@ import pandas as pd
 import base_models
 
 import warnings
-warnings.simplefilter('ignore')
+
+warnings.simplefilter("ignore")
 
 
 def initial_adsorption(sim_conds, stream_conds, variables, series=False):
-    """ 吸着開始時の圧力調整 
+    """吸着開始時の圧力調整
         説明: 規定圧力に達するまでガスを導入する（吸着も起こる）
         ベースモデル: バッチ吸着モデル
         終了条件: 圧力到達
@@ -26,85 +27,100 @@ def initial_adsorption(sim_conds, stream_conds, variables, series=False):
     hb_dict = {}
     hb_wall = {}
     hb_lid = {}
-    mode = 0 # 吸着
+    mode = 0  # 吸着
 
     ### セル計算 --------------------------------------------------------------
 
     # 1. マテバラ・熱バラ計算
-    for stream in range(1, 1+sim_conds["NUM_STR"]):
+    for stream in range(1, 1 + sim_conds["COMMON_COND"]["NUM_STR"]):
         mb_dict[stream] = {}
         hb_dict[stream] = {}
         # sec_1は手動で実施
-        mb_dict[stream][1] = base_models.material_balance_adsorp(sim_conds=sim_conds,
-                                                                 stream_conds=stream_conds,
-                                                                 stream=stream,
-                                                                 section=1,
-                                                                 variables=variables,
-                                                                 inflow_gas=None)
-        hb_dict[stream][1] = base_models.heat_balance(sim_conds=sim_conds,
-                                                      stream_conds=stream_conds,
-                                                      stream=stream,
-                                                      section=1,
-                                                      variables=variables,
-                                                      mode=mode,
-                                                      material_output=mb_dict[stream][1],
-                                                      heat_output=None,
-                                                      vacuum_output=None)
+        mb_dict[stream][1] = base_models.material_balance_adsorp(
+            sim_conds=sim_conds,
+            stream_conds=stream_conds,
+            stream=stream,
+            section=1,
+            variables=variables,
+            inflow_gas=None,
+        )
+        hb_dict[stream][1] = base_models.heat_balance(
+            sim_conds=sim_conds,
+            stream_conds=stream_conds,
+            stream=stream,
+            section=1,
+            variables=variables,
+            mode=mode,
+            material_output=mb_dict[stream][1],
+            heat_output=None,
+            vacuum_output=None,
+        )
         # sec_2以降は自動で実施
-        for section in range(2, 1+sim_conds["NUM_SEC"]):
-            mb_dict[stream][section] = base_models.material_balance_adsorp(sim_conds=sim_conds,
-                                                                           stream_conds=stream_conds,
-                                                                           stream=stream,
-                                                                           section=section,
-                                                                           variables=variables,
-                                                                           inflow_gas=mb_dict[stream][section-1])
-            hb_dict[stream][section] = base_models.heat_balance(sim_conds=sim_conds,
-                                                                stream_conds=stream_conds,
-                                                                stream=stream,
-                                                                section=section,
-                                                                variables=variables,
-                                                                mode=mode,
-                                                                material_output=mb_dict[stream][section],
-                                                                heat_output=hb_dict[stream][section-1],
-                                                                vacuum_output=None)
-    # 2. 壁面熱バラ（stream = 1+sim_conds["NUM_STR"]）
-    hb_wall[1] = base_models.heat_balance_wall(sim_conds=sim_conds,
-                                               stream_conds=stream_conds,
-                                               section=1,
-                                               variables=variables,
-                                               heat_output=hb_dict[sim_conds["NUM_STR"]][1],
-                                               heat_wall_output=None)
-    for section in range(2, 1+sim_conds["NUM_SEC"]):
-        hb_wall[section] = base_models.heat_balance_wall(sim_conds=sim_conds,
-                                                         stream_conds=stream_conds,
-                                                         section=section,
-                                                         variables=variables,
-                                                         heat_output=hb_dict[sim_conds["NUM_STR"]][section],
-                                                         heat_wall_output=hb_wall[section-1])
+        for section in range(2, 1 + sim_conds["COMMON_COND"]["NUM_SEC"]):
+            mb_dict[stream][section] = base_models.material_balance_adsorp(
+                sim_conds=sim_conds,
+                stream_conds=stream_conds,
+                stream=stream,
+                section=section,
+                variables=variables,
+                inflow_gas=mb_dict[stream][section - 1],
+            )
+            hb_dict[stream][section] = base_models.heat_balance(
+                sim_conds=sim_conds,
+                stream_conds=stream_conds,
+                stream=stream,
+                section=section,
+                variables=variables,
+                mode=mode,
+                material_output=mb_dict[stream][section],
+                heat_output=hb_dict[stream][section - 1],
+                vacuum_output=None,
+            )
+    # 2. 壁面熱バラ（stream = 1+sim_conds["COMMON_COND"]["NUM_STR"]）
+    hb_wall[1] = base_models.heat_balance_wall(
+        sim_conds=sim_conds,
+        stream_conds=stream_conds,
+        section=1,
+        variables=variables,
+        heat_output=hb_dict[sim_conds["COMMON_COND"]["NUM_STR"]][1],
+        heat_wall_output=None,
+    )
+    for section in range(2, 1 + sim_conds["COMMON_COND"]["NUM_SEC"]):
+        hb_wall[section] = base_models.heat_balance_wall(
+            sim_conds=sim_conds,
+            stream_conds=stream_conds,
+            section=section,
+            variables=variables,
+            heat_output=hb_dict[sim_conds["COMMON_COND"]["NUM_STR"]][section],
+            heat_wall_output=hb_wall[section - 1],
+        )
     # 3. 上下蓋熱バラ
     for position in ["up", "down"]:
-        hb_lid[position] = base_models.heat_balance_lid(sim_conds=sim_conds,
-                                                        position=position,
-                                                        variables=variables,
-                                                        heat_output=hb_dict,
-                                                        heat_wall_output=hb_wall)
+        hb_lid[position] = base_models.heat_balance_lid(
+            sim_conds=sim_conds,
+            position=position,
+            variables=variables,
+            heat_output=hb_dict,
+            heat_wall_output=hb_wall,
+        )
     # 4. バッチ吸着後圧力変化
-    total_press_after_batch_adsorp = base_models.total_press_after_batch_adsorp(sim_conds=sim_conds,
-                                                                                variables=variables,
-                                                                                series=series)
+    total_press_after_batch_adsorp = base_models.total_press_after_batch_adsorp(
+        sim_conds=sim_conds, variables=variables, series=series
+    )
     # 出力
     output = {
-        "material": mb_dict, # マテバラ
-        "heat": hb_dict, # 熱バラ
-        "heat_wall": hb_wall, # 熱バラ（壁面）
-        "heat_lid": hb_lid, # 熱バラ（蓋）
-        "total_press_after_batch_adsorp": total_press_after_batch_adsorp, # バッチ吸着後圧力
+        "material": mb_dict,  # マテバラ
+        "heat": hb_dict,  # 熱バラ
+        "heat_wall": hb_wall,  # 熱バラ（壁面）
+        "heat_lid": hb_lid,  # 熱バラ（蓋）
+        "total_press_after_batch_adsorp": total_press_after_batch_adsorp,  # バッチ吸着後圧力
     }
 
     return output
 
+
 def stop_mode(sim_conds, stream_conds, variables):
-    """ 停止
+    """停止
         説明: モードとモードの間の吸着停止期間
         ベースモデル: 脱着モデル
         終了条件: 時間経過
@@ -124,74 +140,85 @@ def stop_mode(sim_conds, stream_conds, variables):
     hb_dict = {}
     hb_wall = {}
     hb_lid = {}
-    mode = 1 # 弁停止モード
+    mode = 1  # 弁停止モード
 
     ### セル計算 --------------------------------------------------------------
 
     # 1. マテバラ・熱バラ計算
-    for stream in range(1, 1+sim_conds["NUM_STR"]):
+    for stream in range(1, 1 + sim_conds["COMMON_COND"]["NUM_STR"]):
         mb_dict[stream] = {}
         hb_dict[stream] = {}
         # sec_1は手動で実施
-        mb_dict[stream][1] = base_models.material_balance_valve_stop(stream=stream,
-                                                                     section=1,
-                                                                     variables=variables)
-        hb_dict[stream][1] = base_models.heat_balance(sim_conds=sim_conds,
-                                                      stream_conds=stream_conds,
-                                                      stream=stream,
-                                                      section=1,
-                                                      variables=variables,
-                                                      mode=mode,
-                                                      material_output=mb_dict[stream][1],
-                                                      heat_output=None,
-                                                      vacuum_output=None)
+        mb_dict[stream][1] = base_models.material_balance_valve_stop(
+            stream=stream, section=1, variables=variables
+        )
+        hb_dict[stream][1] = base_models.heat_balance(
+            sim_conds=sim_conds,
+            stream_conds=stream_conds,
+            stream=stream,
+            section=1,
+            variables=variables,
+            mode=mode,
+            material_output=mb_dict[stream][1],
+            heat_output=None,
+            vacuum_output=None,
+        )
         # sec_2以降は自動で実施
-        for section in range(2, 1+sim_conds["NUM_SEC"]):
-            mb_dict[stream][section] = base_models.material_balance_valve_stop(stream=stream,
-                                                                               section=section,
-                                                                               variables=variables)
-            hb_dict[stream][section] = base_models.heat_balance(sim_conds=sim_conds,
-                                                                stream_conds=stream_conds,
-                                                                stream=stream,
-                                                                section=section,
-                                                                variables=variables,
-                                                                mode=mode,
-                                                                material_output=mb_dict[stream][section],
-                                                                heat_output=hb_dict[stream][section-1],
-                                                                vacuum_output=None)
-    # 2. 壁面熱バラ（stream = 1+sim_conds["NUM_STR"]）
-    hb_wall[1] = base_models.heat_balance_wall(sim_conds=sim_conds,
-                                               stream_conds=stream_conds,
-                                               section=1,
-                                               variables=variables,
-                                               heat_output=hb_dict[sim_conds["NUM_STR"]][1],
-                                               heat_wall_output=None)
-    for section in range(2, 1+sim_conds["NUM_SEC"]):
-        hb_wall[section] = base_models.heat_balance_wall(sim_conds=sim_conds,
-                                                         stream_conds=stream_conds,
-                                                         section=section,
-                                                         variables=variables,
-                                                         heat_output=hb_dict[sim_conds["NUM_STR"]][section],
-                                                         heat_wall_output=hb_wall[section-1])
+        for section in range(2, 1 + sim_conds["COMMON_COND"]["NUM_SEC"]):
+            mb_dict[stream][section] = base_models.material_balance_valve_stop(
+                stream=stream, section=section, variables=variables
+            )
+            hb_dict[stream][section] = base_models.heat_balance(
+                sim_conds=sim_conds,
+                stream_conds=stream_conds,
+                stream=stream,
+                section=section,
+                variables=variables,
+                mode=mode,
+                material_output=mb_dict[stream][section],
+                heat_output=hb_dict[stream][section - 1],
+                vacuum_output=None,
+            )
+    # 2. 壁面熱バラ（stream = 1+sim_conds["COMMON_COND"]["NUM_STR"]）
+    hb_wall[1] = base_models.heat_balance_wall(
+        sim_conds=sim_conds,
+        stream_conds=stream_conds,
+        section=1,
+        variables=variables,
+        heat_output=hb_dict[sim_conds["COMMON_COND"]["NUM_STR"]][1],
+        heat_wall_output=None,
+    )
+    for section in range(2, 1 + sim_conds["COMMON_COND"]["NUM_SEC"]):
+        hb_wall[section] = base_models.heat_balance_wall(
+            sim_conds=sim_conds,
+            stream_conds=stream_conds,
+            section=section,
+            variables=variables,
+            heat_output=hb_dict[sim_conds["COMMON_COND"]["NUM_STR"]][section],
+            heat_wall_output=hb_wall[section - 1],
+        )
     # 3. 上下蓋熱バラ
     for position in ["up", "down"]:
-        hb_lid[position] = base_models.heat_balance_lid(sim_conds=sim_conds,
-                                                        position=position,
-                                                        variables=variables,
-                                                        heat_output=hb_dict,
-                                                        heat_wall_output=hb_wall)
+        hb_lid[position] = base_models.heat_balance_lid(
+            sim_conds=sim_conds,
+            position=position,
+            variables=variables,
+            heat_output=hb_dict,
+            heat_wall_output=hb_wall,
+        )
     # 出力
     output = {
-        "material": mb_dict, # マテバラ
-        "heat": hb_dict, # 熱バラ
-        "heat_wall": hb_wall, # 熱バラ（壁面）
-        "heat_lid": hb_lid, # 熱バラ（蓋）
+        "material": mb_dict,  # マテバラ
+        "heat": hb_dict,  # 熱バラ
+        "heat_wall": hb_wall,  # 熱バラ（壁面）
+        "heat_lid": hb_lid,  # 熱バラ（蓋）
     }
 
     return output
 
+
 def flow_adsorption_single_or_upstream(sim_conds, stream_conds, variables):
-    """ 流通吸着_単独/直列吸着_上流
+    """流通吸着_単独/直列吸着_上流
         説明: 1つの吸着塔の流通吸着 or 2つの吸着塔の直列吸着における上流
         ベースモデル: 流通吸着モデル
         終了条件: 時間経過・温度上昇
@@ -210,84 +237,99 @@ def flow_adsorption_single_or_upstream(sim_conds, stream_conds, variables):
     hb_dict = {}
     hb_wall = {}
     hb_lid = {}
-    mode = 0 # 吸着
+    mode = 0  # 吸着
 
     ### セル計算 --------------------------------------------------------------
 
     # 1. マテバラ・熱バラ計算
-    for stream in range(1, 1+sim_conds["NUM_STR"]):
+    for stream in range(1, 1 + sim_conds["COMMON_COND"]["NUM_STR"]):
         mb_dict[stream] = {}
         hb_dict[stream] = {}
         # sec_1は手動で実施
-        mb_dict[stream][1] = base_models.material_balance_adsorp(sim_conds=sim_conds,
-                                                                      stream_conds=stream_conds,
-                                                                      stream=stream,
-                                                                      section=1,
-                                                                      variables=variables,
-                                                                      inflow_gas=None)
-        hb_dict[stream][1] = base_models.heat_balance(sim_conds=sim_conds,
-                                                           stream_conds=stream_conds,
-                                                           stream=stream,
-                                                           section=1,
-                                                           variables=variables,
-                                                           mode=mode,
-                                                           material_output=mb_dict[stream][1],
-                                                           heat_output=None,
-                                                           vacuum_output=None)
+        mb_dict[stream][1] = base_models.material_balance_adsorp(
+            sim_conds=sim_conds,
+            stream_conds=stream_conds,
+            stream=stream,
+            section=1,
+            variables=variables,
+            inflow_gas=None,
+        )
+        hb_dict[stream][1] = base_models.heat_balance(
+            sim_conds=sim_conds,
+            stream_conds=stream_conds,
+            stream=stream,
+            section=1,
+            variables=variables,
+            mode=mode,
+            material_output=mb_dict[stream][1],
+            heat_output=None,
+            vacuum_output=None,
+        )
         # sec_2以降は自動で実施
-        for section in range(2, 1+sim_conds["NUM_SEC"]):
-            mb_dict[stream][section] = base_models.material_balance_adsorp(sim_conds=sim_conds,
-                                                                                stream_conds=stream_conds,
-                                                                                stream=stream,
-                                                                                section=section,
-                                                                                variables=variables,
-                                                                                inflow_gas=mb_dict[stream][section-1])
-            hb_dict[stream][section] = base_models.heat_balance(sim_conds=sim_conds,
-                                                                     stream_conds=stream_conds,
-                                                                     stream=stream,
-                                                                     section=section,
-                                                                     variables=variables,
-                                                                     mode=mode,
-                                                                     material_output=mb_dict[stream][section],
-                                                                     heat_output=hb_dict[stream][section-1],
-                                                                     vacuum_output=None)
-    # 2. 壁面熱バラ（stream = 1+sim_conds["NUM_STR"]）
-    hb_wall[1] = base_models.heat_balance_wall(sim_conds=sim_conds,
-                                                    stream_conds=stream_conds,
-                                                    section=1,
-                                                    variables=variables,
-                                                    heat_output=hb_dict[sim_conds["NUM_STR"]][1],
-                                                    heat_wall_output=None)
-    for section in range(2, 1+sim_conds["NUM_SEC"]):
-        hb_wall[section] = base_models.heat_balance_wall(sim_conds=sim_conds,
-                                                              stream_conds=stream_conds,
-                                                              section=section,
-                                                              variables=variables,
-                                                              heat_output=hb_dict[sim_conds["NUM_STR"]][section],
-                                                              heat_wall_output=hb_wall[section-1])
+        for section in range(2, 1 + sim_conds["COMMON_COND"]["NUM_SEC"]):
+            mb_dict[stream][section] = base_models.material_balance_adsorp(
+                sim_conds=sim_conds,
+                stream_conds=stream_conds,
+                stream=stream,
+                section=section,
+                variables=variables,
+                inflow_gas=mb_dict[stream][section - 1],
+            )
+            hb_dict[stream][section] = base_models.heat_balance(
+                sim_conds=sim_conds,
+                stream_conds=stream_conds,
+                stream=stream,
+                section=section,
+                variables=variables,
+                mode=mode,
+                material_output=mb_dict[stream][section],
+                heat_output=hb_dict[stream][section - 1],
+                vacuum_output=None,
+            )
+    # 2. 壁面熱バラ（stream = 1+sim_conds["COMMON_COND"]["NUM_STR"]）
+    hb_wall[1] = base_models.heat_balance_wall(
+        sim_conds=sim_conds,
+        stream_conds=stream_conds,
+        section=1,
+        variables=variables,
+        heat_output=hb_dict[sim_conds["COMMON_COND"]["NUM_STR"]][1],
+        heat_wall_output=None,
+    )
+    for section in range(2, 1 + sim_conds["COMMON_COND"]["NUM_SEC"]):
+        hb_wall[section] = base_models.heat_balance_wall(
+            sim_conds=sim_conds,
+            stream_conds=stream_conds,
+            section=section,
+            variables=variables,
+            heat_output=hb_dict[sim_conds["COMMON_COND"]["NUM_STR"]][section],
+            heat_wall_output=hb_wall[section - 1],
+        )
     # 3. 上下蓋熱バラ
     for position in ["up", "down"]:
-        hb_lid[position] = base_models.heat_balance_lid(sim_conds=sim_conds,
-                                                             position=position,
-                                                             variables=variables,
-                                                             heat_output=hb_dict,
-                                                             heat_wall_output=hb_wall)
+        hb_lid[position] = base_models.heat_balance_lid(
+            sim_conds=sim_conds,
+            position=position,
+            variables=variables,
+            heat_output=hb_dict,
+            heat_wall_output=hb_wall,
+        )
     # 4. 圧力計算
     total_press_after_flow_adsorp = sim_conds["INFLOW_GAS_COND"]["total_press"]
 
     # 出力
     output = {
-        "material": mb_dict, # マテバラ
-        "heat": hb_dict, # 熱バラ
-        "heat_wall": hb_wall, # 熱バラ（壁面）
-        "heat_lid": hb_lid, # 熱バラ（蓋）
-        "total_press": total_press_after_flow_adsorp, # 圧力
+        "material": mb_dict,  # マテバラ
+        "heat": hb_dict,  # 熱バラ
+        "heat_wall": hb_wall,  # 熱バラ（壁面）
+        "heat_lid": hb_lid,  # 熱バラ（蓋）
+        "total_press": total_press_after_flow_adsorp,  # 圧力
     }
 
     return output
 
+
 def batch_adsorption_upstream(sim_conds, stream_conds, variables, series):
-    """ バッチ吸着_上流
+    """バッチ吸着_上流
         説明: ２つの吸着塔のバッチ吸着における上流側（下流側の圧力回復が目的）
         ベースモデル: バッチ吸着モデル
         終了条件: 下流の温度上昇
@@ -301,9 +343,10 @@ def batch_adsorption_upstream(sim_conds, stream_conds, variables, series):
     return initial_adsorption(sim_conds, stream_conds, variables, series)
 
 
-def equalization_pressure_depressurization(sim_conds, stream_conds, variables,
-                                           downflow_total_press):
-    """ バッチ均圧（減圧）
+def equalization_pressure_depressurization(
+    sim_conds, stream_conds, variables, downflow_total_press
+):
+    """バッチ均圧（減圧）
         説明: 均圧における減圧側
         ベースモデル: 吸着モデル
         終了条件: 圧力到達・時間経過
@@ -322,96 +365,115 @@ def equalization_pressure_depressurization(sim_conds, stream_conds, variables,
     hb_dict = {}
     hb_wall = {}
     hb_lid = {}
-    mode = 0 # 吸着
+    mode = 0  # 吸着
 
     ### セル計算 --------------------------------------------------------------
 
     # 0. 上流管からの流入計算
-    depress_output = base_models.total_press_after_depressure(sim_conds=sim_conds,
-                                                             variables=variables,
-                                                             downflow_total_press=downflow_total_press,)
+    depress_output = base_models.total_press_after_depressure(
+        sim_conds=sim_conds,
+        variables=variables,
+        downflow_total_press=downflow_total_press,
+    )
     # 1. マテバラ・熱バラ計算
-    for stream in range(1, 1+sim_conds["NUM_STR"]):
+    for stream in range(1, 1 + sim_conds["COMMON_COND"]["NUM_STR"]):
         mb_dict[stream] = {}
         hb_dict[stream] = {}
         # sec_1は手動で実施
         # NOTE: 均圧配管流量を引数として与える
-        mb_dict[stream][1] = base_models.material_balance_adsorp(sim_conds=sim_conds,
-                                                                 stream_conds=stream_conds,
-                                                                 stream=stream,
-                                                                 section=1,
-                                                                 variables=variables,
-                                                                 inflow_gas=None,
-                                                                 flow_amt_depress=depress_output["flow_amount_l"])
-        hb_dict[stream][1] = base_models.heat_balance(sim_conds=sim_conds,
-                                                      stream_conds=stream_conds,
-                                                      stream=stream,
-                                                      section=1,
-                                                      variables=variables,
-                                                      mode=mode,
-                                                      material_output=mb_dict[stream][1],
-                                                      heat_output=None,
-                                                      vacuum_output=None)
+        mb_dict[stream][1] = base_models.material_balance_adsorp(
+            sim_conds=sim_conds,
+            stream_conds=stream_conds,
+            stream=stream,
+            section=1,
+            variables=variables,
+            inflow_gas=None,
+            flow_amt_depress=depress_output["flow_amount_l"],
+        )
+        hb_dict[stream][1] = base_models.heat_balance(
+            sim_conds=sim_conds,
+            stream_conds=stream_conds,
+            stream=stream,
+            section=1,
+            variables=variables,
+            mode=mode,
+            material_output=mb_dict[stream][1],
+            heat_output=None,
+            vacuum_output=None,
+        )
         # sec_2以降は自動で実施
-        for section in range(2, 1+sim_conds["NUM_SEC"]):
-            mb_dict[stream][section] = base_models.material_balance_adsorp(sim_conds=sim_conds,
-                                                                           stream_conds=stream_conds,
-                                                                           stream=stream,
-                                                                           section=section,
-                                                                           variables=variables,
-                                                                           inflow_gas=mb_dict[stream][section-1])
-            hb_dict[stream][section] = base_models.heat_balance(sim_conds=sim_conds,
-                                                                stream_conds=stream_conds,
-                                                                stream=stream,
-                                                                section=section,
-                                                                variables=variables,
-                                                                mode=mode,
-                                                                material_output=mb_dict[stream][section],
-                                                                heat_output=hb_dict[stream][section-1],
-                                                                vacuum_output=None)
-    # 2. 壁面熱バラ（stream = 1+sim_conds["NUM_STR"]）
-    hb_wall[1] = base_models.heat_balance_wall(sim_conds=sim_conds,
-                                               stream_conds=stream_conds,
-                                               section=1,
-                                               variables=variables,
-                                               heat_output=hb_dict[sim_conds["NUM_STR"]][1],
-                                               heat_wall_output=None)
-    for section in range(2, 1+sim_conds["NUM_SEC"]):
-        hb_wall[section] = base_models.heat_balance_wall(sim_conds=sim_conds,
-                                                         stream_conds=stream_conds,
-                                                         section=section,
-                                                         variables=variables,
-                                                         heat_output=hb_dict[sim_conds["NUM_STR"]][section],
-                                                         heat_wall_output=hb_wall[section-1])
+        for section in range(2, 1 + sim_conds["COMMON_COND"]["NUM_SEC"]):
+            mb_dict[stream][section] = base_models.material_balance_adsorp(
+                sim_conds=sim_conds,
+                stream_conds=stream_conds,
+                stream=stream,
+                section=section,
+                variables=variables,
+                inflow_gas=mb_dict[stream][section - 1],
+            )
+            hb_dict[stream][section] = base_models.heat_balance(
+                sim_conds=sim_conds,
+                stream_conds=stream_conds,
+                stream=stream,
+                section=section,
+                variables=variables,
+                mode=mode,
+                material_output=mb_dict[stream][section],
+                heat_output=hb_dict[stream][section - 1],
+                vacuum_output=None,
+            )
+    # 2. 壁面熱バラ（stream = 1+sim_conds["COMMON_COND"]["NUM_STR"]）
+    hb_wall[1] = base_models.heat_balance_wall(
+        sim_conds=sim_conds,
+        stream_conds=stream_conds,
+        section=1,
+        variables=variables,
+        heat_output=hb_dict[sim_conds["COMMON_COND"]["NUM_STR"]][1],
+        heat_wall_output=None,
+    )
+    for section in range(2, 1 + sim_conds["COMMON_COND"]["NUM_SEC"]):
+        hb_wall[section] = base_models.heat_balance_wall(
+            sim_conds=sim_conds,
+            stream_conds=stream_conds,
+            section=section,
+            variables=variables,
+            heat_output=hb_dict[sim_conds["COMMON_COND"]["NUM_STR"]][section],
+            heat_wall_output=hb_wall[section - 1],
+        )
     # 3. 上下蓋熱バラ
     for position in ["up", "down"]:
-        hb_lid[position] = base_models.heat_balance_lid(sim_conds=sim_conds,
-                                                        position=position,
-                                                        variables=variables,
-                                                        heat_output=hb_dict,
-                                                        heat_wall_output=hb_wall)
+        hb_lid[position] = base_models.heat_balance_lid(
+            sim_conds=sim_conds,
+            position=position,
+            variables=variables,
+            heat_output=hb_dict,
+            heat_wall_output=hb_wall,
+        )
     # 4. 下流塔の圧力と流入量計算
-    downflow_fr_and_total_press = base_models.downflow_fr_after_depressure(sim_conds=sim_conds,
-                                                                           stream_conds=stream_conds,
-                                                                           variables=variables,
-                                                                           mb_dict=mb_dict,
-                                                                           downflow_total_press=downflow_total_press)
+    downflow_fr_and_total_press = base_models.downflow_fr_after_depressure(
+        sim_conds=sim_conds,
+        stream_conds=stream_conds,
+        variables=variables,
+        mb_dict=mb_dict,
+        downflow_total_press=downflow_total_press,
+    )
 
     # 出力
     output = {
-        "material": mb_dict, # マテバラ
-        "heat": hb_dict, # 熱バラ
-        "heat_wall": hb_wall, # 熱バラ（壁面）
-        "heat_lid": hb_lid, # 熱バラ（蓋）
-        "total_press": depress_output["total_press_after_depressure"], # 減圧後の全圧
+        "material": mb_dict,  # マテバラ
+        "heat": hb_dict,  # 熱バラ
+        "heat_wall": hb_wall,  # 熱バラ（壁面）
+        "heat_lid": hb_lid,  # 熱バラ（蓋）
+        "total_press": depress_output["total_press_after_depressure"],  # 減圧後の全圧
         "diff_press": depress_output["diff_press"],
-        "downflow_params": downflow_fr_and_total_press, # 下流塔の全圧と流入量
+        "downflow_params": downflow_fr_and_total_press,  # 下流塔の全圧と流入量
     }
 
     return output
 
+
 def desorption_by_vacuuming(sim_conds, stream_conds, variables):
-    """ 真空脱着
+    """真空脱着
         説明: 真空引きによる脱着
         ベースモデル: 脱着モデル
         終了条件: 時間経過
@@ -429,93 +491,114 @@ def desorption_by_vacuuming(sim_conds, stream_conds, variables):
     mf_dict = {}
     hb_wall = {}
     hb_lid = {}
-    mode = 2 # 脱着
+    mode = 2  # 脱着
 
     ### セル計算 --------------------------------------------------------------
 
     # 0. 排気後圧力の計算
-    vacuum_output = base_models.total_press_after_vacuum(sim_conds=sim_conds,
-                                                         variables=variables)
+    vacuum_output = base_models.total_press_after_vacuum(
+        sim_conds=sim_conds, variables=variables
+    )
     # 1. マテバラ・熱バラ計算
-    for stream in range(1, 1+sim_conds["NUM_STR"]):
+    for stream in range(1, 1 + sim_conds["COMMON_COND"]["NUM_STR"]):
         mb_dict[stream] = {}
         hb_dict[stream] = {}
         mf_dict[stream] = {}
         # sec_1は手動で実施
-        mb_dict[stream][1], mf_dict[stream][1] = base_models.material_balance_desorp(sim_conds=sim_conds,
-                                                                                     stream_conds=stream_conds,                                                                      
-                                                                                     stream=stream,
-                                                                                     section=1,
-                                                                                     variables=variables,
-                                                                                     vacuum_output=vacuum_output)
-        hb_dict[stream][1] = base_models.heat_balance(sim_conds=sim_conds,
-                                                      stream_conds=stream_conds,
-                                                      stream=stream,
-                                                      section=1,
-                                                      variables=variables,
-                                                      mode=mode,
-                                                      material_output=mb_dict[stream][1],
-                                                      heat_output=None,
-                                                      vacuum_output=vacuum_output)
+        mb_dict[stream][1], mf_dict[stream][1] = base_models.material_balance_desorp(
+            sim_conds=sim_conds,
+            stream_conds=stream_conds,
+            stream=stream,
+            section=1,
+            variables=variables,
+            vacuum_output=vacuum_output,
+        )
+        hb_dict[stream][1] = base_models.heat_balance(
+            sim_conds=sim_conds,
+            stream_conds=stream_conds,
+            stream=stream,
+            section=1,
+            variables=variables,
+            mode=mode,
+            material_output=mb_dict[stream][1],
+            heat_output=None,
+            vacuum_output=vacuum_output,
+        )
         # sec_2以降は自動で実施
-        for section in range(2, 1+sim_conds["NUM_SEC"]):
-            mb_dict[stream][section], mf_dict[stream][section] = base_models.material_balance_desorp(sim_conds=sim_conds,
-                                                                                                     stream_conds=stream_conds,
-                                                                                                     stream=stream,
-                                                                                                     section=section,
-                                                                                                     variables=variables,
-                                                                                                     vacuum_output=vacuum_output)
-            hb_dict[stream][section] = base_models.heat_balance(sim_conds=sim_conds,
-                                                                stream_conds=stream_conds,
-                                                                stream=stream,
-                                                                section=section,
-                                                                variables=variables,
-                                                                mode=mode,
-                                                                material_output=mb_dict[stream][section],
-                                                                heat_output=hb_dict[stream][section-1],
-                                                                vacuum_output=vacuum_output)
-    # 2. 壁面熱バラ（stream = 1+sim_conds["NUM_STR"]）
-    hb_wall[1] = base_models.heat_balance_wall(sim_conds=sim_conds,
-                                               stream_conds=stream_conds,
-                                               section=1,
-                                               variables=variables,
-                                               heat_output=hb_dict[sim_conds["NUM_STR"]][1],
-                                               heat_wall_output=None)
-    for section in range(2, 1+sim_conds["NUM_SEC"]):
-        hb_wall[section] = base_models.heat_balance_wall(sim_conds=sim_conds,
-                                                         stream_conds=stream_conds,
-                                                         section=section,
-                                                         variables=variables,
-                                                         heat_output=hb_dict[sim_conds["NUM_STR"]][section],
-                                                         heat_wall_output=hb_wall[section-1])
+        for section in range(2, 1 + sim_conds["COMMON_COND"]["NUM_SEC"]):
+            mb_dict[stream][section], mf_dict[stream][section] = (
+                base_models.material_balance_desorp(
+                    sim_conds=sim_conds,
+                    stream_conds=stream_conds,
+                    stream=stream,
+                    section=section,
+                    variables=variables,
+                    vacuum_output=vacuum_output,
+                )
+            )
+            hb_dict[stream][section] = base_models.heat_balance(
+                sim_conds=sim_conds,
+                stream_conds=stream_conds,
+                stream=stream,
+                section=section,
+                variables=variables,
+                mode=mode,
+                material_output=mb_dict[stream][section],
+                heat_output=hb_dict[stream][section - 1],
+                vacuum_output=vacuum_output,
+            )
+    # 2. 壁面熱バラ（stream = 1+sim_conds["COMMON_COND"]["NUM_STR"]）
+    hb_wall[1] = base_models.heat_balance_wall(
+        sim_conds=sim_conds,
+        stream_conds=stream_conds,
+        section=1,
+        variables=variables,
+        heat_output=hb_dict[sim_conds["COMMON_COND"]["NUM_STR"]][1],
+        heat_wall_output=None,
+    )
+    for section in range(2, 1 + sim_conds["COMMON_COND"]["NUM_SEC"]):
+        hb_wall[section] = base_models.heat_balance_wall(
+            sim_conds=sim_conds,
+            stream_conds=stream_conds,
+            section=section,
+            variables=variables,
+            heat_output=hb_dict[sim_conds["COMMON_COND"]["NUM_STR"]][section],
+            heat_wall_output=hb_wall[section - 1],
+        )
     # 3. 上下蓋熱バラ
     for position in ["up", "down"]:
-        hb_lid[position] = base_models.heat_balance_lid(sim_conds=sim_conds,
-                                                        position=position,
-                                                        variables=variables,
-                                                        heat_output=hb_dict,
-                                                        heat_wall_output=hb_wall)
+        hb_lid[position] = base_models.heat_balance_lid(
+            sim_conds=sim_conds,
+            position=position,
+            variables=variables,
+            heat_output=hb_dict,
+            heat_wall_output=hb_wall,
+        )
     # 4. 脱着後の全圧
-    total_press_after_desorp = base_models.total_press_after_desorp(sim_conds=sim_conds,
-                                                                    variables=variables,
-                                                                    mf_dict=mf_dict,
-                                                                    vacuum_output=vacuum_output)
+    total_press_after_desorp = base_models.total_press_after_desorp(
+        sim_conds=sim_conds,
+        variables=variables,
+        mf_dict=mf_dict,
+        vacuum_output=vacuum_output,
+    )
     # 出力
     output = {
-        "material": mb_dict, # マテバラ
-        "heat": hb_dict, # 熱バラ
-        "heat_wall": hb_wall, # 熱バラ（壁面）
-        "heat_lid": hb_lid, # 熱バラ（蓋）
-        "mol_fraction": mf_dict, # モル分率
-        "accum_vacuum_amt": vacuum_output, # 積算CO2, N2回収量
-        "total_press_after_desorp": total_press_after_desorp, # 脱着後の全圧
+        "material": mb_dict,  # マテバラ
+        "heat": hb_dict,  # 熱バラ
+        "heat_wall": hb_wall,  # 熱バラ（壁面）
+        "heat_lid": hb_lid,  # 熱バラ（蓋）
+        "mol_fraction": mf_dict,  # モル分率
+        "accum_vacuum_amt": vacuum_output,  # 積算CO2, N2回収量
+        "total_press_after_desorp": total_press_after_desorp,  # 脱着後の全圧
     }
 
     return output
 
-def equalization_pressure_pressurization(sim_conds, stream_conds, variables,
-                                         upstream_params):
-    """ バッチ均圧（加圧）
+
+def equalization_pressure_pressurization(
+    sim_conds, stream_conds, variables, upstream_params
+):
+    """バッチ均圧（加圧）
         説明: 均圧における加圧側
         ベースモデル: バッチ吸着モデル
         終了条件: 圧力到達・時間経過
@@ -536,85 +619,103 @@ def equalization_pressure_pressurization(sim_conds, stream_conds, variables,
     hb_dict = {}
     hb_wall = {}
     hb_lid = {}
-    mode = 0 # 吸着
+    mode = 0  # 吸着
 
     ### セル計算 --------------------------------------------------------------
 
     # 1. マテバラ・熱バラ計算
-    for stream in range(1, 1+sim_conds["NUM_STR"]):
+    for stream in range(1, 1 + sim_conds["COMMON_COND"]["NUM_STR"]):
         mb_dict[stream] = {}
         hb_dict[stream] = {}
         # sec_1は手動で実施
         # NOTE: 上流側で計算した流出量を引数に与える
-        mb_dict[stream][1] = base_models.material_balance_adsorp(sim_conds=sim_conds,
-                                                                 stream_conds=stream_conds,
-                                                                 stream=stream,
-                                                                 section=1,
-                                                                 variables=variables,
-                                                                 inflow_gas=upstream_params["outflow_fr"][stream])
-        hb_dict[stream][1] = base_models.heat_balance(sim_conds=sim_conds,
-                                                      stream_conds=stream_conds,
-                                                      stream=stream,
-                                                      section=1,
-                                                      variables=variables,
-                                                      mode=mode,
-                                                      material_output=mb_dict[stream][1],
-                                                      heat_output=None,
-                                                      vacuum_output=None)
+        mb_dict[stream][1] = base_models.material_balance_adsorp(
+            sim_conds=sim_conds,
+            stream_conds=stream_conds,
+            stream=stream,
+            section=1,
+            variables=variables,
+            inflow_gas=upstream_params["outflow_fr"][stream],
+        )
+        hb_dict[stream][1] = base_models.heat_balance(
+            sim_conds=sim_conds,
+            stream_conds=stream_conds,
+            stream=stream,
+            section=1,
+            variables=variables,
+            mode=mode,
+            material_output=mb_dict[stream][1],
+            heat_output=None,
+            vacuum_output=None,
+        )
         # sec_2以降は自動で実施
-        for section in range(2, 1+sim_conds["NUM_SEC"]):
-            mb_dict[stream][section] = base_models.material_balance_adsorp(sim_conds=sim_conds,
-                                                                           stream_conds=stream_conds,
-                                                                           stream=stream,
-                                                                           section=section,
-                                                                           variables=variables,
-                                                                           inflow_gas=mb_dict[stream][section-1])
-            hb_dict[stream][section] = base_models.heat_balance(sim_conds=sim_conds,
-                                                                stream_conds=stream_conds,
-                                                                stream=stream,
-                                                                section=section,
-                                                                variables=variables,
-                                                                mode=mode,
-                                                                material_output=mb_dict[stream][section],
-                                                                heat_output=hb_dict[stream][section-1],
-                                                                vacuum_output=None)
-    # 2. 壁面熱バラ（stream = 1+sim_conds["NUM_STR"]）
-    hb_wall[1] = base_models.heat_balance_wall(sim_conds=sim_conds,
-                                               stream_conds=stream_conds,
-                                               section=1,
-                                               variables=variables,
-                                               heat_output=hb_dict[sim_conds["NUM_STR"]][1],
-                                               heat_wall_output=None)
-    for section in range(2, 1+sim_conds["NUM_SEC"]):
-        hb_wall[section] = base_models.heat_balance_wall(sim_conds=sim_conds,
-                                                         stream_conds=stream_conds,
-                                                         section=section,
-                                                         variables=variables,
-                                                         heat_output=hb_dict[sim_conds["NUM_STR"]][section],
-                                                         heat_wall_output=hb_wall[section-1])
+        for section in range(2, 1 + sim_conds["COMMON_COND"]["NUM_SEC"]):
+            mb_dict[stream][section] = base_models.material_balance_adsorp(
+                sim_conds=sim_conds,
+                stream_conds=stream_conds,
+                stream=stream,
+                section=section,
+                variables=variables,
+                inflow_gas=mb_dict[stream][section - 1],
+            )
+            hb_dict[stream][section] = base_models.heat_balance(
+                sim_conds=sim_conds,
+                stream_conds=stream_conds,
+                stream=stream,
+                section=section,
+                variables=variables,
+                mode=mode,
+                material_output=mb_dict[stream][section],
+                heat_output=hb_dict[stream][section - 1],
+                vacuum_output=None,
+            )
+    # 2. 壁面熱バラ（stream = 1+sim_conds["COMMON_COND"]["NUM_STR"]）
+    hb_wall[1] = base_models.heat_balance_wall(
+        sim_conds=sim_conds,
+        stream_conds=stream_conds,
+        section=1,
+        variables=variables,
+        heat_output=hb_dict[sim_conds["COMMON_COND"]["NUM_STR"]][1],
+        heat_wall_output=None,
+    )
+    for section in range(2, 1 + sim_conds["COMMON_COND"]["NUM_SEC"]):
+        hb_wall[section] = base_models.heat_balance_wall(
+            sim_conds=sim_conds,
+            stream_conds=stream_conds,
+            section=section,
+            variables=variables,
+            heat_output=hb_dict[sim_conds["COMMON_COND"]["NUM_STR"]][section],
+            heat_wall_output=hb_wall[section - 1],
+        )
     # 3. 上下蓋熱バラ
     for position in ["up", "down"]:
-        hb_lid[position] = base_models.heat_balance_lid(sim_conds=sim_conds,
-                                                        position=position,
-                                                        variables=variables,
-                                                        heat_output=hb_dict,
-                                                        heat_wall_output=hb_wall)
+        hb_lid[position] = base_models.heat_balance_lid(
+            sim_conds=sim_conds,
+            position=position,
+            variables=variables,
+            heat_output=hb_dict,
+            heat_wall_output=hb_wall,
+        )
     # 4. バッチ吸着後圧力変化
-    total_press_after_batch_adsorp = upstream_params["total_press_after_depressure_downflow"]
+    total_press_after_batch_adsorp = upstream_params[
+        "total_press_after_depressure_downflow"
+    ]
     # 出力
     output = {
-        "material": mb_dict, # マテバラ
-        "heat": hb_dict, # 熱バラ
-        "heat_wall": hb_wall, # 熱バラ（壁面）
-        "heat_lid": hb_lid, # 熱バラ（蓋）
-        "total_press_after_batch_adsorp": total_press_after_batch_adsorp, # バッチ吸着後圧力
+        "material": mb_dict,  # マテバラ
+        "heat": hb_dict,  # 熱バラ
+        "heat_wall": hb_wall,  # 熱バラ（壁面）
+        "heat_lid": hb_lid,  # 熱バラ（蓋）
+        "total_press_after_batch_adsorp": total_press_after_batch_adsorp,  # バッチ吸着後圧力
     }
 
     return output
 
-def batch_adsorption_downstream(sim_conds, stream_conds, variables, series,
-                                inflow_gas, stagnant_mf):
-    """ バッチ吸着（下流）
+
+def batch_adsorption_downstream(
+    sim_conds, stream_conds, variables, series, inflow_gas, stagnant_mf
+):
+    """バッチ吸着（下流）
         説明: ２つの吸着塔のバッチ吸着における下流側（下流側の圧力回復が目的）
         ベースモデル: バッチ吸着モデル
         終了条件: 下流の温度上昇
@@ -633,88 +734,102 @@ def batch_adsorption_downstream(sim_conds, stream_conds, variables, series,
     hb_dict = {}
     hb_wall = {}
     hb_lid = {}
-    mode = 0 # 吸着
+    mode = 0  # 吸着
 
     ### セル計算 --------------------------------------------------------------
 
     # 1. マテバラ・熱バラ計算
-    for stream in range(1, 1+sim_conds["NUM_STR"]):
+    for stream in range(1, 1 + sim_conds["COMMON_COND"]["NUM_STR"]):
         mb_dict[stream] = {}
         hb_dict[stream] = {}
         # sec_1は手動で実施
         # NOTE: # 流入ガスが上流の流出ガス
-        mb_dict[stream][1] = base_models.material_balance_adsorp(sim_conds=sim_conds,
-                                                                 stream_conds=stream_conds,
-                                                                 stream=stream,
-                                                                 section=1,
-                                                                 variables=variables,
-                                                                 inflow_gas=inflow_gas[stream][sim_conds["NUM_SEC"]],
-                                                                 stagnant_mode=stagnant_mf)
-        hb_dict[stream][1] = base_models.heat_balance(sim_conds=sim_conds,
-                                                      stream_conds=stream_conds,
-                                                      stream=stream,
-                                                      section=1,
-                                                      variables=variables,
-                                                      mode=mode,
-                                                      material_output=mb_dict[stream][1],
-                                                      heat_output=None,
-                                                      vacuum_output=None)
+        mb_dict[stream][1] = base_models.material_balance_adsorp(
+            sim_conds=sim_conds,
+            stream_conds=stream_conds,
+            stream=stream,
+            section=1,
+            variables=variables,
+            inflow_gas=inflow_gas[stream][sim_conds["COMMON_COND"]["NUM_SEC"]],
+            stagnant_mode=stagnant_mf,
+        )
+        hb_dict[stream][1] = base_models.heat_balance(
+            sim_conds=sim_conds,
+            stream_conds=stream_conds,
+            stream=stream,
+            section=1,
+            variables=variables,
+            mode=mode,
+            material_output=mb_dict[stream][1],
+            heat_output=None,
+            vacuum_output=None,
+        )
         # sec_2以降は自動で実施
-        for section in range(2, 1+sim_conds["NUM_SEC"]):
-            mb_dict[stream][section] = base_models.material_balance_adsorp(sim_conds=sim_conds,
-                                                                           stream_conds=stream_conds,
-                                                                           stream=stream,
-                                                                           section=section,
-                                                                           variables=variables,
-                                                                           inflow_gas=mb_dict[stream][section-1])
-            hb_dict[stream][section] = base_models.heat_balance(sim_conds=sim_conds,
-                                                                stream_conds=stream_conds,
-                                                                stream=stream,
-                                                                section=section,
-                                                                variables=variables,
-                                                                mode=mode,
-                                                                material_output=mb_dict[stream][section],
-                                                                heat_output=hb_dict[stream][section-1],
-                                                                vacuum_output=None)
-    # 2. 壁面熱バラ（stream = 1+sim_conds["NUM_STR"]）
-    hb_wall[1] = base_models.heat_balance_wall(sim_conds=sim_conds,
-                                               stream_conds=stream_conds,
-                                               section=1,
-                                               variables=variables,
-                                               heat_output=hb_dict[sim_conds["NUM_STR"]][1],
-                                               heat_wall_output=None)
-    for section in range(2, 1+sim_conds["NUM_SEC"]):
-        hb_wall[section] = base_models.heat_balance_wall(sim_conds=sim_conds,
-                                                         stream_conds=stream_conds,
-                                                         section=section,
-                                                         variables=variables,
-                                                         heat_output=hb_dict[sim_conds["NUM_STR"]][section],
-                                                         heat_wall_output=hb_wall[section-1])
+        for section in range(2, 1 + sim_conds["COMMON_COND"]["NUM_SEC"]):
+            mb_dict[stream][section] = base_models.material_balance_adsorp(
+                sim_conds=sim_conds,
+                stream_conds=stream_conds,
+                stream=stream,
+                section=section,
+                variables=variables,
+                inflow_gas=mb_dict[stream][section - 1],
+            )
+            hb_dict[stream][section] = base_models.heat_balance(
+                sim_conds=sim_conds,
+                stream_conds=stream_conds,
+                stream=stream,
+                section=section,
+                variables=variables,
+                mode=mode,
+                material_output=mb_dict[stream][section],
+                heat_output=hb_dict[stream][section - 1],
+                vacuum_output=None,
+            )
+    # 2. 壁面熱バラ（stream = 1+sim_conds["COMMON_COND"]["NUM_STR"]）
+    hb_wall[1] = base_models.heat_balance_wall(
+        sim_conds=sim_conds,
+        stream_conds=stream_conds,
+        section=1,
+        variables=variables,
+        heat_output=hb_dict[sim_conds["COMMON_COND"]["NUM_STR"]][1],
+        heat_wall_output=None,
+    )
+    for section in range(2, 1 + sim_conds["COMMON_COND"]["NUM_SEC"]):
+        hb_wall[section] = base_models.heat_balance_wall(
+            sim_conds=sim_conds,
+            stream_conds=stream_conds,
+            section=section,
+            variables=variables,
+            heat_output=hb_dict[sim_conds["COMMON_COND"]["NUM_STR"]][section],
+            heat_wall_output=hb_wall[section - 1],
+        )
     # 3. 上下蓋熱バラ
     for position in ["up", "down"]:
-        hb_lid[position] = base_models.heat_balance_lid(sim_conds=sim_conds,
-                                                        position=position,
-                                                        variables=variables,
-                                                        heat_output=hb_dict,
-                                                        heat_wall_output=hb_wall)
+        hb_lid[position] = base_models.heat_balance_lid(
+            sim_conds=sim_conds,
+            position=position,
+            variables=variables,
+            heat_output=hb_dict,
+            heat_wall_output=hb_wall,
+        )
     # 4. バッチ吸着後圧力変化
-    total_press_after_batch_adsorp = base_models.total_press_after_batch_adsorp(sim_conds=sim_conds,
-                                                                                variables=variables,
-                                                                                series=series)
+    total_press_after_batch_adsorp = base_models.total_press_after_batch_adsorp(
+        sim_conds=sim_conds, variables=variables, series=series
+    )
     # 出力
     output = {
-        "material": mb_dict, # マテバラ
-        "heat": hb_dict, # 熱バラ
-        "heat_wall": hb_wall, # 熱バラ（壁面）
-        "heat_lid": hb_lid, # 熱バラ（蓋）
-        "total_press_after_batch_adsorp": total_press_after_batch_adsorp, # バッチ吸着後圧力
+        "material": mb_dict,  # マテバラ
+        "heat": hb_dict,  # 熱バラ
+        "heat_wall": hb_wall,  # 熱バラ（壁面）
+        "heat_lid": hb_lid,  # 熱バラ（蓋）
+        "total_press_after_batch_adsorp": total_press_after_batch_adsorp,  # バッチ吸着後圧力
     }
 
     return output
 
-def flow_adsorption_downstream(sim_conds, stream_conds, variables,
-                               inflow_gas):
-    """ 流通吸着（下流）
+
+def flow_adsorption_downstream(sim_conds, stream_conds, variables, inflow_gas):
+    """流通吸着（下流）
         説明: ２つの吸着塔による流通吸着における下流側
         ベースモデル: 流通吸着モデル
         終了条件: 上流塔の温度上昇、時間経過
@@ -734,79 +849,93 @@ def flow_adsorption_downstream(sim_conds, stream_conds, variables,
     hb_dict = {}
     hb_wall = {}
     hb_lid = {}
-    mode = 0 # 吸着
+    mode = 0  # 吸着
 
     ### セル計算 --------------------------------------------------------------
 
     # 1. マテバラ・熱バラ計算
-    for stream in range(1, 1+sim_conds["NUM_STR"]):
+    for stream in range(1, 1 + sim_conds["COMMON_COND"]["NUM_STR"]):
         mb_dict[stream] = {}
         hb_dict[stream] = {}
         # sec_1は手動で実施
         # NOTE: # 流入ガスが上流の流出ガス
-        mb_dict[stream][1] = base_models.material_balance_adsorp(sim_conds=sim_conds,
-                                                                 stream_conds=stream_conds,
-                                                                 stream=stream,
-                                                                 section=1,
-                                                                 variables=variables,
-                                                                 inflow_gas=inflow_gas[stream][sim_conds["NUM_SEC"]])
-        hb_dict[stream][1] = base_models.heat_balance(sim_conds=sim_conds,
-                                                           stream_conds=stream_conds,
-                                                           stream=stream,
-                                                           section=1,
-                                                           variables=variables,
-                                                           mode=mode,
-                                                           material_output=mb_dict[stream][1],
-                                                           heat_output=None,
-                                                           vacuum_output=None)
+        mb_dict[stream][1] = base_models.material_balance_adsorp(
+            sim_conds=sim_conds,
+            stream_conds=stream_conds,
+            stream=stream,
+            section=1,
+            variables=variables,
+            inflow_gas=inflow_gas[stream][sim_conds["COMMON_COND"]["NUM_SEC"]],
+        )
+        hb_dict[stream][1] = base_models.heat_balance(
+            sim_conds=sim_conds,
+            stream_conds=stream_conds,
+            stream=stream,
+            section=1,
+            variables=variables,
+            mode=mode,
+            material_output=mb_dict[stream][1],
+            heat_output=None,
+            vacuum_output=None,
+        )
         # sec_2以降は自動で実施
-        for section in range(2, 1+sim_conds["NUM_SEC"]):
-            mb_dict[stream][section] = base_models.material_balance_adsorp(sim_conds=sim_conds,
-                                                                           stream_conds=stream_conds,
-                                                                           stream=stream,
-                                                                           section=section,
-                                                                           variables=variables,
-                                                                           inflow_gas=mb_dict[stream][section-1])
-            hb_dict[stream][section] = base_models.heat_balance(sim_conds=sim_conds,
-                                                                stream_conds=stream_conds,
-                                                                stream=stream,
-                                                                section=section,
-                                                                variables=variables,
-                                                                mode=mode,
-                                                                material_output=mb_dict[stream][section],
-                                                                heat_output=hb_dict[stream][section-1],
-                                                                vacuum_output=None)
-    # 2. 壁面熱バラ（stream = 1+sim_conds["NUM_STR"]）
-    hb_wall[1] = base_models.heat_balance_wall(sim_conds=sim_conds,
-                                               stream_conds=stream_conds,
-                                               section=1,
-                                               variables=variables,
-                                               heat_output=hb_dict[sim_conds["NUM_STR"]][1],
-                                               heat_wall_output=None)
-    for section in range(2, 1+sim_conds["NUM_SEC"]):
-        hb_wall[section] = base_models.heat_balance_wall(sim_conds=sim_conds,
-                                                         stream_conds=stream_conds,
-                                                         section=section,
-                                                         variables=variables,
-                                                         heat_output=hb_dict[sim_conds["NUM_STR"]][section],
-                                                         heat_wall_output=hb_wall[section-1])
+        for section in range(2, 1 + sim_conds["COMMON_COND"]["NUM_SEC"]):
+            mb_dict[stream][section] = base_models.material_balance_adsorp(
+                sim_conds=sim_conds,
+                stream_conds=stream_conds,
+                stream=stream,
+                section=section,
+                variables=variables,
+                inflow_gas=mb_dict[stream][section - 1],
+            )
+            hb_dict[stream][section] = base_models.heat_balance(
+                sim_conds=sim_conds,
+                stream_conds=stream_conds,
+                stream=stream,
+                section=section,
+                variables=variables,
+                mode=mode,
+                material_output=mb_dict[stream][section],
+                heat_output=hb_dict[stream][section - 1],
+                vacuum_output=None,
+            )
+    # 2. 壁面熱バラ（stream = 1+sim_conds["COMMON_COND"]["NUM_STR"]）
+    hb_wall[1] = base_models.heat_balance_wall(
+        sim_conds=sim_conds,
+        stream_conds=stream_conds,
+        section=1,
+        variables=variables,
+        heat_output=hb_dict[sim_conds["COMMON_COND"]["NUM_STR"]][1],
+        heat_wall_output=None,
+    )
+    for section in range(2, 1 + sim_conds["COMMON_COND"]["NUM_SEC"]):
+        hb_wall[section] = base_models.heat_balance_wall(
+            sim_conds=sim_conds,
+            stream_conds=stream_conds,
+            section=section,
+            variables=variables,
+            heat_output=hb_dict[sim_conds["COMMON_COND"]["NUM_STR"]][section],
+            heat_wall_output=hb_wall[section - 1],
+        )
     # 3. 上下蓋熱バラ
     for position in ["up", "down"]:
-        hb_lid[position] = base_models.heat_balance_lid(sim_conds=sim_conds,
-                                                        position=position,
-                                                        variables=variables,
-                                                        heat_output=hb_dict,
-                                                        heat_wall_output=hb_wall)
+        hb_lid[position] = base_models.heat_balance_lid(
+            sim_conds=sim_conds,
+            position=position,
+            variables=variables,
+            heat_output=hb_dict,
+            heat_wall_output=hb_wall,
+        )
     # 4. 全圧
     total_press_after_flow_adsorp = sim_conds["INFLOW_GAS_COND"]["total_press"]
 
     # 出力
     output = {
-        "material": mb_dict, # マテバラ
-        "heat": hb_dict, # 熱バラ
-        "heat_wall": hb_wall, # 熱バラ（壁面）
-        "heat_lid": hb_lid, # 熱バラ（蓋）
-        "total_press": total_press_after_flow_adsorp, # 全圧
+        "material": mb_dict,  # マテバラ
+        "heat": hb_dict,  # 熱バラ
+        "heat_wall": hb_wall,  # 熱バラ（壁面）
+        "heat_lid": hb_lid,  # 熱バラ（蓋）
+        "total_press": total_press_after_flow_adsorp,  # 全圧
     }
 
     return output
