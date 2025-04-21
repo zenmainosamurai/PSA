@@ -13,7 +13,7 @@ from filterpy.common import Q_discrete_white_noise
 
 from utils import const
 from utils.custom_filter import CustomUKF
-from simulator import GasAdosorption_Breakthrough_simulator
+from simulator import GasAdosorptionBreakthroughsimulator
 
 
 class Assimilator:
@@ -36,7 +36,7 @@ class Assimilator:
         os.makedirs(self.output_foldapath_csv, exist_ok=True)
         os.makedirs(self.output_foldapath_png, exist_ok=True)
         # 物理モデルの初期化
-        self.simulator = GasAdosorption_Breakthrough_simulator(self.cond_id)
+        self.simulator = GasAdosorptionBreakthroughsimulator(self.cond_id)
         self.num_tower = self.simulator.sim_conds[1]["NUM_TOWER"]
         self.num_str = self.simulator.sim_conds[1]["CELL_SPLIT"]["num_str"]
         self.num_sec = self.simulator.sim_conds[1]["CELL_SPLIT"]["num_sec"]

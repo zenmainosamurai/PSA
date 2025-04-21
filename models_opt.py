@@ -11,7 +11,7 @@ import sqlite3
 import multiprocessing
 
 from utils import const, init_functions, plot_csv
-from simulator import GasAdosorption_Breakthrough_simulator
+from simulator import GasAdosorptionBreakthroughsimulator
 
 import warnings
 
@@ -133,7 +133,7 @@ class GasAdosorption_for_Optimize:
                 for _tower_num in [1, 2, 3]:
                     f.write(f"params_T{_tower_num} = {params_dict[_tower_num]}\n")
             # パラメータの置換
-            instance = GasAdosorption_Breakthrough_simulator(self.cond_id)
+            instance = GasAdosorptionBreakthroughsimulator(self.cond_id)
             for _tower_num, tgt_tower_params in params_dict.items():
                 for cond_category, tgt_conds in tgt_tower_params.items():
                     for cond_name, value in tgt_conds.items():
@@ -264,7 +264,7 @@ class GasAdosorption_for_Optimize:
     def calc_score(self, params_dict):
         """物理計算を通しで実行"""
         # インスタンス化
-        instance = GasAdosorption_Breakthrough_simulator(self.cond_id)
+        instance = GasAdosorptionBreakthroughsimulator(self.cond_id)
         # パラメータ置換
         for _tower_num, tgt_tower_params in params_dict.items():
             for cond_category, tgt_conds in tgt_tower_params.items():

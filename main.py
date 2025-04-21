@@ -1,7 +1,7 @@
 import yaml
 import time
 
-from simulator import GasAdosorption_Breakthrough_simulator
+from simulator import GasAdosorptionBreakthroughsimulator
 from assimilator import Assimilator
 from models_opt import GasAdosorption_for_Optimize
 
@@ -22,7 +22,7 @@ if __name__ == "__main__":
             for cond_id in main_cond["cond_list"]:
                 print("シミュレーション 実施中 ...")
                 print("cond = ", cond_id)
-                instance = GasAdosorption_Breakthrough_simulator(cond_id)
+                instance = GasAdosorptionBreakthroughsimulator(cond_id)
                 instance.execute_simulation()
         # データ同化
         if mode == "assimilation":
