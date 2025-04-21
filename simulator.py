@@ -87,9 +87,6 @@ class GasAdosorption_Breakthrough_simulator:
         self.df_operation = pd.read_excel(filepath, index_col="工程", sheet_name="工程")
 
         # その他初期化
-        # NOTE: test記録用
-        self.record_test = []
-        self.record_test2 = []
 
     def _init_variables(self):
         """各塔の状態変数を初期化
@@ -225,7 +222,7 @@ class GasAdosorption_Breakthrough_simulator:
             )
             print(f"プロセス {p}: done. timestamp: {round(timestamp,2)}")
             # プロセス終了時刻の記録
-            p_end_dict[p] = timestamp
+            p_end_dict[p] = round(timestamp, 2)
 
         ### ◆(3/4) csv出力 -------------------------------------------------
         print("(2/3) csv output...")
@@ -244,13 +241,6 @@ class GasAdosorption_Breakthrough_simulator:
         self.df_operation.to_csv(
             _tgt_foldapath + "/プロセス終了時刻.csv", encoding="shift-jis"
         )
-        # NOTE: test用
-        pd.DataFrame(self.record_test, columns=["diff_press [MPaA]"]).to_csv(
-            _tgt_foldapath + "/塔23圧力差.csv"
-        )  # , encoding="shift-jis")
-        pd.DataFrame(self.record_test2, columns=["排気後全圧 [MPaA]"]).to_csv(
-            _tgt_foldapath + "/排気後全圧.csv"
-        )  # , encoding="shift-jis")
 
         ### ◆(4/4) 可視化 -------------------------------------------------
         print("(3/3) png output...")
@@ -560,8 +550,6 @@ class GasAdosorption_Breakthrough_simulator:
                 variables=variables,
                 downflow_total_press=other_tower_params,
             )
-            # NOTE: test用
-            self.record_test.append(calc_output["total_press"])
         # 均圧_加圧
         elif mode == "均圧_加圧":
             calc_output = models.equalization_pressure_pressurization(
@@ -575,10 +563,6 @@ class GasAdosorption_Breakthrough_simulator:
         elif mode == "真空脱着":
             calc_output = models.desorption_by_vacuuming(
                 sim_conds=sim_conds, stream_conds=stream_conds, variables=variables
-            )
-            # NOTE: test2用
-            self.record_test2.append(
-                calc_output["accum_vacuum_amt"]["total_press_after_vacuum"]
             )
 
         ### 2. 状態変数の抽出 ----------------------------------------
