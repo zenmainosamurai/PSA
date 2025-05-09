@@ -17,14 +17,19 @@ if __name__ == "__main__":
         # ロガーの作成
         set_logger(log_dir=const.OUTPUT_DIR + cond_id + "/")
         logger = getLogger(cond_id)
-        logger.info("start simulation ---------------------")
+        logger.info("start -----------------------------------")
 
         # 時間計測(開始)
         start = time.time()
 
         # シミュレーション開始
-        instance = GasAdosorptionBreakthroughsimulator(cond_id)
-        instance.execute_simulation()
+        try:
+            instance = GasAdosorptionBreakthroughsimulator(cond_id)
+            instance.execute_simulation()
+            logger.info("complete!")
+        except Exception as e:
+            logger.error(f"エラーが発生したため処理を中断します: \n{e}")
+            logger.error("break")
 
         # 時間計測(終了)
         end = time.time()
@@ -33,4 +38,3 @@ if __name__ == "__main__":
         ptime_min = int(ptime % 3600 // 60)
         ptime_s = int(ptime % 3600 % 60)
         logger.info(f"実行時間: {ptime_hour} h {ptime_min} m {ptime_s}s")
-        logger.info("complete! ---------------------")

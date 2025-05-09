@@ -1,6 +1,4 @@
-import numpy as np
 import math
-import CoolProp.CoolProp as CP
 
 
 def read_sim_conds(df_sim_conds):

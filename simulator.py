@@ -205,7 +205,7 @@ class GasAdosorptionBreakthroughsimulator:
         ### ◆(2/4) シミュレーション実行 --------------------------------------
         self.logger.info("(1/3) simulation...")
         # プロセス終了時刻記録用
-        p_end_dict = {key: 0 for key in range(len(self.df_operation))}
+        p_end_dict = {key: 0 for key in range(1, 1 + len(self.df_operation))}
         # 状態変数の初期化
         variables_tower = self._init_variables()
         # 吸着計算
