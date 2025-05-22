@@ -20,7 +20,7 @@ def compute_gas_k(T_K: float, mf_co2: float, mf_n2: float) -> float:
     P_ATM = 0.101325e6  # Pa
     k_co2 = CP.PropsSI("L", "T", T_K, "P", P_ATM, "co2")
     k_n2 = CP.PropsSI("L", "T", T_K, "P", P_ATM, "nitrogen")
-    return k_co2 * mf_co2 + k_n2 * mf_n2
+    return (k_co2 * mf_co2 + k_n2 * mf_n2) / 1000
 
 
 # ------------------------------------------------------------------

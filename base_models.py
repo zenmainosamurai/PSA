@@ -13,6 +13,8 @@ from scipy import optimize
 import CoolProp.CoolProp as CP
 
 from utils import const, init_functions, plot_csv, other_utils
+from utils.heat_transfer import calc_heat_transfer_coef as _heat_transfer_coef
+
 
 import warnings
 
@@ -47,9 +49,7 @@ def material_balance_adsorp(
     # セクション吸着材量 [g]
     Mabs = stream_conds[stream]["Mabs"] / sim_conds["COMMON_COND"]["NUM_SEC"]
     # 流入CO2, N2流量 [cm3]
-    if (
-        (section == 1) & (inflow_gas is None) & (flow_amt_depress is None)
-    ):  # 最上流セルの流入ガスによる吸着など
+    if (section == 1) & (inflow_gas is None) & (flow_amt_depress is None):  # 最上流セルの流入ガスによる吸着など
         inflow_fr_co2 = (
             sim_conds["INFLOW_GAS_COND"]["fr_co2"]
             * sim_conds["COMMON_COND"]["dt"]
@@ -100,8 +100,7 @@ def material_balance_adsorp(
     )
     # ガス比熱 [kJ/kg/K]
     gas_cp = (
-        sim_conds["INFLOW_GAS_COND"]["cp_co2"] * inflow_mf_co2
-        + sim_conds["INFLOW_GAS_COND"]["cp_n2"] * inflow_mf_n2
+        sim_conds["INFLOW_GAS_COND"]["cp_co2"] * inflow_mf_co2 + sim_conds["INFLOW_GAS_COND"]["cp_n2"] * inflow_mf_n2
     )
     # 現在雰囲気の平衡吸着量 [cm3/g-abs]
     P_KPA = p_co2 * 1000  # [kPaA]
@@ -112,8 +111,7 @@ def material_balance_adsorp(
     # 理論新規吸着量 [cm3/g-abs]
     if adsorp_amt_equilibrium >= adsorp_amt_current:
         adsorp_amt_estimate_abs = (
-            sim_conds["PACKED_BED_COND"]["ks_adsorp"]
-            ** (adsorp_amt_current / adsorp_amt_equilibrium)
+            sim_conds["PACKED_BED_COND"]["ks_adsorp"] ** (adsorp_amt_current / adsorp_amt_equilibrium)
             / sim_conds["PACKED_BED_COND"]["rho_abs"]
             * 6
             * (1 - sim_conds["PACKED_BED_COND"]["epsilon"])
@@ -130,8 +128,7 @@ def material_balance_adsorp(
         adsorp_amt_estimate = min(adsorp_amt_estimate, inflow_fr_co2)
     else:
         adsorp_amt_estimate_abs = (
-            sim_conds["PACKED_BED_COND"]["ks_desorp"]
-            ** (adsorp_amt_current / adsorp_amt_equilibrium)
+            sim_conds["PACKED_BED_COND"]["ks_desorp"] ** (adsorp_amt_current / adsorp_amt_equilibrium)
             / sim_conds["PACKED_BED_COND"]["rho_abs"]
             * 6
             * (1 - sim_conds["PACKED_BED_COND"]["epsilon"])
@@ -169,9 +166,7 @@ def material_balance_adsorp(
             # 直前値に置換
             outflow_pco2 = variables["outflow_pco2"][stream][section]
             # セクション新規吸着量とそれに伴う各変数を逆算
-            adsorp_amt_estimate = inflow_fr_co2 - outflow_pco2 * inflow_fr_n2 / (
-                total_press - outflow_pco2
-            )
+            adsorp_amt_estimate = inflow_fr_co2 - outflow_pco2 * inflow_fr_n2 / (total_press - outflow_pco2)
             # 実際の新規吸着量 [cm3/g-abs]
             adsorp_amt_estimate_abs = adsorp_amt_estimate / Mabs
             # 時間経過後吸着量 [cm3/g-abs]
@@ -189,9 +184,7 @@ def material_balance_adsorp(
             # co2分圧に置換
             outflow_pco2 = p_co2
             # セクション新規吸着量とそれに伴う各変数を逆算
-            adsorp_amt_estimate = inflow_fr_co2 - outflow_pco2 * inflow_fr_n2 / (
-                total_press - outflow_pco2
-            )
+            adsorp_amt_estimate = inflow_fr_co2 - outflow_pco2 * inflow_fr_n2 / (total_press - outflow_pco2)
             # 実際の新規吸着量 [cm3/g-abs]
             adsorp_amt_estimate_abs = adsorp_amt_estimate / Mabs
             # 時間経過後吸着量 [cm3/g-abs]
@@ -227,9 +220,7 @@ def material_balance_adsorp(
     return output
 
 
-def material_balance_desorp(
-    sim_conds, stream_conds, stream, section, variables, vacuum_output
-):
+def material_balance_desorp(sim_conds, stream_conds, stream, section, variables, vacuum_output):
     """任意セルのマテリアルバランスを計算する
         脱着モード
 
@@ -251,9 +242,7 @@ def material_balance_desorp(
         / sim_conds["VACUUMING_PIPE_COND"]["Vspace"]
     )
     # セクション空間現在物質量 [mol]
-    mol_amt_section = (
-        vacuum_output["case_inner_mol_amt_after_vacuum"] * space_ratio_section
-    )
+    mol_amt_section = vacuum_output["case_inner_mol_amt_after_vacuum"] * space_ratio_section
     # 現在気相モル量 [mol]
     inflow_fr_co2 = mol_amt_section * variables["mf_co2"][stream][section]
     inflow_fr_n2 = mol_amt_section * variables["mf_n2"][stream][section]
@@ -279,8 +268,7 @@ def material_balance_desorp(
     # 理論新規吸着量 [cm3/g-abs]
     if adsorp_amt_equilibrium >= adsorp_amt_current:
         adsorp_amt_estimate_abs = (
-            sim_conds["PACKED_BED_COND"]["ks_adsorp"]
-            ** (adsorp_amt_current / adsorp_amt_equilibrium)
+            sim_conds["PACKED_BED_COND"]["ks_adsorp"] ** (adsorp_amt_current / adsorp_amt_equilibrium)
             / sim_conds["PACKED_BED_COND"]["rho_abs"]
             * 6
             * (1 - sim_conds["PACKED_BED_COND"]["epsilon"])
@@ -297,8 +285,7 @@ def material_balance_desorp(
         adsorp_amt_estimate = min(adsorp_amt_estimate, inflow_fr_co2)
     else:
         adsorp_amt_estimate_abs = (
-            sim_conds["PACKED_BED_COND"]["ks_desorp"]
-            ** (adsorp_amt_current / adsorp_amt_equilibrium)
+            sim_conds["PACKED_BED_COND"]["ks_desorp"] ** (adsorp_amt_current / adsorp_amt_equilibrium)
             / sim_conds["PACKED_BED_COND"]["rho_abs"]
             * 6
             * (1 - sim_conds["PACKED_BED_COND"]["epsilon"])
@@ -327,20 +314,15 @@ def material_balance_desorp(
     # 気相放出後全物質量 [mol]
     desorp_mw_all_after_vacuum = desorp_mw_co2_after_vacuum + desorp_mw_n2_after_vacuum
     # 気相放出後モル分率
-    desorp_mf_co2_after_vacuum = desorp_mw_co2_after_vacuum / (
-        desorp_mw_co2_after_vacuum + desorp_mw_n2_after_vacuum
-    )
-    desorp_mf_n2_after_vacuum = desorp_mw_n2_after_vacuum / (
-        desorp_mw_co2_after_vacuum + desorp_mw_n2_after_vacuum
-    )
+    desorp_mf_co2_after_vacuum = desorp_mw_co2_after_vacuum / (desorp_mw_co2_after_vacuum + desorp_mw_n2_after_vacuum)
+    desorp_mf_n2_after_vacuum = desorp_mw_n2_after_vacuum / (desorp_mw_co2_after_vacuum + desorp_mw_n2_after_vacuum)
 
     ### その他（熱バラ渡す用） ---------------------------------------
     P = vacuum_output["total_press_after_vacuum"] * 1e6
     P_ATM = 0.101325 * 1e6
     # ガス密度 [kg/m3]
     gas_density = (
-        CP.PropsSI("D", "T", T_K, "P", P, "co2") * mf_co2
-        + CP.PropsSI("D", "T", T_K, "P", P, "nitrogen") * mf_n2
+        CP.PropsSI("D", "T", T_K, "P", P, "co2") * mf_co2 + CP.PropsSI("D", "T", T_K, "P", P, "nitrogen") * mf_n2
     )
     # ガス比熱 [kJ/kg/K]
     # NOTE: 比熱と熱伝導率と粘度は大気圧を使用
@@ -473,14 +455,8 @@ def heat_balance(
         Mgas = 0  # 弁停止・脱着モードでは0
     else:
         Mgas = (
-            material_output["inflow_fr_co2"]
-            / 1000
-            / 22.4
-            * sim_conds["INFLOW_GAS_COND"]["mw_co2"]
-            + material_output["inflow_fr_n2"]
-            / 1000
-            / 22.4
-            * sim_conds["INFLOW_GAS_COND"]["mw_n2"]
+            material_output["inflow_fr_co2"] / 1000 / 22.4 * sim_conds["INFLOW_GAS_COND"]["mw_co2"]
+            + material_output["inflow_fr_n2"] / 1000 / 22.4 * sim_conds["INFLOW_GAS_COND"]["mw_n2"]
         )
     # 流入ガス比熱 [J/g/K]
     if mode == 1:
@@ -529,30 +505,12 @@ def heat_balance(
     if stream == 1:
         Hwin = 0
     else:
-        Hwin = (
-            u1
-            * Ain
-            * (temp_inside_cell - temp_now)
-            * sim_conds["COMMON_COND"]["dt"]
-            * 60
-        )
+        Hwin = u1 * Ain * (temp_inside_cell - temp_now) * sim_conds["COMMON_COND"]["dt"] * 60
     # 外側境界への熱流束 [J]
     if stream == sim_conds["COMMON_COND"]["NUM_STR"]:
-        Hwout = (
-            hw1
-            * Aout
-            * (temp_now - temp_outside_cell)
-            * sim_conds["COMMON_COND"]["dt"]
-            * 60
-        )
+        Hwout = hw1 * Aout * (temp_now - temp_outside_cell) * sim_conds["COMMON_COND"]["dt"] * 60
     else:
-        Hwout = (
-            u1
-            * Aout
-            * (temp_now - temp_outside_cell)
-            * sim_conds["COMMON_COND"]["dt"]
-            * 60
-        )
+        Hwout = u1 * Aout * (temp_now - temp_outside_cell) * sim_conds["COMMON_COND"]["dt"] * 60
     # 下流セルへの熱流束 [J]
     if section == sim_conds["COMMON_COND"]["NUM_SEC"]:
         Hbb = (  # 下蓋への熱流束
@@ -563,13 +521,7 @@ def heat_balance(
             * 60
         )
     else:
-        Hbb = (  # 下流セルへの熱流束
-            u1
-            * Abb
-            * (temp_now - temp_below_cell)
-            * sim_conds["COMMON_COND"]["dt"]
-            * 60
-        )
+        Hbb = u1 * Abb * (temp_now - temp_below_cell) * sim_conds["COMMON_COND"]["dt"] * 60  # 下流セルへの熱流束
     # 上流セルヘの熱流束 [J]
     if section == 1:  # 上蓋からの熱流束
         Hroof = (
@@ -598,16 +550,12 @@ def heat_balance(
         "Hroof": Hroof,
         "stream": stream,
     }
-    temp_reached = optimize.newton(
-        __optimize_temp_reached, temp_now, args=args.values()
-    )
+    temp_reached = optimize.newton(__optimize_temp_reached, temp_now, args=args.values())
 
     ### 熱電対温度の計算 --------------------------------------------------------------
 
     # 熱電対熱容量 [J/K]
-    heat_capacity = (
-        sim_conds["THERMOCOUPLE_COND"]["cp"] * sim_conds["THERMOCOUPLE_COND"]["weight"]
-    )
+    heat_capacity = sim_conds["THERMOCOUPLE_COND"]["cp"] * sim_conds["THERMOCOUPLE_COND"]["weight"]
     # 熱電対側面積 [m2]
     S_side = 0.004 * np.pi * 0.1
     # 熱電対伝熱係数 [W/m2/K]
@@ -618,27 +566,19 @@ def heat_balance(
             heat_transfer
             * sim_conds["THERMOCOUPLE_COND"]["coef_heat_transfer"]
             * S_side
-            * (
-                variables["temp"][stream][section]
-                - variables["temp_thermo"][stream][section]
-            )
+            * (variables["temp"][stream][section] - variables["temp_thermo"][stream][section])
         )
     else:
         heat_flux = (
             heat_transfer
             * 100
             * S_side
-            * (
-                variables["temp"][stream][section]
-                - variables["temp_thermo"][stream][section]
-            )
+            * (variables["temp"][stream][section] - variables["temp_thermo"][stream][section])
         )
     # 熱電対上昇温度 [℃]
     temp_increase = heat_flux * sim_conds["COMMON_COND"]["dt"] * 60 / heat_capacity
     # 次時刻熱電対温度 [℃]
-    temp_thermocouple_reached = (
-        variables["temp_thermo"][stream][section] + temp_increase
-    )
+    temp_thermocouple_reached = variables["temp_thermo"][stream][section] + temp_increase
 
     output = {
         "temp_reached": temp_reached,
@@ -656,9 +596,7 @@ def heat_balance(
     return output
 
 
-def heat_balance_wall(
-    sim_conds, stream_conds, section, variables, heat_output, heat_wall_output=None
-):
+def heat_balance_wall(sim_conds, stream_conds, section, variables, heat_output, heat_wall_output=None):
     """壁面の熱バランス計算
 
     Args:
@@ -733,9 +671,7 @@ def heat_balance_wall(
         "Hbb": Hbb,
         "Hroof": Hroof,
     }
-    temp_reached = optimize.newton(
-        __optimize_temp_reached_wall, temp_now, args=args.values()
-    )
+    temp_reached = optimize.newton(__optimize_temp_reached_wall, temp_now, args=args.values())
 
     output = {
         "Hbb": Hbb,
@@ -776,12 +712,7 @@ def heat_balance_lid(sim_conds, position, variables, heat_output, heat_wall_outp
         Hout *= sim_conds["LID_COND_UP"]["Sflange_up"]
     # 底が受け取る熱(熱収支基準)
     if position == "up":
-        Hlidall_heat = (
-            heat_output[2][1]["Hroof"]
-            - heat_output[1][1]["Hroof"]
-            - Hout
-            - heat_wall_output[1]["Hroof"]
-        )
+        Hlidall_heat = heat_output[2][1]["Hroof"] - heat_output[1][1]["Hroof"] - Hout - heat_wall_output[1]["Hroof"]
     else:
         Hlidall_heat = (
             heat_output[2][sim_conds["COMMON_COND"]["NUM_SEC"]]["Hroof"]
@@ -796,9 +727,7 @@ def heat_balance_lid(sim_conds, position, variables, heat_output, heat_wall_outp
         "Hlidall_heat": Hlidall_heat,
         "position": position,
     }
-    temp_reached = optimize.newton(
-        __optimize_temp_reached_lid, temp_now, args=args.values()
-    )
+    temp_reached = optimize.newton(__optimize_temp_reached_lid, temp_now, args=args.values())
 
     output = {
         "temp_reached": temp_reached,
@@ -911,9 +840,7 @@ def total_press_after_vacuum(sim_conds, variables):
     # 積算排気N2量 [mol]
     accum_vacuum_amt_n2 = variables["vacuum_amt_n2"] + vacuum_amt_n2
     # CO2回収濃度 [%]
-    vacuum_co2_mf = (
-        accum_vacuum_amt_co2 / (accum_vacuum_amt_co2 + accum_vacuum_amt_n2)
-    ) * 100
+    vacuum_co2_mf = (accum_vacuum_amt_co2 / (accum_vacuum_amt_co2 + accum_vacuum_amt_n2)) * 100
 
     ### 排気後圧力計算 --------------------------------
     # 排気"前"の真空排気空間の現在物質量 [mol]
@@ -928,11 +855,7 @@ def total_press_after_vacuum(sim_conds, variables):
     case_inner_mol_amt_after_vacuum = max(0, case_inner_mol_amt - vacuum_amt)
     # 排気"後"の容器内部圧力 [MPaA]
     total_press_after_vacuum = (
-        case_inner_mol_amt_after_vacuum
-        * 8.314
-        * T_K
-        / sim_conds["VACUUMING_PIPE_COND"]["Vspace"]
-        * 1e-6
+        case_inner_mol_amt_after_vacuum * 8.314 * T_K / sim_conds["VACUUMING_PIPE_COND"]["Vspace"] * 1e-6
     )
 
     # 出力
@@ -1039,11 +962,7 @@ def total_press_after_depressure(sim_conds, variables, downflow_total_press):
         print("収束せず: 圧力差 =", np.abs(P_resist - P_resist_old))
     # 均圧配管流量 [m3/min]
     flow_amount_m3 = (
-        sim_conds["PRESS_EQUAL_PIPE_COND"]["Spipe"]
-        * flow_rate
-        / 60
-        * sim_conds["PRESS_EQUAL_PIPE_COND"]["coef_fr"]
-        * 5
+        sim_conds["PRESS_EQUAL_PIPE_COND"]["Spipe"] * flow_rate / 60 * sim_conds["PRESS_EQUAL_PIPE_COND"]["coef_fr"] * 5
     )
     # 均圧配管ノルマル流量 [m3/min]
     flow_amount_m3_N = flow_amount_m3 * variables["total_press"] / 0.1013
@@ -1054,10 +973,7 @@ def total_press_after_depressure(sim_conds, variables, downflow_total_press):
     # 容器上流空間を移動する物質量 [mol]
     mw_upper_space = flow_amount_m3_N * 1000 * sim_conds["COMMON_COND"]["dt"] / 22.4
     # 上流側の合計体積 [m3]
-    V_upper_tower = (
-        sim_conds["PACKED_BED_COND"]["v_pipespace"]
-        + sim_conds["PACKED_BED_COND"]["v_space"]
-    )
+    V_upper_tower = sim_conds["PACKED_BED_COND"]["v_pipespace"] + sim_conds["PACKED_BED_COND"]["v_space"]
     # 上流容器圧力変化 [MPaA]
     dP_upper = 8.314 * T_K / V_upper_tower * mw_upper_space * 1e-6
     # 次時刻の容器圧力 [MPaA]
@@ -1073,9 +989,7 @@ def total_press_after_depressure(sim_conds, variables, downflow_total_press):
     return output
 
 
-def downflow_fr_after_depressure(
-    sim_conds, stream_conds, variables, mb_dict, downflow_total_press
-):
+def downflow_fr_after_depressure(sim_conds, stream_conds, variables, mb_dict, downflow_total_press):
     """減圧計算時に下流塔の圧力・流入量を計算する
         減圧モード
 
@@ -1147,12 +1061,8 @@ def downflow_fr_after_depressure(
     outflow_fr = {}
     for stream in range(1, 1 + sim_conds["COMMON_COND"]["NUM_STR"]):
         outflow_fr[stream] = {}
-        outflow_fr[stream]["outflow_fr_co2"] = (
-            sum_outflow_fr_co2 * stream_conds[stream]["streamratio"]
-        )
-        outflow_fr[stream]["outflow_fr_n2"] = (
-            sum_outflow_fr_n2 * stream_conds[stream]["streamratio"]
-        )
+        outflow_fr[stream]["outflow_fr_co2"] = sum_outflow_fr_co2 * stream_conds[stream]["streamratio"]
+        outflow_fr[stream]["outflow_fr_n2"] = sum_outflow_fr_n2 * stream_conds[stream]["streamratio"]
 
     # 出力
     output = {
@@ -1198,16 +1108,10 @@ def total_press_after_desorp(sim_conds, variables, mf_dict, vacuum_output):
     )
     # 配管上のモル量を加算
     sum_desorp_mw += (
-        vacuum_output["total_press_after_vacuum"]
-        * 1e6
-        * sim_conds["VACUUMING_PIPE_COND"]["Vpipe"]
-        / 8.314
-        / T_K
+        vacuum_output["total_press_after_vacuum"] * 1e6 * sim_conds["VACUUMING_PIPE_COND"]["Vpipe"] / 8.314 / T_K
     )
     # 気相放出後の全圧 [MPaA]
-    total_press_after_desorp = (
-        sum_desorp_mw * 8.314 * T_K / sim_conds["VACUUMING_PIPE_COND"]["Vspace"] * 1e-6
-    )
+    total_press_after_desorp = sum_desorp_mw * 8.314 * T_K / sim_conds["VACUUMING_PIPE_COND"]["Vspace"] * 1e-6
 
     return total_press_after_desorp
 
@@ -1234,11 +1138,7 @@ def total_press_after_batch_adsorp(sim_conds, variables, series):
     # 空間体積（配管含む）
     if series:
         V = (
-            (
-                sim_conds["PACKED_BED_COND"]["v_space"]
-                + sim_conds["PACKED_BED_COND"]["v_pipespace"]
-            )
-            * 2
+            (sim_conds["PACKED_BED_COND"]["v_space"] + sim_conds["PACKED_BED_COND"]["v_pipespace"]) * 2
             + sim_conds["PACKED_BED_COND"]["v_upstream"]
             + sim_conds["PRESS_EQUAL_PIPE_COND"]["Vpipe"]
         )
@@ -1251,169 +1151,11 @@ def total_press_after_batch_adsorp(sim_conds, variables, series):
     # ノルマル体積流量
     F = sim_conds["INFLOW_GAS_COND"]["fr_all"]  # バッチ吸着: 導入ガスの流量
     # 圧力変化量
-    diff_pressure = (
-        R * temp_mean / V * (F / 22.4) * sim_conds["COMMON_COND"]["dt"] / 1e6
-    )
+    diff_pressure = R * temp_mean / V * (F / 22.4) * sim_conds["COMMON_COND"]["dt"] / 1e6
     # 変化後全圧
     total_press_after_batch_adsorp = variables["total_press"] + diff_pressure
 
     return total_press_after_batch_adsorp
-
-
-def _heat_transfer_coef(
-    sim_conds,
-    stream_conds,
-    stream,
-    section,
-    temp_now,
-    mode,
-    variables,
-    material_output,
-    vacuum_output=None,
-):
-    """層伝熱係数、壁-層伝熱係数を算出する
-
-    Args:
-        stream (int): 対象のストリーム番号
-        temp_now (float): 対象セルの現在温度
-        mode (str): 吸着・脱着等の運転モード
-        material_output (dict): 対象セルのマテバラ計算結果
-        vacuum_output (dict): 排気後圧力計算の出力（脱着時）
-
-    Returns:
-        float: 層伝熱係数、壁-層伝熱係数
-    """
-    # CoolProp用の前準備
-    T_K = temp_now + 273.15  # 温度 [K]
-    if mode == 0:  # 吸着
-        P = variables["total_press"] * 1e6  # 圧力 [Pa]
-        mf_co2 = material_output["inflow_mf_co2"]  # 流入ガスのCO2モル分率
-        mf_n2 = material_output["inflow_mf_n2"]  # 流入ガスのN2モル分率
-    elif mode == 2:  # 脱着
-        P = vacuum_output["total_press_after_vacuum"] * 1e6  # 圧力 [Pa]
-        mf_co2 = variables["mf_co2"][stream][section]  # 気相中のCO2モル分率
-        mf_n2 = variables["mf_n2"][stream][section]  # 気相中のN2モル分率
-    # 導入気体の熱伝導率 [W/m/K]
-    # NOTE: 比熱と熱伝導率と粘度は大気圧を使用
-    P_ATM = 0.101325 * 1e6
-    kf = (
-        CP.PropsSI("L", "T", T_K, "P", P_ATM, "co2") * mf_co2
-        + CP.PropsSI("L", "T", T_K, "P", P_ATM, "nitrogen") * mf_n2
-    ) / 1000
-    # 充填剤の熱伝導率 [W/m/K]
-    kp = sim_conds["PACKED_BED_COND"]["lambda_col"]
-    # Yagi-Kunii式 1
-    Phi_1 = 0.15
-    # Yagi-Kunii式 2
-    Phi_2 = 0.07
-    # Yagi-Kunii式 3
-    Phi = (
-        Phi_2
-        + (Phi_1 - Phi_2) * (sim_conds["PACKED_BED_COND"]["epsilon"] - 0.26) / 0.26
-    )
-    # Yagi-Kunii式 4
-    hrv = (
-        0.227
-        / (
-            1
-            + sim_conds["PACKED_BED_COND"]["epsilon"]
-            / 2
-            / (1 - sim_conds["PACKED_BED_COND"]["epsilon"])
-            * (1 - sim_conds["PACKED_BED_COND"]["epsilon_p"])
-            / sim_conds["PACKED_BED_COND"]["epsilon_p"]
-        )
-    ) * ((temp_now + 273.15) / 100) ** 3
-    # Yagi-Kunii式 5
-    hrp = (
-        0.227
-        * sim_conds["PACKED_BED_COND"]["epsilon_p"]
-        / (2 - sim_conds["PACKED_BED_COND"]["epsilon_p"])
-        * ((temp_now + 273.15) / 100) ** 3
-    )
-    # Yagi-Kunii式 6
-    ksi = 1 / Phi + hrp * sim_conds["PACKED_BED_COND"]["dp"] / kf
-    # Yagi-Kunii式 7
-    ke0_kf = sim_conds["PACKED_BED_COND"]["epsilon"] * (
-        1 + hrv * sim_conds["PACKED_BED_COND"]["dp"] / kf
-    ) + (1 - sim_conds["PACKED_BED_COND"]["epsilon"]) / (1 / ksi + 2 * kf / 3 / kp)
-    # 静止充填層有効熱伝導率 [W/m/K]
-    ke0 = kf * ke0_kf
-    # ストリーム換算直径 [m]
-    d1 = 2 * (stream_conds[stream]["Sstream"] / math.pi) ** 0.5
-    # 気体粘度 [Pas]
-    # NOTE: 比熱と熱伝導率と粘度は大気圧を使用
-    P_ATM = 0.101325 * 1e6
-    mu = (
-        CP.PropsSI("V", "T", T_K, "P", P_ATM, "co2") * mf_co2
-        + CP.PropsSI("V", "T", T_K, "P", P_ATM, "nitrogen") * mf_n2
-    )
-    # プラントル数
-    Pr = mu * 1000 * material_output["gas_cp"] / kf
-    # 流入ガス体積流量 [m3/s]
-    if mode == 0:
-        f0 = (
-            (material_output["inflow_fr_co2"] + material_output["inflow_fr_n2"])
-            / 1e6
-            / (sim_conds["COMMON_COND"]["dt"] * 60)
-        )
-    elif mode == 2:  # 脱着時は排気ガス体積流量 [m3/s]
-        f0 = vacuum_output["vacuum_rate_N"] / 60 * stream_conds[stream]["streamratio"]
-    # ストリーム空塔速度 [m/s]
-    vcol = f0 / stream_conds[stream]["Sstream"]
-    # 気体動粘度 [m2/s]
-    nu = mu / material_output["gas_density"]
-    # 粒子レイノルズ数
-    if vcol == 0:
-        Rep = 1
-    else:
-        Rep = vcol * sim_conds["PACKED_BED_COND"]["dp"] / nu
-    # 充填層有効熱伝導率 1
-    psi_beta = (
-        1.0985 * (sim_conds["PACKED_BED_COND"]["dp"] / d1) ** 2
-        - 0.5192 * (sim_conds["PACKED_BED_COND"]["dp"] / d1)
-        + 0.1324
-    )
-    # 充填層有効熱伝導率 2
-    ke_kf = ke0 / kf + psi_beta * Pr * Rep
-    # 充填層有効熱伝導率 3 [W/m/K]
-    ke = ke_kf * kf
-    # ヌッセルト数
-    Nup = 0.84 * Rep
-    # 粒子‐流体間熱伝達率 [W/m2/K]
-    habs = Nup / sim_conds["PACKED_BED_COND"]["dp"] * kf
-    # 隙間係数
-    a = 2
-    # 格子長さ [m]
-    l0 = sim_conds["PACKED_BED_COND"]["dp"] * a * 2 / 2**0.5
-    # 粒子代表長さ [m]
-    dlat = l0 * (1 - sim_conds["PACKED_BED_COND"]["epsilon"])
-    # 代表長さ（セクション全長）1
-    c0 = 4
-    # 代表長さ（セクション全長）2
-    Lambda_2 = c0 * Pr ** (1 / 3) * Rep ** (1 / 2)
-    # 代表長さ（セクション全長）3
-    knew = ke + 1 / (1 / (0.02 * Pr * Rep) + 2 / Lambda_2)
-    # 代表長さ（セクション全長）4
-    Lambda_1 = 2 / (kf / ke - kf / knew)
-    # 代表長さ（セクション全長）5
-    b0 = 0.5 * Lambda_1 * d1 / sim_conds["PACKED_BED_COND"]["dp"] * kf / ke
-    # 代表長さ（セクション全長）6
-    Phi_b = 0.0775 * np.log(b0) + 0.028
-    # 代表長さ（セクション全長）7
-    a12 = 0.9107 * np.log(b0) + 2.2395
-    # 代表長さ（セクション全長）8 [m]
-    Lp = sim_conds["PACKED_BED_COND"]["Lbed"] / sim_conds["COMMON_COND"]["NUM_SEC"]
-    # 粒子層-壁面伝熱ヌッセルト数 1
-    y0 = 4 * sim_conds["PACKED_BED_COND"]["dp"] / d1 * Lp / d1 * ke_kf / (Pr * Rep)
-    # 粒子層-壁面伝熱ヌッセルト数 1
-    Nupw = sim_conds["PACKED_BED_COND"]["dp"] / d1 * ke_kf * (a12 + Phi_b / y0)
-    # 壁-層伝熱係数 [W/m2/K]
-    hw1 = Nupw / sim_conds["PACKED_BED_COND"]["dp"] * kf
-    hw1 *= sim_conds["DRUM_WALL_COND"]["coef_hw1"]
-    # 層伝熱係数 [W/m2/K]
-    u1 = 1 / (dlat / ke + 1 / habs)
-
-    return hw1, u1
 
 
 def _equilibrium_adsorp_amt(P, T):
@@ -1429,11 +1171,7 @@ def _equilibrium_adsorp_amt(P, T):
     adsorp_amt_equilibrium = (
         P
         * (252.0724 - 0.50989705 * T)
-        / (
-            P
-            - 3554.54819062669 * (1 - 0.0655247236249063 * np.sqrt(T)) ** 3
-            + 1.7354268
-        )
+        / (P - 3554.54819062669 * (1 - 0.0655247236249063 * np.sqrt(T)) ** 3 + 1.7354268)
     )
     return adsorp_amt_equilibrium
 
@@ -1506,9 +1244,7 @@ def __optimize_temp_reached_wall(
     return Hwall_heat_blc - Hwall_time
 
 
-def __optimize_temp_reached_lid(
-    temp_reached, sim_conds, temp_now, Hlidall_heat, position
-):
+def __optimize_temp_reached_lid(temp_reached, sim_conds, temp_now, Hlidall_heat, position):
     """上下蓋の到達温度算出におけるソルバー用関数
 
     Args:
