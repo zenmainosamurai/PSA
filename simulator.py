@@ -1,3 +1,4 @@
+from copy import deepcopy
 import os
 import datetime
 import yaml
@@ -61,17 +62,13 @@ class GasAdosorptionBreakthroughsimulator:
         for _tower_num in [1, 2, 3]:
             self.stream_conds[_tower_num] = {}
             for stream in range(1, 1 + self.num_str):
-                self.stream_conds[_tower_num][stream] = (
-                    init_functions.init_stream_conds(  # 各ストリーム
-                        self.sim_conds[_tower_num],
-                        stream,
-                        self.stream_conds[_tower_num],
-                    )
+                self.stream_conds[_tower_num][stream] = init_functions.init_stream_conds(  # 各ストリーム
+                    self.sim_conds[_tower_num],
+                    stream,
+                    self.stream_conds[_tower_num],
                 )
-            self.stream_conds[_tower_num][stream + 1] = (
-                init_functions.init_drum_wall_conds(  # 壁面
-                    self.sim_conds[_tower_num], self.stream_conds[_tower_num]
-                )
+            self.stream_conds[_tower_num][stream + 1] = init_functions.init_drum_wall_conds(  # 壁面
+                self.sim_conds[_tower_num], self.stream_conds[_tower_num]
             )
 
         # 観測値(data)の読み込み
@@ -79,12 +76,8 @@ class GasAdosorptionBreakthroughsimulator:
         if filepath[-3:] == "csv":
             self.df_obs = pd.read_csv(filepath, index_col=0)
         else:
-            self.df_obs = pd.read_excel(
-                filepath, sheet_name=self.sim_conds[1]["sheet_name"], index_col="time"
-            )
-        self.df_obs = other_utils.resample_obs_data(
-            self.df_obs, self.dt
-        )  # リサンプリング
+            self.df_obs = pd.read_excel(filepath, sheet_name=self.sim_conds[1]["sheet_name"], index_col="time")
+        self.df_obs = other_utils.resample_obs_data(self.df_obs, self.dt)  # リサンプリング
 
         # 稼働表の読み込み
         filepath = const.CONDITIONS_DIR + self.cond_id + "/" + "稼働工程表.xlsx"
@@ -108,37 +101,37 @@ class GasAdosorptionBreakthroughsimulator:
             for stream in range(1, 1 + self.num_str):
                 variables_tower[_tower_num]["temp"][stream] = {}
                 for section in range(1, 1 + self.num_sec):
-                    variables_tower[_tower_num]["temp"][stream][section] = (
-                        self.sim_conds[_tower_num]["DRUM_WALL_COND"]["temp_outside"]
-                    )
+                    variables_tower[_tower_num]["temp"][stream][section] = self.sim_conds[_tower_num]["DRUM_WALL_COND"][
+                        "temp_outside"
+                    ]
             # 壁面温度
             variables_tower[_tower_num]["temp_wall"] = {}
             for section in range(1, 1 + self.num_sec):
-                variables_tower[_tower_num]["temp_wall"][section] = self.sim_conds[
-                    _tower_num
-                ]["DRUM_WALL_COND"]["temp_outside"]
+                variables_tower[_tower_num]["temp_wall"][section] = self.sim_conds[_tower_num]["DRUM_WALL_COND"][
+                    "temp_outside"
+                ]
             # 上下蓋の温度
             variables_tower[_tower_num]["temp_lid"] = {}
             for position in ["up", "down"]:
-                variables_tower[_tower_num]["temp_lid"][position] = self.sim_conds[
-                    _tower_num
-                ]["DRUM_WALL_COND"]["temp_outside"]
+                variables_tower[_tower_num]["temp_lid"][position] = self.sim_conds[_tower_num]["DRUM_WALL_COND"][
+                    "temp_outside"
+                ]
             # 各セルの熱電対温度
             variables_tower[_tower_num]["temp_thermo"] = {}
             for stream in range(1, 1 + self.num_str):
                 variables_tower[_tower_num]["temp_thermo"][stream] = {}
                 for section in range(1, 1 + self.num_sec):
-                    variables_tower[_tower_num]["temp_thermo"][stream][section] = (
-                        self.sim_conds[_tower_num]["DRUM_WALL_COND"]["temp_outside"]
-                    )
+                    variables_tower[_tower_num]["temp_thermo"][stream][section] = self.sim_conds[_tower_num][
+                        "DRUM_WALL_COND"
+                    ]["temp_outside"]
             # 吸着量
             variables_tower[_tower_num]["adsorp_amt"] = {}
             for stream in range(1, 1 + self.num_str):
                 variables_tower[_tower_num]["adsorp_amt"][stream] = {}
                 for section in range(1, 1 + self.num_sec):
-                    variables_tower[_tower_num]["adsorp_amt"][stream][section] = (
-                        self.sim_conds[_tower_num]["PACKED_BED_COND"]["init_adsorp_amt"]
-                    )
+                    variables_tower[_tower_num]["adsorp_amt"][stream][section] = self.sim_conds[_tower_num][
+                        "PACKED_BED_COND"
+                    ]["init_adsorp_amt"]
             # モル分率
             variables_tower[_tower_num]["mf_co2"] = {}
             variables_tower[_tower_num]["mf_n2"] = {}
@@ -146,12 +139,12 @@ class GasAdosorptionBreakthroughsimulator:
                 variables_tower[_tower_num]["mf_co2"][stream] = {}
                 variables_tower[_tower_num]["mf_n2"][stream] = {}
                 for section in range(1, 1 + self.num_sec):
-                    variables_tower[_tower_num]["mf_co2"][stream][section] = (
-                        self.sim_conds[_tower_num]["INFLOW_GAS_COND"]["mf_co2"]
-                    )
-                    variables_tower[_tower_num]["mf_n2"][stream][section] = (
-                        self.sim_conds[_tower_num]["INFLOW_GAS_COND"]["mf_n2"]
-                    )
+                    variables_tower[_tower_num]["mf_co2"][stream][section] = self.sim_conds[_tower_num][
+                        "INFLOW_GAS_COND"
+                    ]["mf_co2"]
+                    variables_tower[_tower_num]["mf_n2"][stream][section] = self.sim_conds[_tower_num][
+                        "INFLOW_GAS_COND"
+                    ]["mf_n2"]
             # 壁-、層伝熱係数
             variables_tower[_tower_num]["heat_t_coef"] = {}  # 層伝熱係数
             variables_tower[_tower_num]["heat_t_coef_wall"] = {}  # 壁-層伝熱係数
@@ -160,13 +153,9 @@ class GasAdosorptionBreakthroughsimulator:
                 variables_tower[_tower_num]["heat_t_coef_wall"][stream] = {}
                 for section in range(1, 1 + self.num_sec):
                     variables_tower[_tower_num]["heat_t_coef"][stream][section] = 1e-5
-                    variables_tower[_tower_num]["heat_t_coef_wall"][stream][
-                        section
-                    ] = 14
+                    variables_tower[_tower_num]["heat_t_coef_wall"][stream][section] = 14
             # 全圧
-            variables_tower[_tower_num]["total_press"] = self.df_obs.loc[
-                0, f"T{_tower_num}_press"
-            ]
+            variables_tower[_tower_num]["total_press"] = self.df_obs.loc[0, f"T{_tower_num}_press"]
             # CO2, N2回収量 [mol]
             variables_tower[_tower_num]["vacuum_amt_co2"] = 0
             variables_tower[_tower_num]["vacuum_amt_n2"] = 0
@@ -175,9 +164,9 @@ class GasAdosorptionBreakthroughsimulator:
             for stream in range(1, 1 + self.num_str):
                 variables_tower[_tower_num]["outflow_pco2"][stream] = {}
                 for section in range(1, 1 + self.num_sec):
-                    variables_tower[_tower_num]["outflow_pco2"][stream][section] = (
-                        variables_tower[_tower_num]["total_press"]
-                    )
+                    variables_tower[_tower_num]["outflow_pco2"][stream][section] = variables_tower[_tower_num][
+                        "total_press"
+                    ]
 
         return variables_tower
 
@@ -216,24 +205,20 @@ class GasAdosorptionBreakthroughsimulator:
             # 終了条件(文字列)の抽出
             termination_cond = self.df_operation.loc[p, "終了条件"]
             # プロセスpにおける各塔の吸着計算実施
-            timestamp, variables_tower, record_dict, success = (
-                self.calc_adsorption_process(
-                    mode_list=mode_list,
-                    termination_cond_str=termination_cond,
-                    variables_tower=variables_tower,
-                    record_dict=record_dict,
-                    timestamp=timestamp,
-                    filtered_x=filtered_states,
-                )
+            timestamp, variables_tower, record_dict, success = self.calc_adsorption_process(
+                mode_list=mode_list,
+                termination_cond_str=termination_cond,
+                variables_tower=variables_tower,
+                record_dict=record_dict,
+                timestamp=timestamp,
+                filtered_x=filtered_states,
             )
             self.logger.info(f"プロセス {p}: done. timestamp: {round(timestamp,2)}")
             # プロセス終了時刻の記録
             p_end_dict[p] = round(timestamp, 2)
             # 処理が中断された場合、次のステップに移行
             if not success:
-                self.logger.warning(
-                    f"工程 {p} でエラーが発生したため、後続処理をスキップします"
-                )
+                self.logger.warning(f"工程 {p} でエラーが発生したため、後続処理をスキップします")
                 break
 
         ### ◆(3/4) csv出力 -------------------------------------------------
@@ -250,9 +235,7 @@ class GasAdosorptionBreakthroughsimulator:
         # プロセス終了時刻
         _tgt_foldapath = output_foldapath
         self.df_operation["終了時刻(min)"] = p_end_dict.values()
-        self.df_operation.to_csv(
-            _tgt_foldapath + "/プロセス終了時刻.csv", encoding="shift-jis"
-        )
+        self.df_operation.to_csv(_tgt_foldapath + "/プロセス終了時刻.csv", encoding="shift-jis")
 
         ### ◆(4/4) 可視化 -------------------------------------------------
         self.logger.info("(3/3) png output...")
@@ -338,9 +321,7 @@ class GasAdosorptionBreakthroughsimulator:
                 # 時間超過による強制終了
                 time_threshold = 20
                 if timestamp_p >= time_threshold:
-                    self.logger.warning(
-                        f"{time_threshold}分以内に終了しなかったため強制終了"
-                    )
+                    self.logger.warning(f"{time_threshold}分以内に終了しなかったため強制終了")
                     return timestamp + timestamp_p, variables_tower, record_dict, False
             return timestamp + timestamp_p, variables_tower, record_dict, True
 
@@ -372,12 +353,8 @@ class GasAdosorptionBreakthroughsimulator:
             ["流通吸着_単独/上流", "流通吸着_下流"],  # [上流, 下流]
             ["バッチ吸着_上流", "バッチ吸着_下流"],
         ]
-        cond1 = (up_and_down_mode_list[0][0] in mode_list) and (
-            up_and_down_mode_list[0][1] in mode_list
-        )
-        cond2 = (up_and_down_mode_list[1][0] in mode_list) and (
-            up_and_down_mode_list[1][1] in mode_list
-        )
+        cond1 = (up_and_down_mode_list[0][0] in mode_list) and (up_and_down_mode_list[0][1] in mode_list)
+        cond2 = (up_and_down_mode_list[1][0] in mode_list) and (up_and_down_mode_list[1][1] in mode_list)
         if cond1 | cond2:
             # 上流から実施
             if cond1:
@@ -498,9 +475,7 @@ class GasAdosorptionBreakthroughsimulator:
 
         return new_variables_tower, record_outputs_tower
 
-    def branch_operation_mode(
-        self, sim_conds, stream_conds, mode, variables, other_tower_params=None
-    ):
+    def branch_operation_mode(self, sim_conds, stream_conds, mode, variables, other_tower_params=None):
         """稼働モードxの時のガス吸着計算を行う
 
         Args:
@@ -518,7 +493,7 @@ class GasAdosorptionBreakthroughsimulator:
         # 初回ガス導入
         if mode == "初回ガス導入":
             # 0. 前準備
-            sim_conds_copy = sim_conds.copy()
+            sim_conds_copy = deepcopy(sim_conds)
             sim_conds_copy["INFLOW_GAS_COND"]["fr_co2"] = 20
             sim_conds_copy["INFLOW_GAS_COND"]["fr_n2"] = 25.2
             calc_output = models.initial_adsorption(
@@ -526,9 +501,7 @@ class GasAdosorptionBreakthroughsimulator:
             )
         # 停止
         elif mode == "停止":
-            calc_output = models.stop_mode(
-                sim_conds=sim_conds, stream_conds=stream_conds, variables=variables
-            )
+            calc_output = models.stop_mode(sim_conds=sim_conds, stream_conds=stream_conds, variables=variables)
         # 流通吸着_単独/上流
         elif mode == "流通吸着_単独/上流":
             calc_output = models.flow_adsorption_single_or_upstream(
@@ -614,37 +587,31 @@ class GasAdosorptionBreakthroughsimulator:
         for stream in range(1, 1 + self.num_str):
             new_variables["temp"][stream] = {}
             for section in range(1, 1 + self.num_sec):
-                new_variables["temp"][stream][section] = calc_output["heat"][stream][
-                    section
-                ]["temp_reached"]
+                new_variables["temp"][stream][section] = calc_output["heat"][stream][section]["temp_reached"]
         # 温度（壁面）
         new_variables["temp_wall"] = {}
         for section in range(1, 1 + self.num_sec):
-            new_variables["temp_wall"][section] = calc_output["heat_wall"][section][
-                "temp_reached"
-            ]
+            new_variables["temp_wall"][section] = calc_output["heat_wall"][section]["temp_reached"]
         # 上下蓋の温度
         new_variables["temp_lid"] = {}
         for position in ["up", "down"]:
-            new_variables["temp_lid"][position] = calc_output["heat_lid"][position][
-                "temp_reached"
-            ]
+            new_variables["temp_lid"][position] = calc_output["heat_lid"][position]["temp_reached"]
         # 熱電対温度
         new_variables["temp_thermo"] = {}
         for stream in range(1, 1 + self.num_str):
             new_variables["temp_thermo"][stream] = {}
             for section in range(1, 1 + self.num_sec):
-                new_variables["temp_thermo"][stream][section] = calc_output["heat"][
-                    stream
-                ][section]["temp_thermocouple_reached"]
+                new_variables["temp_thermo"][stream][section] = calc_output["heat"][stream][section][
+                    "temp_thermocouple_reached"
+                ]
         # 既存吸着量
         new_variables["adsorp_amt"] = {}
         for stream in range(1, 1 + self.num_str):
             new_variables["adsorp_amt"][stream] = {}
             for section in range(1, 1 + self.num_sec):
-                new_variables["adsorp_amt"][stream][section] = calc_output["material"][
-                    stream
-                ][section]["accum_adsorp_amt"]
+                new_variables["adsorp_amt"][stream][section] = calc_output["material"][stream][section][
+                    "accum_adsorp_amt"
+                ]
         # モル分率
         new_variables["mf_co2"] = {}
         new_variables["mf_n2"] = {}
@@ -661,36 +628,28 @@ class GasAdosorptionBreakthroughsimulator:
                 new_variables["mf_co2"][stream] = {}
                 new_variables["mf_n2"][stream] = {}
                 for section in range(1, 1 + self.num_sec):  # 吸着時は「流出モル分率」
-                    new_variables["mf_co2"][stream][section] = calc_output["material"][
-                        stream
-                    ][section]["outflow_mf_co2"]
-                    new_variables["mf_n2"][stream][section] = calc_output["material"][
-                        stream
-                    ][section]["outflow_mf_n2"]
+                    new_variables["mf_co2"][stream][section] = calc_output["material"][stream][section][
+                        "outflow_mf_co2"
+                    ]
+                    new_variables["mf_n2"][stream][section] = calc_output["material"][stream][section]["outflow_mf_n2"]
         elif mode in ["真空脱着"]:
             for stream in range(1, 1 + self.num_str):
                 new_variables["mf_co2"][stream] = {}
                 new_variables["mf_n2"][stream] = {}
-                for section in range(
-                    1, 1 + self.num_sec
-                ):  # 脱着時は「脱着後のモル分率」
-                    new_variables["mf_co2"][stream][section] = calc_output[
-                        "mol_fraction"
-                    ][stream][section]["mf_co2_after_vacuum"]
-                    new_variables["mf_n2"][stream][section] = calc_output[
-                        "mol_fraction"
-                    ][stream][section]["mf_n2_after_vacuum"]
+                for section in range(1, 1 + self.num_sec):  # 脱着時は「脱着後のモル分率」
+                    new_variables["mf_co2"][stream][section] = calc_output["mol_fraction"][stream][section][
+                        "mf_co2_after_vacuum"
+                    ]
+                    new_variables["mf_n2"][stream][section] = calc_output["mol_fraction"][stream][section][
+                        "mf_n2_after_vacuum"
+                    ]
         elif mode in ["停止"]:
             for stream in range(1, 1 + self.num_str):
                 new_variables["mf_co2"][stream] = {}
                 new_variables["mf_n2"][stream] = {}
                 for section in range(1, 1 + self.num_sec):  # 停止時は直前のモル分率
-                    new_variables["mf_co2"][stream][section] = variables["mf_co2"][
-                        stream
-                    ][section]
-                    new_variables["mf_n2"][stream][section] = variables["mf_n2"][
-                        stream
-                    ][section]
+                    new_variables["mf_co2"][stream][section] = variables["mf_co2"][stream][section]
+                    new_variables["mf_n2"][stream][section] = variables["mf_n2"][stream][section]
         # 壁―, 層伝熱係数
         new_variables["heat_t_coef"] = {}
         new_variables["heat_t_coef_wall"] = {}
@@ -698,12 +657,8 @@ class GasAdosorptionBreakthroughsimulator:
             new_variables["heat_t_coef"][stream] = {}
             new_variables["heat_t_coef_wall"][stream] = {}
             for section in range(1, 1 + self.num_sec):
-                new_variables["heat_t_coef"][stream][section] = calc_output["heat"][
-                    stream
-                ][section]["hw1"]
-                new_variables["heat_t_coef_wall"][stream][section] = calc_output[
-                    "heat"
-                ][stream][section]["u1"]
+                new_variables["heat_t_coef"][stream][section] = calc_output["heat"][stream][section]["hw1"]
+                new_variables["heat_t_coef_wall"][stream][section] = calc_output["heat"][stream][section]["u1"]
         # 全圧
         if mode in ["初回ガス導入", "バッチ吸着_上流", "均圧_加圧", "バッチ吸着_下流"]:
             new_variables["total_press"] = calc_output["total_press_after_batch_adsorp"]
@@ -715,12 +670,8 @@ class GasAdosorptionBreakthroughsimulator:
             new_variables["total_press"] = variables["total_press"]
         # CO2, N2回収量 [mol]
         if mode in ["真空脱着"]:
-            new_variables["vacuum_amt_co2"] = calc_output["accum_vacuum_amt"][
-                "accum_vacuum_amt_co2"
-            ]
-            new_variables["vacuum_amt_n2"] = calc_output["accum_vacuum_amt"][
-                "accum_vacuum_amt_n2"
-            ]
+            new_variables["vacuum_amt_co2"] = calc_output["accum_vacuum_amt"]["accum_vacuum_amt_co2"]
+            new_variables["vacuum_amt_n2"] = calc_output["accum_vacuum_amt"]["accum_vacuum_amt_n2"]
         else:
             new_variables["vacuum_amt_co2"] = 0
             new_variables["vacuum_amt_n2"] = 0
@@ -729,9 +680,9 @@ class GasAdosorptionBreakthroughsimulator:
         for stream in range(1, 1 + self.num_str):
             new_variables["outflow_pco2"][stream] = {}
             for section in range(1, 1 + self.num_sec):
-                new_variables["outflow_pco2"][stream][section] = calc_output[
-                    "material"
-                ][stream][section]["outflow_pco2"]
+                new_variables["outflow_pco2"][stream][section] = calc_output["material"][stream][section][
+                    "outflow_pco2"
+                ]
 
         return new_variables
 
@@ -760,9 +711,7 @@ class GasAdosorptionBreakthroughsimulator:
                 [1e-8, filtered_x.loc[_tgt_index, f"T{_tower_num}_adsorp_heat_co2"]]
             )
 
-    def _create_termination_cond(
-        self, termination_cond_str, variables_tower, timestamp, timestamp_p
-    ):
+    def _create_termination_cond(self, termination_cond_str, variables_tower, timestamp, timestamp_p):
         """文字列の終了条件からブール値の終了条件を作成する
 
         Args:
@@ -779,10 +728,7 @@ class GasAdosorptionBreakthroughsimulator:
             target_temp = float(cond_list[2])  # 目標温度
             target_section = self.num_sec  # 温度測定するセクション
             temp_now = np.mean(
-                [
-                    variables_tower[tower_num]["temp"][stream][target_section]
-                    for stream in range(1, 1 + self.num_str)
-                ]
+                [variables_tower[tower_num]["temp"][stream][target_section] for stream in range(1, 1 + self.num_str)]
             )
             return temp_now < target_temp
 

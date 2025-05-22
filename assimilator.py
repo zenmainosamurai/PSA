@@ -1,3 +1,4 @@
+from copy import deepcopy
 import os
 import sys
 import yaml
@@ -27,12 +28,8 @@ class Assimilator:
         # クラス変数初期化
         self.cond_id = cond_id
         # 出力先フォルダ
-        self.output_foldapath_csv = (
-            const.OUTPUT_DIR + f"{self.cond_id}/assimilation/csv/"
-        )
-        self.output_foldapath_png = (
-            const.OUTPUT_DIR + f"{self.cond_id}/assimilation/png/"
-        )
+        self.output_foldapath_csv = const.OUTPUT_DIR + f"{self.cond_id}/assimilation/csv/"
+        self.output_foldapath_png = const.OUTPUT_DIR + f"{self.cond_id}/assimilation/png/"
         os.makedirs(self.output_foldapath_csv, exist_ok=True)
         os.makedirs(self.output_foldapath_png, exist_ok=True)
         # 物理モデルの初期化
@@ -67,17 +64,13 @@ class Assimilator:
         # データ同化実施
         timestamp = 0
         timestamp_list = []
-        _time_limit = self.simulator.df_operation["手動終了時刻"].iloc[
-            -1
-        ]  # 手動終了時刻の最後
+        _time_limit = self.simulator.df_operation["手動終了時刻"].iloc[-1]  # 手動終了時刻の最後
         while timestamp < _time_limit:
             # filtering
             self.filtering(timestamp)
             # 記録
             filtered_x = np.concatenate([filtered_x, self.ukf.x.reshape((1, -1))])
-            filtered_p = np.concatenate(
-                [filtered_p, self.ukf.P.reshape((1, len(self.ukf.x), -1))]
-            )
+            filtered_p = np.concatenate([filtered_p, self.ukf.P.reshape((1, len(self.ukf.x), -1))])
             # 時刻更新
             timestamp_list.append(timestamp)
             timestamp += self.dt
@@ -101,13 +94,9 @@ class Assimilator:
                     columns.append(f"T{tower_num}_{cond_name}")
         index_ = timestamp_list
         df_filtered_x = pd.DataFrame(filtered_x, columns=columns, index=index_)
-        df_filtered_p = pd.DataFrame(
-            [list(val.diagonal()) for val in filtered_p], columns=columns, index=index_
-        )
+        df_filtered_p = pd.DataFrame([list(val.diagonal()) for val in filtered_p], columns=columns, index=index_)
         df_smoothed_x = pd.DataFrame(sm_x, columns=columns, index=index_)
-        df_smoothed_p = pd.DataFrame(
-            [list(val.diagonal()) for val in sm_P], columns=columns, index=index_
-        )
+        df_smoothed_p = pd.DataFrame([list(val.diagonal()) for val in sm_P], columns=columns, index=index_)
         # csv出力
         df_filtered_x.to_csv(self.output_foldapath_csv + "filtered_states.csv")
         df_filtered_p.to_csv(self.output_foldapath_csv + "filtered_covariance.csv")
@@ -126,14 +115,10 @@ class Assimilator:
 
         ### ◆(5/5) resimulation----------------------------------
 
-        df_filtered_x = pd.read_csv(
-            self.output_foldapath_csv + "filtered_states.csv", index_col=0
-        )
+        df_filtered_x = pd.read_csv(self.output_foldapath_csv + "filtered_states.csv", index_col=0)
         print("(5/5) re-simulation ...")
         output_foldapath = const.OUTPUT_DIR + f"{self.cond_id}/simulation_assim/"
-        self.simulator.execute_simulation(
-            filtered_states=df_filtered_x, output_foldapath=output_foldapath
-        )
+        self.simulator.execute_simulation(filtered_states=df_filtered_x, output_foldapath=output_foldapath)
 
     def filtering(self, timestamp):
         """フィルタリング実行関数
@@ -149,9 +134,7 @@ class Assimilator:
             obs_values = self.df_obs.iloc[self.obs_index, :]
             # filtering
             _timestamp = self.df_obs.index[self.obs_index]
-            self.ukf.update(
-                np.array(obs_values), gx_args={"timestamp": _timestamp}, hx_args={}
-            )
+            self.ukf.update(np.array(obs_values), gx_args={"timestamp": _timestamp}, hx_args={})
             self.obs_index += 1
             # マイナスチェック
             # NOTE: 必要な場合のみ
@@ -187,7 +170,7 @@ class Assimilator:
 
         # 状態変数(x)をシミュレータのパラメータに上書き
         i = 0
-        sim_conds = self.simulator.sim_conds.copy()
+        sim_conds = deepcopy(self.simulator.sim_conds)
         for _tower_num, tgt_tower_params in self.assim_conds["STATE_VARS"].items():
             for cond_category, tgt_conds in tgt_tower_params.items():
                 for cond_name in tgt_conds.keys():
@@ -202,22 +185,13 @@ class Assimilator:
         # 中間変数(圧力)の上書き
         _tgt_index = self.df_obs.index[np.abs(self.df_obs.index - (timestamp)).argmin()]
         for _tower_num in range(1, 1 + self.num_tower):
-            middle_vars[_tower_num]["total_press"] = self.simulator.df_obs.loc[
-                _tgt_index, f"T{_tower_num}_press"
-            ]
+            middle_vars[_tower_num]["total_press"] = self.simulator.df_obs.loc[_tgt_index, f"T{_tower_num}_press"]
         # プロセス番号抽出
-        p = 1 + sum(
-            [
-                1 if timestamp > x else 0
-                for x in self.simulator.df_operation["手動終了時刻"]
-            ]
-        )
+        p = 1 + sum([1 if timestamp > x else 0 for x in self.simulator.df_operation["手動終了時刻"]])
         # 各塔の稼働モード抽出
         mode_list = list(self.simulator.df_operation.loc[p, ["塔1", "塔2", "塔3"]])
         # 各塔の吸着計算実施
-        middle_vars, _ = self.simulator.calc_adsorption_mode_list(
-            sim_conds, mode_list, middle_vars
-        )
+        middle_vars, _ = self.simulator.calc_adsorption_mode_list(sim_conds, mode_list, middle_vars)
         ### ◆出力 --------------------------------
 
         # 計算結果から中間変数と観測変数を抽出
@@ -303,9 +277,7 @@ class Assimilator:
         """
         # 温度のみ抽出
         tgt_cols = [
-            f"T{_tower_num}_temp_{_section}"
-            for _tower_num in range(1, 1 + self.num_tower)
-            for _section in [1, 2, 3]
+            f"T{_tower_num}_temp_{_section}" for _tower_num in range(1, 1 + self.num_tower) for _section in [1, 2, 3]
         ]
         df_obs = self.simulator.df_obs[tgt_cols]
 
@@ -369,9 +341,7 @@ class Assimilator:
             plt.xlabel("timestamp")
             plt.grid()
             plt.title(col)
-        plt.savefig(
-            self.output_foldapath_png + "smootheed_covariance_diag.png", dpi=100
-        )
+        plt.savefig(self.output_foldapath_png + "smootheed_covariance_diag.png", dpi=100)
         plt.close()
 
     def __array_to_dict_middle_variables(self, s_bfr):
@@ -449,9 +419,7 @@ class Assimilator:
             for stream in range(1, 1 + self.num_str):
                 middle_vars[_tower_num]["heat_t_coef_wall"][stream] = {}
                 for section in range(1, 1 + self.num_sec):
-                    middle_vars[_tower_num]["heat_t_coef_wall"][stream][section] = (
-                        s_bfr[i]
-                    )
+                    middle_vars[_tower_num]["heat_t_coef_wall"][stream][section] = s_bfr[i]
                     i += 1
         # 9. 全圧
         for _tower_num in range(1, 1 + self.num_tower):
@@ -518,9 +486,7 @@ class Assimilator:
         for _tower_num in range(1, 1 + self.num_tower):
             for stream in range(1, 1 + self.num_str):
                 for section in range(1, 1 + self.num_sec):
-                    s.append(
-                        middle_vars[_tower_num]["heat_t_coef_wall"][stream][section]
-                    )
+                    s.append(middle_vars[_tower_num]["heat_t_coef_wall"][stream][section])
         # 9. 全圧
         for _tower_num in range(1, 1 + self.num_tower):
             s.append(middle_vars[_tower_num]["total_press"])
