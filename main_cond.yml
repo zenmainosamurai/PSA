@@ -11,7 +11,7 @@ mode_list: [
 cond_list: [
   # 5_05_mod_termination_conds,
   # 5_06_mod_termination_conds2,
-  5_07_mod_simconds
+  5_08_mod_logging2
 ]
 
 # パラメータ最適化のパラメータ
