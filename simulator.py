@@ -78,6 +78,7 @@ class GasAdosorptionBreakthroughsimulator:
         self.df_operation = pd.read_excel(filepath, index_col="工程", sheet_name="工程")
 
         # その他初期化
+        self.stagnant_mf: dict | None = None
 
     def _init_variables(self):
         """各塔の状態変数を初期化
@@ -519,6 +520,8 @@ class GasAdosorptionBreakthroughsimulator:
             )
         # バッチ吸着_下流
         elif mode == "バッチ吸着_下流":
+            if self.stagnant_mf is None:
+                self.logger.warning("stagnant_mf計算前にバッチ吸着_下流が呼ばれました")
             calc_output = models.batch_adsorption_downstream(
                 sim_conds=sim_conds,
                 stream_conds=stream_conds,
