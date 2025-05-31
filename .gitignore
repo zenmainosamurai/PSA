@@ -10,3 +10,4 @@ build/
 *.spec
 ~*
 *props_usage.csv
+*prop_table.npz

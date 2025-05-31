@@ -4,7 +4,7 @@ import time
 from simulator import GasAdosorptionBreakthroughsimulator
 from assimilator import Assimilator
 from models_opt import GasAdosorption_for_Optimize
-import utils.props_logger
+import utils.prop_table
 
 if __name__ == "__main__":
 
