@@ -28,7 +28,7 @@ _LOG_FILE.parent.mkdir(parents=True, exist_ok=True)
 if not _LOG_FILE.exists():
     _LOG_FILE.write_text("timestamp,fluid,prop,T_K,P_Pa\n", encoding="utf-8")
 
-_log_fh = _LOG_FILE.open("a", newline="", encoding="utf-8")
+_log_fh = _LOG_FILE.open("w", newline="", encoding="utf-8")
 _csv_writer = writer(_log_fh)
 
 
