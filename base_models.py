@@ -21,7 +21,7 @@ import warnings
 warnings.simplefilter("error")
 
 
-def material_balance_adsorp(
+def calculate_mass_balance_for_adsorption(
     sim_conds,
     stream_conds,
     stream,
@@ -105,7 +105,7 @@ def material_balance_adsorp(
     # 現在雰囲気の平衡吸着量 [cm3/g-abs]
     P_KPA = p_co2 * 1000  # [kPaA]
     T_K = temp + 273.15  # [K]
-    adsorp_amt_equilibrium = max(0.1, _equilibrium_adsorp_amt(P_KPA, T_K))
+    adsorp_amt_equilibrium = max(0.1, _calculate_equilibrium_adsorption_amount(P_KPA, T_K))
     # 現在の既存吸着量 [cm3/g-abs]
     adsorp_amt_current = variables["adsorp_amt"][stream][section]
     # 理論新規吸着量 [cm3/g-abs]
@@ -220,7 +220,7 @@ def material_balance_adsorp(
     return output
 
 
-def material_balance_desorp(sim_conds, stream_conds, stream, section, variables, vacuum_output):
+def calculate_mass_balance_for_desorption(sim_conds, stream_conds, stream, section, variables, vacuum_output):
     """任意セルのマテリアルバランスを計算する
         脱着モード
 
@@ -262,7 +262,7 @@ def material_balance_desorp(sim_conds, stream_conds, stream, section, variables,
     Mabs = stream_conds[stream]["Mabs"] / sim_conds["COMMON_COND"]["NUM_SEC"]
     # 現在雰囲気の平衡吸着量 [cm3/g-abs]
     P_KPA = p_co2 * 1000  # [MPaA] → [kPaA]
-    adsorp_amt_equilibrium = max(0.1, _equilibrium_adsorp_amt(P_KPA, T_K))
+    adsorp_amt_equilibrium = max(0.1, _calculate_equilibrium_adsorption_amount(P_KPA, T_K))
     # 現在の既存吸着量 [cm3/g-abs]
     adsorp_amt_current = variables["adsorp_amt"][stream][section]
     # 理論新規吸着量 [cm3/g-abs]
@@ -361,7 +361,7 @@ def material_balance_desorp(sim_conds, stream_conds, stream, section, variables,
     return output, output2
 
 
-def material_balance_valve_stop(stream, section, variables):
+def calculate_mass_balance_for_valve_closed(stream, section, variables):
     """任意セルのマテリアルバランスを計算する
         弁停止モード
 
@@ -397,7 +397,7 @@ def material_balance_valve_stop(stream, section, variables):
     return output
 
 
-def heat_balance(
+def calculate_heat_balance_for_bed(
     sim_conds,
     stream_conds,
     stream,
@@ -550,7 +550,7 @@ def heat_balance(
         "Hroof": Hroof,
         "stream": stream,
     }
-    temp_reached = optimize.newton(__optimize_temp_reached, temp_now, args=args.values())
+    temp_reached = optimize.newton(_optimize_bed_temperature, temp_now, args=args.values())
 
     ### 熱電対温度の計算 --------------------------------------------------------------
 
@@ -596,7 +596,7 @@ def heat_balance(
     return output
 
 
-def heat_balance_wall(sim_conds, stream_conds, section, variables, heat_output, heat_wall_output=None):
+def calculate_heat_balance_for_wall(sim_conds, stream_conds, section, variables, heat_output, heat_wall_output=None):
     """壁面の熱バランス計算
 
     Args:
@@ -671,7 +671,7 @@ def heat_balance_wall(sim_conds, stream_conds, section, variables, heat_output, 
         "Hbb": Hbb,
         "Hroof": Hroof,
     }
-    temp_reached = optimize.newton(__optimize_temp_reached_wall, temp_now, args=args.values())
+    temp_reached = optimize.newton(_optimize_wall_temperature, temp_now, args=args.values())
 
     output = {
         "Hbb": Hbb,
@@ -686,7 +686,7 @@ def heat_balance_wall(sim_conds, stream_conds, section, variables, heat_output, 
     return output
 
 
-def heat_balance_lid(sim_conds, position, variables, heat_output, heat_wall_output):
+def calculate_heat_balance_for_lid(sim_conds, position, variables, heat_output, heat_wall_output):
     """上下蓋の熱バランス計算
 
     Args:
@@ -727,7 +727,7 @@ def heat_balance_lid(sim_conds, position, variables, heat_output, heat_wall_outp
         "Hlidall_heat": Hlidall_heat,
         "position": position,
     }
-    temp_reached = optimize.newton(__optimize_temp_reached_lid, temp_now, args=args.values())
+    temp_reached = optimize.newton(_optimize_lid_temperature, temp_now, args=args.values())
 
     output = {
         "temp_reached": temp_reached,
@@ -738,7 +738,7 @@ def heat_balance_lid(sim_conds, position, variables, heat_output, heat_wall_outp
     return output
 
 
-def total_press_after_vacuum(sim_conds, variables):
+def calculate_pressure_after_vacuum_pumping(sim_conds, variables):
     """排気後圧力とCO2回収濃度の計算
         真空脱着モード
 
@@ -872,7 +872,7 @@ def total_press_after_vacuum(sim_conds, variables):
     return output
 
 
-def total_press_after_depressure(sim_conds, variables, downflow_total_press):
+def calculate_pressure_after_depressurization(sim_conds, variables, downflow_total_press):
     """減圧時の上流からの均圧配管流量計算
         バッチ均圧(上流側)モード
 
@@ -989,7 +989,7 @@ def total_press_after_depressure(sim_conds, variables, downflow_total_press):
     return output
 
 
-def downflow_fr_after_depressure(sim_conds, stream_conds, variables, mb_dict, downflow_total_press):
+def calculate_downstream_flow_after_depressurization(sim_conds, stream_conds, variables, mb_dict, downflow_total_press):
     """減圧計算時に下流塔の圧力・流入量を計算する
         減圧モード
 
@@ -1073,7 +1073,7 @@ def downflow_fr_after_depressure(sim_conds, stream_conds, variables, mb_dict, do
     return output
 
 
-def total_press_after_desorp(sim_conds, variables, mf_dict, vacuum_output):
+def calculate_pressure_after_desorption(sim_conds, variables, mf_dict, vacuum_output):
     """気相放出後の全圧の計算
 
     Args:
@@ -1116,7 +1116,7 @@ def total_press_after_desorp(sim_conds, variables, mf_dict, vacuum_output):
     return total_press_after_desorp
 
 
-def total_press_after_batch_adsorp(sim_conds, variables, series):
+def calculate_pressure_after_batch_adsorption(sim_conds, variables, series):
     """バッチ吸着における圧力変化
 
     Args:
@@ -1158,7 +1158,7 @@ def total_press_after_batch_adsorp(sim_conds, variables, series):
     return total_press_after_batch_adsorp
 
 
-def _equilibrium_adsorp_amt(P, T):
+def _calculate_equilibrium_adsorption_amount(P, T):
     """平衡吸着量を計算
 
     Args:
@@ -1176,7 +1176,7 @@ def _equilibrium_adsorp_amt(P, T):
     return adsorp_amt_equilibrium
 
 
-def __optimize_temp_reached(
+def _optimize_bed_temperature(
     temp_reached,
     sim_conds,
     stream_conds,
@@ -1213,7 +1213,7 @@ def __optimize_temp_reached(
     return Hbed_heat_blc - Hbed_time
 
 
-def __optimize_temp_reached_wall(
+def _optimize_wall_temperature(
     temp_reached,
     sim_conds,
     stream_conds,
@@ -1244,7 +1244,7 @@ def __optimize_temp_reached_wall(
     return Hwall_heat_blc - Hwall_time
 
 
-def __optimize_temp_reached_lid(temp_reached, sim_conds, temp_now, Hlidall_heat, position):
+def _optimize_lid_temperature(temp_reached, sim_conds, temp_now, Hlidall_heat, position):
     """上下蓋の到達温度算出におけるソルバー用関数
 
     Args:
