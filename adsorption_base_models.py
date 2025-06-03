@@ -1122,7 +1122,7 @@ def calculate_pressure_after_desorption(sim_conds, variables, mole_fraction_resu
     return pressure_after_desorption
 
 
-def calculate_pressure_after_batch_adsorption(sim_conds, variables, series):
+def calculate_pressure_after_batch_adsorption(sim_conds, variables, is_series_operation):
     """バッチ吸着における圧力変化
 
     Args:
@@ -1142,7 +1142,7 @@ def calculate_pressure_after_batch_adsorption(sim_conds, variables, series):
     temp_mean = np.mean(temp_mean)
     temp_mean += 273.15
     # 空間体積（配管含む）
-    if series:
+    if is_series_operation:
         V = (
             (sim_conds["PACKED_BED_COND"]["v_space"] + sim_conds["PACKED_BED_COND"]["v_pipespace"]) * 2
             + sim_conds["PACKED_BED_COND"]["v_upstream"]

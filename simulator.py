@@ -518,7 +518,7 @@ class GasAdosorptionBreakthroughsimulator:
                 sim_conds=sim_conds,
                 stream_conds=stream_conds,
                 variables=variables,
-                series=True,
+                is_series_operation=True,
             )
         # バッチ吸着_下流
         elif mode == "バッチ吸着_下流":
@@ -528,7 +528,7 @@ class GasAdosorptionBreakthroughsimulator:
                 sim_conds=sim_conds,
                 stream_conds=stream_conds,
                 variables=variables,
-                series=True,
+                is_series_operation=True,
                 inflow_gas=other_tower_params,
                 stagnant_mf=self.stagnant_mf,
             )
