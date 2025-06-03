@@ -220,7 +220,7 @@ def calculate_mass_balance_for_adsorption(
     return output
 
 
-def calculate_mass_balance_for_desorption(sim_conds, stream_conds, stream, section, variables, vacuum_output):
+def calculate_mass_balance_for_desorption(sim_conds, stream_conds, stream, section, variables, vacuum_pumping_results):
     """任意セルのマテリアルバランスを計算する
         脱着モード
 
@@ -228,7 +228,7 @@ def calculate_mass_balance_for_desorption(sim_conds, stream_conds, stream, secti
         stream (int): 対象セルのstream番号
         section (int): 対象セルのsection番号
         variables (dict): 温度等の状態変数
-        vacuum_output (dict): 排気後圧力計算の出力
+        vacuum_pumping_results (dict): 排気後圧力計算の出力
 
     Returns:
         dict: 対象セルの計算結果
@@ -242,7 +242,7 @@ def calculate_mass_balance_for_desorption(sim_conds, stream_conds, stream, secti
         / sim_conds["VACUUMING_PIPE_COND"]["Vspace"]
     )
     # セクション空間現在物質量 [mol]
-    mol_amt_section = vacuum_output["case_inner_mol_amt_after_vacuum"] * space_ratio_section
+    mol_amt_section = vacuum_pumping_results["case_inner_mol_amt_after_vacuum"] * space_ratio_section
     # 現在気相モル量 [mol]
     inflow_fr_co2 = mol_amt_section * variables["mf_co2"][stream][section]
     inflow_fr_n2 = mol_amt_section * variables["mf_n2"][stream][section]
@@ -257,7 +257,7 @@ def calculate_mass_balance_for_desorption(sim_conds, stream_conds, stream, secti
     mf_co2 = variables["mf_co2"][stream][section]
     mf_n2 = variables["mf_n2"][stream][section]
     # CO2分圧 [MPaA]
-    p_co2 = max(2.5e-3, vacuum_output["total_press_after_vacuum"] * mf_co2)
+    p_co2 = max(2.5e-3, vacuum_pumping_results["total_press_after_vacuum"] * mf_co2)
     # セクション吸着材量 [g]
     Mabs = stream_conds[stream]["Mabs"] / sim_conds["COMMON_COND"]["NUM_SEC"]
     # 現在雰囲気の平衡吸着量 [cm3/g-abs]
@@ -318,7 +318,7 @@ def calculate_mass_balance_for_desorption(sim_conds, stream_conds, stream, secti
     desorp_mf_n2_after_vacuum = desorp_mw_n2_after_vacuum / (desorp_mw_co2_after_vacuum + desorp_mw_n2_after_vacuum)
 
     ### その他（熱バラ渡す用） ---------------------------------------
-    P = vacuum_output["total_press_after_vacuum"] * 1e6
+    P = vacuum_pumping_results["total_press_after_vacuum"] * 1e6
     P_ATM = 0.101325 * 1e6
     # ガス密度 [kg/m3]
     gas_density = (
@@ -369,7 +369,7 @@ def calculate_mass_balance_for_valve_closed(stream, section, variables):
         stream (int): 対象セルのstream番号
         section (int): 対象セルのsection番号
         variables (dict): 温度等の状態変数
-        vacuum_output (dict): 排気後圧力計算の出力
+        vacuum_pumping_results (dict): 排気後圧力計算の出力
 
     Returns:
         dict: 対象セルの計算結果
@@ -406,7 +406,7 @@ def calculate_heat_balance_for_bed(
     mode,
     material_output=None,
     heat_output=None,
-    vacuum_output=None,
+    vacuum_pumping_results=None,
 ):
     """対象セルの熱バランスを計算する
 
@@ -417,7 +417,7 @@ def calculate_heat_balance_for_bed(
         mode (int): 吸着・脱着等の運転モード
         material_output (dict): 対象セルのマテバラ出力
         heat_output (dict): 上流セクションの熱バラ出力
-        vacuum_output (dict): 排気後圧力計算の出力（脱着時）
+        vacuum_pumping_results (dict): 排気後圧力計算の出力（脱着時）
 
     Returns:
         dict: 対象セルの熱バラ出力
@@ -496,7 +496,7 @@ def calculate_heat_balance_for_bed(
             mode,
             variables,
             material_output,
-            vacuum_output,
+            vacuum_pumping_results,
         )
 
     ### 熱流束計算 ---------------------------------------------------
@@ -872,7 +872,7 @@ def calculate_pressure_after_vacuum_pumping(sim_conds, variables):
     return output
 
 
-def calculate_pressure_after_depressurization(sim_conds, variables, downflow_total_press):
+def calculate_pressure_after_depressurization(sim_conds, variables, downstream_tower_pressure):
     """減圧時の上流からの均圧配管流量計算
         バッチ均圧(上流側)モード
 
@@ -931,7 +931,7 @@ def calculate_pressure_after_depressurization(sim_conds, variables, downflow_tot
     for iter in range(_max_iteration):
         P_resist_old = P_resist
         # 塔間の圧力差 [PaA]
-        dP = (variables["total_press"] - downflow_total_press - P_resist) * 1e6
+        dP = (variables["total_press"] - downstream_tower_pressure - P_resist) * 1e6
         if np.abs(dP) < 1:
             dP = 0
         # 配管流速 [m/s]
@@ -989,7 +989,9 @@ def calculate_pressure_after_depressurization(sim_conds, variables, downflow_tot
     return output
 
 
-def calculate_downstream_flow_after_depressurization(sim_conds, stream_conds, variables, mb_dict, downflow_total_press):
+def calculate_downstream_flow_after_depressurization(
+    sim_conds, stream_conds, variables, mass_balance_results, downstream_tower_pressure
+):
     """減圧計算時に下流塔の圧力・流入量を計算する
         減圧モード
 
@@ -997,8 +999,8 @@ def calculate_downstream_flow_after_depressurization(sim_conds, stream_conds, va
         sim_conds (dict): 全体共通パラメータ
         stream_conds (dict): ストリーム内共通パラメータ
         variables (dict): 状態変数
-        mb_dict (dict): マテバラ計算結果
-        downflow_total_press (float): 下流塔の現在全圧
+        mass_balance_results (dict): マテバラ計算結果
+        downstream_tower_pressure (float): 下流塔の現在全圧
 
     Returns:
         float: 減圧後の下流塔の全圧 [MPaA]
@@ -1022,8 +1024,8 @@ def calculate_downstream_flow_after_depressurization(sim_conds, stream_conds, va
     sum_outflow_fr = (
         sum(
             [
-                mb_dict[stream][most_down_section]["outflow_fr_co2"]
-                + mb_dict[stream][most_down_section]["outflow_fr_n2"]
+                mass_balance_results[stream][most_down_section]["outflow_fr_co2"]
+                + mass_balance_results[stream][most_down_section]["outflow_fr_n2"]
                 for stream in range(1, 1 + sim_conds["COMMON_COND"]["NUM_STR"])
             ]
         )
@@ -1040,20 +1042,20 @@ def calculate_downstream_flow_after_depressurization(sim_conds, stream_conds, va
     # 下流容器圧力変化 [MPaA]
     dP = 8.314 * T_K / V_downflow * sum_outflow_mol / 1e6
     # 次時刻の下流容器全圧 [MPaA]
-    total_press_after_depressure_downflow = downflow_total_press + dP
+    total_press_after_depressure_downflow = downstream_tower_pressure + dP
 
     ### 下流容器への流入量 --------------------------------------------
     # 下流塔への合計流出CO2流量 [cm3]
     sum_outflow_fr_co2 = sum(
         [
-            mb_dict[stream][most_down_section]["outflow_fr_co2"]
+            mass_balance_results[stream][most_down_section]["outflow_fr_co2"]
             for stream in range(1, 1 + sim_conds["COMMON_COND"]["NUM_STR"])
         ]
     )
     # 下流塔への合計流出N2流量 [cm3]
     sum_outflow_fr_n2 = sum(
         [
-            mb_dict[stream][most_down_section]["outflow_fr_n2"]
+            mass_balance_results[stream][most_down_section]["outflow_fr_n2"]
             for stream in range(1, 1 + sim_conds["COMMON_COND"]["NUM_STR"])
         ]
     )
@@ -1073,12 +1075,12 @@ def calculate_downstream_flow_after_depressurization(sim_conds, stream_conds, va
     return output
 
 
-def calculate_pressure_after_desorption(sim_conds, variables, mf_dict, vacuum_output):
+def calculate_pressure_after_desorption(sim_conds, variables, mole_fraction_results, vacuum_pumping_results):
     """気相放出後の全圧の計算
 
     Args:
         variables (dict): 状態変数
-        mf_dict (dict): マテバラの出力結果（モル分率）
+        mole_fraction_results (dict): マテバラの出力結果（モル分率）
 
     Returns:
         dict: 気相放出後の全圧
@@ -1098,7 +1100,7 @@ def calculate_pressure_after_desorption(sim_conds, variables, mf_dict, vacuum_ou
     sum_desorp_mw = (
         sum(
             [
-                mf_dict[stream][section]["desorp_mw_all_after_vacuum"]
+                mole_fraction_results[stream][section]["desorp_mw_all_after_vacuum"]
                 for stream in range(1, 1 + sim_conds["COMMON_COND"]["NUM_STR"])
                 for section in range(1, 1 + sim_conds["COMMON_COND"]["NUM_SEC"])
             ]
@@ -1108,12 +1110,16 @@ def calculate_pressure_after_desorption(sim_conds, variables, mf_dict, vacuum_ou
     )
     # 配管上のモル量を加算
     sum_desorp_mw += (
-        vacuum_output["total_press_after_vacuum"] * 1e6 * sim_conds["VACUUMING_PIPE_COND"]["Vpipe"] / 8.314 / T_K
+        vacuum_pumping_results["total_press_after_vacuum"]
+        * 1e6
+        * sim_conds["VACUUMING_PIPE_COND"]["Vpipe"]
+        / 8.314
+        / T_K
     )
     # 気相放出後の全圧 [MPaA]
-    total_press_after_desorp = sum_desorp_mw * 8.314 * T_K / sim_conds["VACUUMING_PIPE_COND"]["Vspace"] * 1e-6
+    pressure_after_desorption = sum_desorp_mw * 8.314 * T_K / sim_conds["VACUUMING_PIPE_COND"]["Vspace"] * 1e-6
 
-    return total_press_after_desorp
+    return pressure_after_desorption
 
 
 def calculate_pressure_after_batch_adsorption(sim_conds, variables, series):
@@ -1153,9 +1159,9 @@ def calculate_pressure_after_batch_adsorption(sim_conds, variables, series):
     # 圧力変化量
     diff_pressure = R * temp_mean / V * (F / 22.4) * sim_conds["COMMON_COND"]["dt"] / 1e6
     # 変化後全圧
-    total_press_after_batch_adsorp = variables["total_press"] + diff_pressure
+    pressure_after_batch_adsorption = variables["total_press"] + diff_pressure
 
-    return total_press_after_batch_adsorp
+    return pressure_after_batch_adsorption
 
 
 def _calculate_equilibrium_adsorption_amount(P, T):

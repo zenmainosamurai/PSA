@@ -114,7 +114,7 @@ def calc_heat_transfer_coef(
     mode: int,
     variables: dict,
     material_output: dict,
-    vacuum_output: dict | None = None,
+    vacuum_pumping_results: dict | None = None,
 ) -> tuple[float, float]:
     """層伝熱係数、壁-層伝熱係数を算出する
 
@@ -126,7 +126,7 @@ def calc_heat_transfer_coef(
         temp_now(float):
         mode(int):
         material_output(dict):
-        vacuum_output(dict | None):
+        vacuum_pumping_results(dict | None):
 
     Returns:
         tuple[float, float]:
@@ -178,7 +178,7 @@ def calc_heat_transfer_coef(
             / (sim_conds["COMMON_COND"]["dt"] * 60.0)
         )
     elif mode == 2:  # 脱着時は排気ガス体積流量 [m3/s]
-        f0 = vacuum_output["vacuum_rate_N"] / 60.0 * stream_conds[stream]["streamratio"]
+        f0 = vacuum_pumping_results["vacuum_rate_N"] / 60.0 * stream_conds[stream]["streamratio"]
     else:
         f0 = 0.0  # NOTE: この処理で正しいか確認
 

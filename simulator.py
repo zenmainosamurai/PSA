@@ -6,7 +6,7 @@ import pandas as pd
 from logging import getLogger
 
 from utils import const, init_functions, plot_csv, other_utils
-import models
+import operation_models
 
 import warnings
 
@@ -491,20 +491,22 @@ class GasAdosorptionBreakthroughsimulator:
             sim_conds_copy = deepcopy(sim_conds)
             sim_conds_copy["INFLOW_GAS_COND"]["fr_co2"] = 20
             sim_conds_copy["INFLOW_GAS_COND"]["fr_n2"] = 25.2
-            calc_output = models.initial_adsorption(
+            calc_output = operation_models.initial_adsorption(
                 sim_conds=sim_conds_copy, stream_conds=stream_conds, variables=variables
             )
         # 停止
         elif mode == "停止":
-            calc_output = models.stop_mode(sim_conds=sim_conds, stream_conds=stream_conds, variables=variables)
+            calc_output = operation_models.stop_mode(
+                sim_conds=sim_conds, stream_conds=stream_conds, variables=variables
+            )
         # 流通吸着_単独/上流
         elif mode == "流通吸着_単独/上流":
-            calc_output = models.flow_adsorption_single_or_upstream(
+            calc_output = operation_models.flow_adsorption_single_or_upstream(
                 sim_conds=sim_conds, stream_conds=stream_conds, variables=variables
             )
         # 流通吸着_下流
         elif mode == "流通吸着_下流":
-            calc_output = models.flow_adsorption_downstream(
+            calc_output = operation_models.flow_adsorption_downstream(
                 sim_conds=sim_conds,
                 stream_conds=stream_conds,
                 variables=variables,
@@ -512,7 +514,7 @@ class GasAdosorptionBreakthroughsimulator:
             )
         # バッチ吸着_上流
         elif mode == "バッチ吸着_上流":
-            calc_output = models.batch_adsorption_upstream(
+            calc_output = operation_models.batch_adsorption_upstream(
                 sim_conds=sim_conds,
                 stream_conds=stream_conds,
                 variables=variables,
@@ -522,7 +524,7 @@ class GasAdosorptionBreakthroughsimulator:
         elif mode == "バッチ吸着_下流":
             if self.stagnant_mf is None:
                 self.logger.warning("stagnant_mf計算前にバッチ吸着_下流が呼ばれました")
-            calc_output = models.batch_adsorption_downstream(
+            calc_output = operation_models.batch_adsorption_downstream(
                 sim_conds=sim_conds,
                 stream_conds=stream_conds,
                 variables=variables,
@@ -532,15 +534,15 @@ class GasAdosorptionBreakthroughsimulator:
             )
         # 均圧_減圧
         elif mode == "均圧_減圧":
-            calc_output = models.equalization_pressure_depressurization(
+            calc_output = operation_models.equalization_pressure_depressurization(
                 sim_conds=sim_conds,
                 stream_conds=stream_conds,
                 variables=variables,
-                downflow_total_press=other_tower_params,
+                downstream_tower_pressure=other_tower_params,
             )
         # 均圧_加圧
         elif mode == "均圧_加圧":
-            calc_output = models.equalization_pressure_pressurization(
+            calc_output = operation_models.equalization_pressure_pressurization(
                 sim_conds=sim_conds,
                 stream_conds=stream_conds,
                 variables=variables,
@@ -549,7 +551,7 @@ class GasAdosorptionBreakthroughsimulator:
             self.stagnant_mf = calc_output["material"]
         # 真空脱着
         elif mode == "真空脱着":
-            calc_output = models.desorption_by_vacuuming(
+            calc_output = operation_models.desorption_by_vacuuming(
                 sim_conds=sim_conds, stream_conds=stream_conds, variables=variables
             )
 
@@ -658,11 +660,11 @@ class GasAdosorptionBreakthroughsimulator:
                 new_variables["heat_t_coef_wall"][stream][section] = calc_output["heat"][stream][section]["u1"]
         # 全圧
         if mode in ["初回ガス導入", "バッチ吸着_上流", "均圧_加圧", "バッチ吸着_下流"]:
-            new_variables["total_press"] = calc_output["total_press_after_batch_adsorp"]
+            new_variables["total_press"] = calc_output["pressure_after_batch_adsorption"]
         elif mode in ["均圧_減圧", "流通吸着_単独/上流", "流通吸着_下流"]:
             new_variables["total_press"] = calc_output["total_press"]
         elif mode in ["真空脱着"]:
-            new_variables["total_press"] = calc_output["total_press_after_desorp"]
+            new_variables["total_press"] = calc_output["pressure_after_desorption"]
         else:
             new_variables["total_press"] = variables["total_press"]
         # CO2, N2回収量 [mol]
