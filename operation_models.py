@@ -730,10 +730,28 @@ def batch_adsorption_downstream(sim_conds, stream_conds, variables, is_series_op
     lid_heat_balance_results = {}
     mode = 0  # 吸着
 
+    most_down_section = sim_conds["COMMON_COND"]["NUM_SEC"]
+    total_outflow_co2 = sum(
+        [
+            inflow_gas[stream][most_down_section]["outflow_fr_co2"]
+            for stream in range(1, 1 + sim_conds["COMMON_COND"]["NUM_STR"])
+        ]
+    )
+    total_outflow_n2 = sum(
+        [
+            inflow_gas[stream][most_down_section]["outflow_fr_n2"]
+            for stream in range(1, 1 + sim_conds["COMMON_COND"]["NUM_STR"])
+        ]
+    )
+
     ### セル計算 --------------------------------------------------------------
 
     # 1. マテバラ・熱バラ計算
     for stream in range(1, 1 + sim_conds["COMMON_COND"]["NUM_STR"]):
+        distributed_inflow = {
+            "outflow_fr_co2": total_outflow_co2 * stream_conds[stream]["streamratio"],
+            "outflow_fr_n2": total_outflow_n2 * stream_conds[stream]["streamratio"],
+        }
         mass_balance_results[stream] = {}
         heat_balance_results[stream] = {}
         # sec_1は手動で実施
@@ -744,7 +762,7 @@ def batch_adsorption_downstream(sim_conds, stream_conds, variables, is_series_op
             stream=stream,
             section=1,
             variables=variables,
-            inflow_gas=inflow_gas[stream][sim_conds["COMMON_COND"]["NUM_SEC"]],
+            inflow_gas=distributed_inflow,
             stagnant_mode=stagnant_mf,
         )
         heat_balance_results[stream][1] = adsorption_base_models.calculate_heat_balance_for_bed(
@@ -845,10 +863,28 @@ def flow_adsorption_downstream(sim_conds, stream_conds, variables, inflow_gas):
     lid_heat_balance_results = {}
     mode = 0  # 吸着
 
+    most_down_section = sim_conds["COMMON_COND"]["NUM_SEC"]
+    total_outflow_co2 = sum(
+        [
+            inflow_gas[stream][most_down_section]["outflow_fr_co2"]
+            for stream in range(1, 1 + sim_conds["COMMON_COND"]["NUM_STR"])
+        ]
+    )
+    total_outflow_n2 = sum(
+        [
+            inflow_gas[stream][most_down_section]["outflow_fr_n2"]
+            for stream in range(1, 1 + sim_conds["COMMON_COND"]["NUM_STR"])
+        ]
+    )
+
     ### セル計算 --------------------------------------------------------------
 
     # 1. マテバラ・熱バラ計算
     for stream in range(1, 1 + sim_conds["COMMON_COND"]["NUM_STR"]):
+        distributed_inflow = {
+            "outflow_fr_co2": total_outflow_co2 * stream_conds[stream]["streamratio"],
+            "outflow_fr_n2": total_outflow_n2 * stream_conds[stream]["streamratio"],
+        }
         mass_balance_results[stream] = {}
         heat_balance_results[stream] = {}
         # sec_1は手動で実施
@@ -859,7 +895,7 @@ def flow_adsorption_downstream(sim_conds, stream_conds, variables, inflow_gas):
             stream=stream,
             section=1,
             variables=variables,
-            inflow_gas=inflow_gas[stream][sim_conds["COMMON_COND"]["NUM_SEC"]],
+            inflow_gas=distributed_inflow,
         )
         heat_balance_results[stream][1] = adsorption_base_models.calculate_heat_balance_for_bed(
             sim_conds=sim_conds,

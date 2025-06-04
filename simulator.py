@@ -274,6 +274,7 @@ class GasAdosorptionBreakthroughsimulator:
             if "バッチ吸着_上流" in mode_list:
                 tower_num_up = mode_list.index("バッチ吸着_上流") + 1
                 tower_num_dw = mode_list.index("バッチ吸着_下流") + 1
+                # NOTE: 圧力平均化の位置
                 # 圧力の平均化
                 total_press_mean = (
                     variables_tower[tower_num_up]["total_press"]
