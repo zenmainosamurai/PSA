@@ -828,7 +828,7 @@ def calculate_pressure_after_vacuum_pumping(sim_conds, variables):
 
     ### CO2回収濃度計算 --------------------------------------
     # 排気速度 [mol/min]
-    vacuum_rate_mol = P_PUMP * vacuum_rate_N / 8.314 / T_K
+    vacuum_rate_mol = 101325 * vacuum_rate_N / 8.314 / T_K
     # 排気量 [mol]
     vacuum_amt = vacuum_rate_mol * sim_conds["COMMON_COND"]["dt"]
     # 排気CO2量 [mol]
