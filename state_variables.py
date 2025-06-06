@@ -96,23 +96,29 @@ class StateVariables:
         """計算結果から状態変数を効率的に更新"""
         tower = self.towers[tower_num]
 
-        # 温度データの一括更新
-        for stream in range(1, self.num_streams + 1):
-            for section in range(1, self.num_sections + 1):
-                tower.temp[stream - 1, section - 1] = calc_output["heat"][stream][section]["temp_reached"]
-                tower.temp_thermo[stream - 1, section - 1] = calc_output["heat"][stream][section][
-                    "temp_thermocouple_reached"
-                ]
-                tower.adsorp_amt[stream - 1, section - 1] = calc_output["material"][stream][section]["accum_adsorp_amt"]
-                tower.heat_t_coef[stream - 1, section - 1] = calc_output["heat"][stream][section]["hw1"]
-                tower.heat_t_coef_wall[stream - 1, section - 1] = calc_output["heat"][stream][section]["u1"]
-                tower.outflow_pco2[stream - 1, section - 1] = calc_output["material"][stream][section]["outflow_pco2"]
+        heat = calc_output["heat"]
+        material = calc_output["material"]
+
+        as_mat = lambda dct, key: np.array(
+            [
+                [dct[stream][section][key] for section in range(1, self.num_sections + 1)]
+                for stream in range(1, self.num_streams + 1)
+            ],
+            dtype=np.float64,
+        )
+
+        tower.temp[:, :] = as_mat(heat, "temp_reached")
+        tower.temp_thermo[:, :] = as_mat(heat, "temp_thermocouple_reached")
+        tower.adsorp_amt[:, :] = as_mat(material, "accum_adsorp_amt")
+        tower.heat_t_coef[:, :] = as_mat(heat, "hw1")
+        tower.heat_t_coef_wall[:, :] = as_mat(heat, "u1")
+        tower.outflow_pco2[:, :] = as_mat(material, "outflow_pco2")
 
         # 壁面温度の更新
-        for section in range(1, self.num_sections + 1):
-            tower.temp_wall[section - 1] = calc_output["heat_wall"][section]["temp_reached"]
-
-        # 蓋の温度の更新
+        tower.temp_wall[:] = np.array(
+            [calc_output["heat_wall"][section]["temp_reached"] for section in range(1, self.num_sections + 1)],
+            dtype=np.float64,
+        )
         tower.temp_lid_up = calc_output["heat_lid"]["up"]["temp_reached"]
         tower.temp_lid_down = calc_output["heat_lid"]["down"]["temp_reached"]
 
@@ -128,19 +134,12 @@ class StateVariables:
             "バッチ吸着_下流",
             "流通吸着_下流",
         ]:
-            for stream in range(1, self.num_streams + 1):
-                for section in range(1, self.num_sections + 1):
-                    tower.mf_co2[stream - 1, section - 1] = calc_output["material"][stream][section]["outflow_mf_co2"]
-                    tower.mf_n2[stream - 1, section - 1] = calc_output["material"][stream][section]["outflow_mf_n2"]
+            tower.mf_co2[:, :] = as_mat(material, "outflow_mf_co2")
+            tower.mf_n2[:, :] = as_mat(material, "outflow_mf_n2")
         elif mode == "真空脱着":
-            for stream in range(1, self.num_streams + 1):
-                for section in range(1, self.num_sections + 1):
-                    tower.mf_co2[stream - 1, section - 1] = calc_output["mol_fraction"][stream][section][
-                        "mf_co2_after_vacuum"
-                    ]
-                    tower.mf_n2[stream - 1, section - 1] = calc_output["mol_fraction"][stream][section][
-                        "mf_n2_after_vacuum"
-                    ]
+            mol_frac = calc_output["mol_fraction"]
+            tower.mf_co2[:, :] = as_mat(mol_frac, "mf_co2_after_vacuum")
+            tower.mf_n2[:, :] = as_mat(mol_frac, "mf_n2_after_vacuum")
 
         # 全圧の更新
         if mode == "停止":
