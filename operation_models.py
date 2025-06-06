@@ -8,7 +8,7 @@ import warnings
 warnings.simplefilter("ignore")
 
 
-def initial_adsorption(sim_conds, stream_conds, variables, is_series_operation=False):
+def initial_adsorption(sim_conds, stream_conds, state_manager, tower_num, is_series_operation=False):
     """吸着開始時の圧力調整
         説明: 規定圧力に達するまでガスを導入する（吸着も起こる）
         ベースモデル: バッチ吸着モデル
@@ -41,7 +41,8 @@ def initial_adsorption(sim_conds, stream_conds, variables, is_series_operation=F
             stream_conds=stream_conds,
             stream=stream,
             section=1,
-            variables=variables,
+            state_manager=state_manager,
+            tower_num=tower_num,
             inflow_gas=None,
         )
         heat_balance_results[stream][1] = adsorption_base_models.calculate_heat_balance_for_bed(
@@ -49,7 +50,8 @@ def initial_adsorption(sim_conds, stream_conds, variables, is_series_operation=F
             stream_conds=stream_conds,
             stream=stream,
             section=1,
-            variables=variables,
+            state_manager=state_manager,
+            tower_num=tower_num,
             mode=mode,
             material_output=mass_balance_results[stream][1],
             heat_output=None,
@@ -62,7 +64,8 @@ def initial_adsorption(sim_conds, stream_conds, variables, is_series_operation=F
                 stream_conds=stream_conds,
                 stream=stream,
                 section=section,
-                variables=variables,
+                state_manager=state_manager,
+                tower_num=tower_num,
                 inflow_gas=mass_balance_results[stream][section - 1],
             )
             heat_balance_results[stream][section] = adsorption_base_models.calculate_heat_balance_for_bed(
@@ -70,7 +73,8 @@ def initial_adsorption(sim_conds, stream_conds, variables, is_series_operation=F
                 stream_conds=stream_conds,
                 stream=stream,
                 section=section,
-                variables=variables,
+                state_manager=state_manager,
+                tower_num=tower_num,
                 mode=mode,
                 material_output=mass_balance_results[stream][section],
                 heat_output=heat_balance_results[stream][section - 1],
@@ -81,7 +85,8 @@ def initial_adsorption(sim_conds, stream_conds, variables, is_series_operation=F
         sim_conds=sim_conds,
         stream_conds=stream_conds,
         section=1,
-        variables=variables,
+        state_manager=state_manager,
+        tower_num=tower_num,
         heat_output=heat_balance_results[sim_conds["COMMON_COND"]["NUM_STR"]][1],
         heat_wall_output=None,
     )
@@ -90,7 +95,8 @@ def initial_adsorption(sim_conds, stream_conds, variables, is_series_operation=F
             sim_conds=sim_conds,
             stream_conds=stream_conds,
             section=section,
-            variables=variables,
+            state_manager=state_manager,
+            tower_num=tower_num,
             heat_output=heat_balance_results[sim_conds["COMMON_COND"]["NUM_STR"]][section],
             heat_wall_output=wall_heat_balance_results[section - 1],
         )
@@ -99,13 +105,14 @@ def initial_adsorption(sim_conds, stream_conds, variables, is_series_operation=F
         lid_heat_balance_results[position] = adsorption_base_models.calculate_heat_balance_for_lid(
             sim_conds=sim_conds,
             position=position,
-            variables=variables,
+            state_manager=state_manager,
+            tower_num=tower_num,
             heat_output=heat_balance_results,
             heat_wall_output=wall_heat_balance_results,
         )
     # 4. バッチ吸着後圧力変化
     pressure_after_batch_adsorption = adsorption_base_models.calculate_pressure_after_batch_adsorption(
-        sim_conds=sim_conds, variables=variables, is_series_operation=is_series_operation
+        sim_conds=sim_conds, state_manager=state_manager, tower_num=tower_num, is_series_operation=is_series_operation
     )
     # 出力
     output = {
@@ -119,7 +126,7 @@ def initial_adsorption(sim_conds, stream_conds, variables, is_series_operation=F
     return output
 
 
-def stop_mode(sim_conds, stream_conds, variables):
+def stop_mode(sim_conds, stream_conds, state_manager, tower_num):
     """停止
         説明: モードとモードの間の吸着停止期間
         ベースモデル: 脱着モデル
@@ -150,14 +157,15 @@ def stop_mode(sim_conds, stream_conds, variables):
         heat_balance_results[stream] = {}
         # sec_1は手動で実施
         mass_balance_results[stream][1] = adsorption_base_models.calculate_mass_balance_for_valve_closed(
-            stream=stream, section=1, variables=variables
+            stream=stream, section=1, state_manager=state_manager, tower_num=tower_num
         )
         heat_balance_results[stream][1] = adsorption_base_models.calculate_heat_balance_for_bed(
             sim_conds=sim_conds,
             stream_conds=stream_conds,
             stream=stream,
             section=1,
-            variables=variables,
+            state_manager=state_manager,
+            tower_num=tower_num,
             mode=mode,
             material_output=mass_balance_results[stream][1],
             heat_output=None,
@@ -166,14 +174,15 @@ def stop_mode(sim_conds, stream_conds, variables):
         # sec_2以降は自動で実施
         for section in range(2, 1 + sim_conds["COMMON_COND"]["NUM_SEC"]):
             mass_balance_results[stream][section] = adsorption_base_models.calculate_mass_balance_for_valve_closed(
-                stream=stream, section=section, variables=variables
+                stream=stream, section=section, state_manager=state_manager, tower_num=tower_num
             )
             heat_balance_results[stream][section] = adsorption_base_models.calculate_heat_balance_for_bed(
                 sim_conds=sim_conds,
                 stream_conds=stream_conds,
                 stream=stream,
                 section=section,
-                variables=variables,
+                state_manager=state_manager,
+                tower_num=tower_num,
                 mode=mode,
                 material_output=mass_balance_results[stream][section],
                 heat_output=heat_balance_results[stream][section - 1],
@@ -184,7 +193,8 @@ def stop_mode(sim_conds, stream_conds, variables):
         sim_conds=sim_conds,
         stream_conds=stream_conds,
         section=1,
-        variables=variables,
+        state_manager=state_manager,
+        tower_num=tower_num,
         heat_output=heat_balance_results[sim_conds["COMMON_COND"]["NUM_STR"]][1],
         heat_wall_output=None,
     )
@@ -193,7 +203,8 @@ def stop_mode(sim_conds, stream_conds, variables):
             sim_conds=sim_conds,
             stream_conds=stream_conds,
             section=section,
-            variables=variables,
+            state_manager=state_manager,
+            tower_num=tower_num,
             heat_output=heat_balance_results[sim_conds["COMMON_COND"]["NUM_STR"]][section],
             heat_wall_output=wall_heat_balance_results[section - 1],
         )
@@ -202,7 +213,8 @@ def stop_mode(sim_conds, stream_conds, variables):
         lid_heat_balance_results[position] = adsorption_base_models.calculate_heat_balance_for_lid(
             sim_conds=sim_conds,
             position=position,
-            variables=variables,
+            state_manager=state_manager,
+            tower_num=tower_num,
             heat_output=heat_balance_results,
             heat_wall_output=wall_heat_balance_results,
         )
@@ -217,7 +229,7 @@ def stop_mode(sim_conds, stream_conds, variables):
     return output
 
 
-def flow_adsorption_single_or_upstream(sim_conds, stream_conds, variables):
+def flow_adsorption_single_or_upstream(sim_conds, stream_conds, state_manager, tower_num):
     """流通吸着_単独/直列吸着_上流
         説明: 1つの吸着塔の流通吸着 or 2つの吸着塔の直列吸着における上流
         ベースモデル: 流通吸着モデル
@@ -251,7 +263,8 @@ def flow_adsorption_single_or_upstream(sim_conds, stream_conds, variables):
             stream_conds=stream_conds,
             stream=stream,
             section=1,
-            variables=variables,
+            state_manager=state_manager,
+            tower_num=tower_num,
             inflow_gas=None,
         )
         heat_balance_results[stream][1] = adsorption_base_models.calculate_heat_balance_for_bed(
@@ -259,7 +272,8 @@ def flow_adsorption_single_or_upstream(sim_conds, stream_conds, variables):
             stream_conds=stream_conds,
             stream=stream,
             section=1,
-            variables=variables,
+            state_manager=state_manager,
+            tower_num=tower_num,
             mode=mode,
             material_output=mass_balance_results[stream][1],
             heat_output=None,
@@ -272,7 +286,8 @@ def flow_adsorption_single_or_upstream(sim_conds, stream_conds, variables):
                 stream_conds=stream_conds,
                 stream=stream,
                 section=section,
-                variables=variables,
+                state_manager=state_manager,
+                tower_num=tower_num,
                 inflow_gas=mass_balance_results[stream][section - 1],
             )
             heat_balance_results[stream][section] = adsorption_base_models.calculate_heat_balance_for_bed(
@@ -280,7 +295,8 @@ def flow_adsorption_single_or_upstream(sim_conds, stream_conds, variables):
                 stream_conds=stream_conds,
                 stream=stream,
                 section=section,
-                variables=variables,
+                state_manager=state_manager,
+                tower_num=tower_num,
                 mode=mode,
                 material_output=mass_balance_results[stream][section],
                 heat_output=heat_balance_results[stream][section - 1],
@@ -291,7 +307,8 @@ def flow_adsorption_single_or_upstream(sim_conds, stream_conds, variables):
         sim_conds=sim_conds,
         stream_conds=stream_conds,
         section=1,
-        variables=variables,
+        state_manager=state_manager,
+        tower_num=tower_num,
         heat_output=heat_balance_results[sim_conds["COMMON_COND"]["NUM_STR"]][1],
         heat_wall_output=None,
     )
@@ -300,7 +317,8 @@ def flow_adsorption_single_or_upstream(sim_conds, stream_conds, variables):
             sim_conds=sim_conds,
             stream_conds=stream_conds,
             section=section,
-            variables=variables,
+            state_manager=state_manager,
+            tower_num=tower_num,
             heat_output=heat_balance_results[sim_conds["COMMON_COND"]["NUM_STR"]][section],
             heat_wall_output=wall_heat_balance_results[section - 1],
         )
@@ -309,7 +327,8 @@ def flow_adsorption_single_or_upstream(sim_conds, stream_conds, variables):
         lid_heat_balance_results[position] = adsorption_base_models.calculate_heat_balance_for_lid(
             sim_conds=sim_conds,
             position=position,
-            variables=variables,
+            state_manager=state_manager,
+            tower_num=tower_num,
             heat_output=heat_balance_results,
             heat_wall_output=wall_heat_balance_results,
         )
@@ -328,7 +347,7 @@ def flow_adsorption_single_or_upstream(sim_conds, stream_conds, variables):
     return output
 
 
-def batch_adsorption_upstream(sim_conds, stream_conds, variables, is_series_operation):
+def batch_adsorption_upstream(sim_conds, stream_conds, state_manager, tower_num, is_series_operation):
     """バッチ吸着_上流
         説明: ２つの吸着塔のバッチ吸着における上流側（下流側の圧力回復が目的）
         ベースモデル: バッチ吸着モデル
@@ -340,10 +359,12 @@ def batch_adsorption_upstream(sim_conds, stream_conds, variables, is_series_oper
         timestamp (float): 時刻
     """
     # 初期のバッチ吸着と同じ仕組み
-    return initial_adsorption(sim_conds, stream_conds, variables, is_series_operation)
+    return initial_adsorption(sim_conds, stream_conds, state_manager, tower_num, is_series_operation)
 
 
-def equalization_pressure_depressurization(sim_conds, stream_conds, variables, downstream_tower_pressure):
+def equalization_pressure_depressurization(
+    sim_conds, stream_conds, state_manager, tower_num, downstream_tower_pressure
+):
     """バッチ均圧（減圧）
         説明: 均圧における減圧側
         ベースモデル: 吸着モデル
@@ -370,7 +391,8 @@ def equalization_pressure_depressurization(sim_conds, stream_conds, variables, d
     # 0. 上流管からの流入計算
     depressurization_results = adsorption_base_models.calculate_pressure_after_depressurization(
         sim_conds=sim_conds,
-        variables=variables,
+        state_manager=state_manager,
+        tower_num=tower_num,
         downstream_tower_pressure=downstream_tower_pressure,
     )
     # 1. マテバラ・熱バラ計算
@@ -384,7 +406,8 @@ def equalization_pressure_depressurization(sim_conds, stream_conds, variables, d
             stream_conds=stream_conds,
             stream=stream,
             section=1,
-            variables=variables,
+            state_manager=state_manager,
+            tower_num=tower_num,
             inflow_gas=None,
             flow_amt_depress=depressurization_results["flow_amount_l"],
         )
@@ -393,7 +416,8 @@ def equalization_pressure_depressurization(sim_conds, stream_conds, variables, d
             stream_conds=stream_conds,
             stream=stream,
             section=1,
-            variables=variables,
+            state_manager=state_manager,
+            tower_num=tower_num,
             mode=mode,
             material_output=mass_balance_results[stream][1],
             heat_output=None,
@@ -406,7 +430,8 @@ def equalization_pressure_depressurization(sim_conds, stream_conds, variables, d
                 stream_conds=stream_conds,
                 stream=stream,
                 section=section,
-                variables=variables,
+                state_manager=state_manager,
+                tower_num=tower_num,
                 inflow_gas=mass_balance_results[stream][section - 1],
             )
             heat_balance_results[stream][section] = adsorption_base_models.calculate_heat_balance_for_bed(
@@ -414,7 +439,8 @@ def equalization_pressure_depressurization(sim_conds, stream_conds, variables, d
                 stream_conds=stream_conds,
                 stream=stream,
                 section=section,
-                variables=variables,
+                state_manager=state_manager,
+                tower_num=tower_num,
                 mode=mode,
                 material_output=mass_balance_results[stream][section],
                 heat_output=heat_balance_results[stream][section - 1],
@@ -425,7 +451,8 @@ def equalization_pressure_depressurization(sim_conds, stream_conds, variables, d
         sim_conds=sim_conds,
         stream_conds=stream_conds,
         section=1,
-        variables=variables,
+        state_manager=state_manager,
+        tower_num=tower_num,
         heat_output=heat_balance_results[sim_conds["COMMON_COND"]["NUM_STR"]][1],
         heat_wall_output=None,
     )
@@ -434,7 +461,8 @@ def equalization_pressure_depressurization(sim_conds, stream_conds, variables, d
             sim_conds=sim_conds,
             stream_conds=stream_conds,
             section=section,
-            variables=variables,
+            state_manager=state_manager,
+            tower_num=tower_num,
             heat_output=heat_balance_results[sim_conds["COMMON_COND"]["NUM_STR"]][section],
             heat_wall_output=wall_heat_balance_results[section - 1],
         )
@@ -443,7 +471,8 @@ def equalization_pressure_depressurization(sim_conds, stream_conds, variables, d
         lid_heat_balance_results[position] = adsorption_base_models.calculate_heat_balance_for_lid(
             sim_conds=sim_conds,
             position=position,
-            variables=variables,
+            state_manager=state_manager,
+            tower_num=tower_num,
             heat_output=heat_balance_results,
             heat_wall_output=wall_heat_balance_results,
         )
@@ -451,7 +480,8 @@ def equalization_pressure_depressurization(sim_conds, stream_conds, variables, d
     downstream_flow_and_pressure = adsorption_base_models.calculate_downstream_flow_after_depressurization(
         sim_conds=sim_conds,
         stream_conds=stream_conds,
-        variables=variables,
+        state_manager=state_manager,
+        tower_num=tower_num,
         mass_balance_results=mass_balance_results,
         downstream_tower_pressure=downstream_tower_pressure,
     )
@@ -470,7 +500,7 @@ def equalization_pressure_depressurization(sim_conds, stream_conds, variables, d
     return output
 
 
-def desorption_by_vacuuming(sim_conds, stream_conds, variables):
+def desorption_by_vacuuming(sim_conds, stream_conds, state_manager, tower_num):
     """真空脱着
         説明: 真空引きによる脱着
         ベースモデル: 脱着モデル
@@ -495,7 +525,7 @@ def desorption_by_vacuuming(sim_conds, stream_conds, variables):
 
     # 0. 排気後圧力の計算
     vacuum_pumping_results = adsorption_base_models.calculate_pressure_after_vacuum_pumping(
-        sim_conds=sim_conds, variables=variables
+        sim_conds=sim_conds, state_manager=state_manager, tower_num=tower_num
     )
     # 1. マテバラ・熱バラ計算
     for stream in range(1, 1 + sim_conds["COMMON_COND"]["NUM_STR"]):
@@ -509,7 +539,8 @@ def desorption_by_vacuuming(sim_conds, stream_conds, variables):
                 stream_conds=stream_conds,
                 stream=stream,
                 section=1,
-                variables=variables,
+                state_manager=state_manager,
+                tower_num=tower_num,
                 vacuum_pumping_results=vacuum_pumping_results,
             )
         )
@@ -518,7 +549,8 @@ def desorption_by_vacuuming(sim_conds, stream_conds, variables):
             stream_conds=stream_conds,
             stream=stream,
             section=1,
-            variables=variables,
+            state_manager=state_manager,
+            tower_num=tower_num,
             mode=mode,
             material_output=mass_balance_results[stream][1],
             heat_output=None,
@@ -532,7 +564,8 @@ def desorption_by_vacuuming(sim_conds, stream_conds, variables):
                     stream_conds=stream_conds,
                     stream=stream,
                     section=section,
-                    variables=variables,
+                    state_manager=state_manager,
+                    tower_num=tower_num,
                     vacuum_pumping_results=vacuum_pumping_results,
                 )
             )
@@ -541,7 +574,8 @@ def desorption_by_vacuuming(sim_conds, stream_conds, variables):
                 stream_conds=stream_conds,
                 stream=stream,
                 section=section,
-                variables=variables,
+                state_manager=state_manager,
+                tower_num=tower_num,
                 mode=mode,
                 material_output=mass_balance_results[stream][section],
                 heat_output=heat_balance_results[stream][section - 1],
@@ -552,7 +586,8 @@ def desorption_by_vacuuming(sim_conds, stream_conds, variables):
         sim_conds=sim_conds,
         stream_conds=stream_conds,
         section=1,
-        variables=variables,
+        state_manager=state_manager,
+        tower_num=tower_num,
         heat_output=heat_balance_results[sim_conds["COMMON_COND"]["NUM_STR"]][1],
         heat_wall_output=None,
     )
@@ -561,7 +596,8 @@ def desorption_by_vacuuming(sim_conds, stream_conds, variables):
             sim_conds=sim_conds,
             stream_conds=stream_conds,
             section=section,
-            variables=variables,
+            state_manager=state_manager,
+            tower_num=tower_num,
             heat_output=heat_balance_results[sim_conds["COMMON_COND"]["NUM_STR"]][section],
             heat_wall_output=wall_heat_balance_results[section - 1],
         )
@@ -570,14 +606,16 @@ def desorption_by_vacuuming(sim_conds, stream_conds, variables):
         lid_heat_balance_results[position] = adsorption_base_models.calculate_heat_balance_for_lid(
             sim_conds=sim_conds,
             position=position,
-            variables=variables,
+            state_manager=state_manager,
+            tower_num=tower_num,
             heat_output=heat_balance_results,
             heat_wall_output=wall_heat_balance_results,
         )
     # 4. 脱着後の全圧
     pressure_after_desorption = adsorption_base_models.calculate_pressure_after_desorption(
         sim_conds=sim_conds,
-        variables=variables,
+        state_manager=state_manager,
+        tower_num=tower_num,
         mole_fraction_results=mole_fraction_results,
         vacuum_pumping_results=vacuum_pumping_results,
     )
@@ -595,7 +633,7 @@ def desorption_by_vacuuming(sim_conds, stream_conds, variables):
     return output
 
 
-def equalization_pressure_pressurization(sim_conds, stream_conds, variables, upstream_params):
+def equalization_pressure_pressurization(sim_conds, stream_conds, state_manager, tower_num, upstream_params):
     """バッチ均圧（加圧）
         説明: 均圧における加圧側
         ベースモデル: バッチ吸着モデル
@@ -632,7 +670,8 @@ def equalization_pressure_pressurization(sim_conds, stream_conds, variables, ups
             stream_conds=stream_conds,
             stream=stream,
             section=1,
-            variables=variables,
+            state_manager=state_manager,
+            tower_num=tower_num,
             inflow_gas=upstream_params["outflow_fr"][stream],
         )
         heat_balance_results[stream][1] = adsorption_base_models.calculate_heat_balance_for_bed(
@@ -640,7 +679,8 @@ def equalization_pressure_pressurization(sim_conds, stream_conds, variables, ups
             stream_conds=stream_conds,
             stream=stream,
             section=1,
-            variables=variables,
+            state_manager=state_manager,
+            tower_num=tower_num,
             mode=mode,
             material_output=mass_balance_results[stream][1],
             heat_output=None,
@@ -653,7 +693,8 @@ def equalization_pressure_pressurization(sim_conds, stream_conds, variables, ups
                 stream_conds=stream_conds,
                 stream=stream,
                 section=section,
-                variables=variables,
+                state_manager=state_manager,
+                tower_num=tower_num,
                 inflow_gas=mass_balance_results[stream][section - 1],
             )
             heat_balance_results[stream][section] = adsorption_base_models.calculate_heat_balance_for_bed(
@@ -661,7 +702,8 @@ def equalization_pressure_pressurization(sim_conds, stream_conds, variables, ups
                 stream_conds=stream_conds,
                 stream=stream,
                 section=section,
-                variables=variables,
+                state_manager=state_manager,
+                tower_num=tower_num,
                 mode=mode,
                 material_output=mass_balance_results[stream][section],
                 heat_output=heat_balance_results[stream][section - 1],
@@ -672,7 +714,8 @@ def equalization_pressure_pressurization(sim_conds, stream_conds, variables, ups
         sim_conds=sim_conds,
         stream_conds=stream_conds,
         section=1,
-        variables=variables,
+        state_manager=state_manager,
+        tower_num=tower_num,
         heat_output=heat_balance_results[sim_conds["COMMON_COND"]["NUM_STR"]][1],
         heat_wall_output=None,
     )
@@ -681,7 +724,8 @@ def equalization_pressure_pressurization(sim_conds, stream_conds, variables, ups
             sim_conds=sim_conds,
             stream_conds=stream_conds,
             section=section,
-            variables=variables,
+            state_manager=state_manager,
+            tower_num=tower_num,
             heat_output=heat_balance_results[sim_conds["COMMON_COND"]["NUM_STR"]][section],
             heat_wall_output=wall_heat_balance_results[section - 1],
         )
@@ -690,7 +734,8 @@ def equalization_pressure_pressurization(sim_conds, stream_conds, variables, ups
         lid_heat_balance_results[position] = adsorption_base_models.calculate_heat_balance_for_lid(
             sim_conds=sim_conds,
             position=position,
-            variables=variables,
+            state_manager=state_manager,
+            tower_num=tower_num,
             heat_output=heat_balance_results,
             heat_wall_output=wall_heat_balance_results,
         )
@@ -708,7 +753,9 @@ def equalization_pressure_pressurization(sim_conds, stream_conds, variables, ups
     return output
 
 
-def batch_adsorption_downstream(sim_conds, stream_conds, variables, is_series_operation, inflow_gas, stagnant_mf):
+def batch_adsorption_downstream(
+    sim_conds, stream_conds, state_manager, tower_num, is_series_operation, inflow_gas, stagnant_mf
+):
     """バッチ吸着（下流）
         説明: ２つの吸着塔のバッチ吸着における下流側（下流側の圧力回復が目的）
         ベースモデル: バッチ吸着モデル
@@ -761,7 +808,8 @@ def batch_adsorption_downstream(sim_conds, stream_conds, variables, is_series_op
             stream_conds=stream_conds,
             stream=stream,
             section=1,
-            variables=variables,
+            state_manager=state_manager,
+            tower_num=tower_num,
             inflow_gas=distributed_inflow,
             stagnant_mode=stagnant_mf,
         )
@@ -770,7 +818,8 @@ def batch_adsorption_downstream(sim_conds, stream_conds, variables, is_series_op
             stream_conds=stream_conds,
             stream=stream,
             section=1,
-            variables=variables,
+            state_manager=state_manager,
+            tower_num=tower_num,
             mode=mode,
             material_output=mass_balance_results[stream][1],
             heat_output=None,
@@ -783,7 +832,8 @@ def batch_adsorption_downstream(sim_conds, stream_conds, variables, is_series_op
                 stream_conds=stream_conds,
                 stream=stream,
                 section=section,
-                variables=variables,
+                state_manager=state_manager,
+                tower_num=tower_num,
                 inflow_gas=mass_balance_results[stream][section - 1],
             )
             heat_balance_results[stream][section] = adsorption_base_models.calculate_heat_balance_for_bed(
@@ -791,7 +841,8 @@ def batch_adsorption_downstream(sim_conds, stream_conds, variables, is_series_op
                 stream_conds=stream_conds,
                 stream=stream,
                 section=section,
-                variables=variables,
+                state_manager=state_manager,
+                tower_num=tower_num,
                 mode=mode,
                 material_output=mass_balance_results[stream][section],
                 heat_output=heat_balance_results[stream][section - 1],
@@ -802,7 +853,8 @@ def batch_adsorption_downstream(sim_conds, stream_conds, variables, is_series_op
         sim_conds=sim_conds,
         stream_conds=stream_conds,
         section=1,
-        variables=variables,
+        state_manager=state_manager,
+        tower_num=tower_num,
         heat_output=heat_balance_results[sim_conds["COMMON_COND"]["NUM_STR"]][1],
         heat_wall_output=None,
     )
@@ -811,7 +863,8 @@ def batch_adsorption_downstream(sim_conds, stream_conds, variables, is_series_op
             sim_conds=sim_conds,
             stream_conds=stream_conds,
             section=section,
-            variables=variables,
+            state_manager=state_manager,
+            tower_num=tower_num,
             heat_output=heat_balance_results[sim_conds["COMMON_COND"]["NUM_STR"]][section],
             heat_wall_output=wall_heat_balance_results[section - 1],
         )
@@ -820,13 +873,14 @@ def batch_adsorption_downstream(sim_conds, stream_conds, variables, is_series_op
         lid_heat_balance_results[position] = adsorption_base_models.calculate_heat_balance_for_lid(
             sim_conds=sim_conds,
             position=position,
-            variables=variables,
+            state_manager=state_manager,
+            tower_num=tower_num,
             heat_output=heat_balance_results,
             heat_wall_output=wall_heat_balance_results,
         )
     # 4. バッチ吸着後圧力変化
     pressure_after_batch_adsorption = adsorption_base_models.calculate_pressure_after_batch_adsorption(
-        sim_conds=sim_conds, variables=variables, is_series_operation=is_series_operation
+        sim_conds=sim_conds, state_manager=state_manager, tower_num=tower_num, is_series_operation=is_series_operation
     )
     # 出力
     output = {
@@ -840,7 +894,7 @@ def batch_adsorption_downstream(sim_conds, stream_conds, variables, is_series_op
     return output
 
 
-def flow_adsorption_downstream(sim_conds, stream_conds, variables, inflow_gas):
+def flow_adsorption_downstream(sim_conds, stream_conds, state_manager, tower_num, inflow_gas):
     """流通吸着（下流）
         説明: ２つの吸着塔による流通吸着における下流側
         ベースモデル: 流通吸着モデル
@@ -894,7 +948,8 @@ def flow_adsorption_downstream(sim_conds, stream_conds, variables, inflow_gas):
             stream_conds=stream_conds,
             stream=stream,
             section=1,
-            variables=variables,
+            state_manager=state_manager,
+            tower_num=tower_num,
             inflow_gas=distributed_inflow,
         )
         heat_balance_results[stream][1] = adsorption_base_models.calculate_heat_balance_for_bed(
@@ -902,7 +957,8 @@ def flow_adsorption_downstream(sim_conds, stream_conds, variables, inflow_gas):
             stream_conds=stream_conds,
             stream=stream,
             section=1,
-            variables=variables,
+            state_manager=state_manager,
+            tower_num=tower_num,
             mode=mode,
             material_output=mass_balance_results[stream][1],
             heat_output=None,
@@ -915,7 +971,8 @@ def flow_adsorption_downstream(sim_conds, stream_conds, variables, inflow_gas):
                 stream_conds=stream_conds,
                 stream=stream,
                 section=section,
-                variables=variables,
+                state_manager=state_manager,
+                tower_num=tower_num,
                 inflow_gas=mass_balance_results[stream][section - 1],
             )
             heat_balance_results[stream][section] = adsorption_base_models.calculate_heat_balance_for_bed(
@@ -923,7 +980,8 @@ def flow_adsorption_downstream(sim_conds, stream_conds, variables, inflow_gas):
                 stream_conds=stream_conds,
                 stream=stream,
                 section=section,
-                variables=variables,
+                state_manager=state_manager,
+                tower_num=tower_num,
                 mode=mode,
                 material_output=mass_balance_results[stream][section],
                 heat_output=heat_balance_results[stream][section - 1],
@@ -934,7 +992,8 @@ def flow_adsorption_downstream(sim_conds, stream_conds, variables, inflow_gas):
         sim_conds=sim_conds,
         stream_conds=stream_conds,
         section=1,
-        variables=variables,
+        state_manager=state_manager,
+        tower_num=tower_num,
         heat_output=heat_balance_results[sim_conds["COMMON_COND"]["NUM_STR"]][1],
         heat_wall_output=None,
     )
@@ -943,7 +1002,8 @@ def flow_adsorption_downstream(sim_conds, stream_conds, variables, inflow_gas):
             sim_conds=sim_conds,
             stream_conds=stream_conds,
             section=section,
-            variables=variables,
+            state_manager=state_manager,
+            tower_num=tower_num,
             heat_output=heat_balance_results[sim_conds["COMMON_COND"]["NUM_STR"]][section],
             heat_wall_output=wall_heat_balance_results[section - 1],
         )
@@ -952,7 +1012,8 @@ def flow_adsorption_downstream(sim_conds, stream_conds, variables, inflow_gas):
         lid_heat_balance_results[position] = adsorption_base_models.calculate_heat_balance_for_lid(
             sim_conds=sim_conds,
             position=position,
-            variables=variables,
+            state_manager=state_manager,
+            tower_num=tower_num,
             heat_output=heat_balance_results,
             heat_wall_output=wall_heat_balance_results,
         )

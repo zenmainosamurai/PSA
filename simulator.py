@@ -7,7 +7,7 @@ from logging import getLogger
 
 from utils import const, init_functions, plot_csv, other_utils
 import operation_models
-from optimized_state_variables import OptimizedStateVariables, TowerStateArrays
+from state_variables import StateVariables, TowerStateArrays
 
 
 import warnings
@@ -82,17 +82,12 @@ class GasAdosorptionBreakthroughsimulator:
         # その他初期化
         self.stagnant_mf: dict | None = None
 
-        self.state_manager = OptimizedStateVariables(self.num_tower, self.num_str, self.num_sec, self.sim_conds)
+        self.state_manager = StateVariables(self.num_tower, self.num_str, self.num_sec, self.sim_conds)
 
     def _init_variables(self):
-        """各塔の状態変数を初期化
-
-        Returns:
-            dict: 初期化した状態変数
-        """
+        """各塔の状態変数を初期化"""
         for tower_num in range(1, self.num_tower + 1):
             self.state_manager.towers[tower_num].total_press = self.df_obs.loc[0, f"T{tower_num}_press"]
-        return self.state_manager.to_legacy_format()
 
     def execute_simulation(self, filtered_states=None, output_foldapath=None):
         """物理計算を通しで実行"""
@@ -120,7 +115,7 @@ class GasAdosorptionBreakthroughsimulator:
         # プロセス終了時刻記録用
         p_end_dict = {key: 0 for key in range(1, 1 + len(self.df_operation))}
         # 状態変数の初期化
-        variables_tower = self._init_variables()
+        self._init_variables()
         # 吸着計算
         timestamp = 0
         for p in self.df_operation.index:
@@ -129,10 +124,9 @@ class GasAdosorptionBreakthroughsimulator:
             # 終了条件(文字列)の抽出
             termination_cond = self.df_operation.loc[p, "終了条件"]
             # プロセスpにおける各塔の吸着計算実施
-            timestamp, variables_tower, record_dict, success = self.calc_adsorption_process(
+            timestamp, record_dict, success = self.calc_adsorption_process(
                 mode_list=mode_list,
                 termination_cond_str=termination_cond,
-                variables_tower=variables_tower,
                 record_dict=record_dict,
                 timestamp=timestamp,
                 filtered_x=filtered_states,
@@ -181,7 +175,6 @@ class GasAdosorptionBreakthroughsimulator:
         self,
         mode_list,
         termination_cond_str,
-        variables_tower,
         record_dict,
         timestamp,
         filtered_x=None,
@@ -196,65 +189,61 @@ class GasAdosorptionBreakthroughsimulator:
             timestamp (float): 時刻t
             filtered_x (pd.DataFrame): データ同化で得られた状態変数の推移
         """
-        try:
-            # プロセス開始後経過時間
-            timestamp_p = 0
-            # 初回限定処理の実施
-            if "バッチ吸着_上流" in mode_list:
-                tower_num_up = mode_list.index("バッチ吸着_上流") + 1
-                tower_num_dw = mode_list.index("バッチ吸着_下流") + 1
-                # NOTE: 圧力平均化の位置
-                # 圧力の平均化
-                total_press_mean = (
-                    variables_tower[tower_num_up]["total_press"]
-                    * self.sim_conds[tower_num_up]["PACKED_BED_COND"]["v_space"]
-                    + variables_tower[tower_num_dw]["total_press"]
-                    * self.sim_conds[tower_num_dw]["PACKED_BED_COND"]["v_space"]
-                ) / (
-                    self.sim_conds[tower_num_up]["PACKED_BED_COND"]["v_space"]
-                    + self.sim_conds[tower_num_dw]["PACKED_BED_COND"]["v_space"]
-                )
-                variables_tower[tower_num_up]["total_press"] = total_press_mean
-                variables_tower[tower_num_dw]["total_press"] = total_press_mean
-            # 終了条件の抽出
+        # try:
+        # プロセス開始後経過時間
+        timestamp_p = 0
+        # 初回限定処理の実施
+        if "バッチ吸着_上流" in mode_list:
+            tower_num_up = mode_list.index("バッチ吸着_上流") + 1
+            tower_num_dw = mode_list.index("バッチ吸着_下流") + 1
+            tower_up = self.state_manager.towers[tower_num_up]
+            tower_dw = self.state_manager.towers[tower_num_dw]
+            # NOTE: 圧力平均化の位置
+            # 圧力の平均化
+            total_press_mean = (
+                tower_up.total_press * self.sim_conds[tower_num_up]["PACKED_BED_COND"]["v_space"]
+                + tower_dw.total_press * self.sim_conds[tower_num_dw]["PACKED_BED_COND"]["v_space"]
+            ) / (
+                self.sim_conds[tower_num_up]["PACKED_BED_COND"]["v_space"]
+                + self.sim_conds[tower_num_dw]["PACKED_BED_COND"]["v_space"]
+            )
+            tower_up.total_press = total_press_mean
+            tower_dw.total_press = total_press_mean
+        # 終了条件の抽出
+        termination_cond = self._create_termination_cond(
+            termination_cond_str,
+            timestamp,
+            timestamp_p,
+        )
+        # 逐次吸着計算
+        while termination_cond:
+            # 各塔の吸着計算実施
+            _record_outputs_tower = self.calc_adsorption_mode_list(self.sim_conds, mode_list)
+            # timestamp_p更新
+            timestamp_p += self.dt
+            # 記録
+            for _tower_num in range(1, 1 + self.num_tower):
+                record_dict[_tower_num]["timestamp"].append(timestamp + timestamp_p)
+                for key, values in _record_outputs_tower[_tower_num].items():
+                    record_dict[_tower_num][key].append(values)
+            # 終了条件の更新
             termination_cond = self._create_termination_cond(
                 termination_cond_str,
-                variables_tower,
                 timestamp,
                 timestamp_p,
             )
-            # 逐次吸着計算
-            while termination_cond:
-                # 各塔の吸着計算実施
-                variables_tower, _record_outputs_tower = self.calc_adsorption_mode_list(
-                    self.sim_conds, mode_list, variables_tower
-                )
-                # timestamp_p更新
-                timestamp_p += self.dt
-                # 記録
-                for _tower_num in range(1, 1 + self.num_tower):
-                    record_dict[_tower_num]["timestamp"].append(timestamp + timestamp_p)
-                    for key, values in _record_outputs_tower[_tower_num].items():
-                        record_dict[_tower_num][key].append(values)
-                # 終了条件の更新
-                termination_cond = self._create_termination_cond(
-                    termination_cond_str,
-                    variables_tower,
-                    timestamp,
-                    timestamp_p,
-                )
-                # 時間超過による強制終了
-                time_threshold = 20
-                if timestamp_p >= time_threshold:
-                    self.logger.warning(f"{time_threshold}分以内に終了しなかったため強制終了")
-                    return timestamp + timestamp_p, variables_tower, record_dict, False
-            return timestamp + timestamp_p, variables_tower, record_dict, True
+            # 時間超過による強制終了
+            time_threshold = 20
+            if timestamp_p >= time_threshold:
+                self.logger.warning(f"{time_threshold}分以内に終了しなかったため強制終了")
+                return timestamp + timestamp_p, record_dict, False
+        return timestamp + timestamp_p, record_dict, True
 
-        except Exception as e:
-            self.logger.warning(f"エラーが発生しました: \n{e}")
-            return timestamp + timestamp_p, variables_tower, record_dict, False
+        # except Exception as e:
+        #     self.logger.warning(f"エラーが発生しました: \n{e}")
+        #     return timestamp + timestamp_p, record_dict, False
 
-    def calc_adsorption_mode_list(self, sim_conds, mode_list, variables_tower):
+    def calc_adsorption_mode_list(self, sim_conds, mode_list):
         """モード(x_1, x_2, ... x_n)の時の各塔のガス吸着計算を行う
             上流や減圧は優先するなど、計算する順番を制御する
 
@@ -266,9 +255,7 @@ class GasAdosorptionBreakthroughsimulator:
             dict: 更新後の各塔の状態変数
             dict: 記録用の計算結果
         """
-        self.state_manager.from_legacy_format(variables_tower)
         # 記録用
-        new_variables_tower = {}  # 状態変数
         record_outputs_tower = {}  # 可視化等記録用
 
         ### 各塔のガス吸着計算 ---------------------------------
@@ -291,17 +278,15 @@ class GasAdosorptionBreakthroughsimulator:
             # 塔番号
             _tgt_tower_num_up = mode_list.index(_tgt_mode) + 1
             # ガス吸着計算実施
-            tower_vars = self.state_manager.to_legacy_format()[_tgt_tower_num_up]
             (
-                new_variables_tower[_tgt_tower_num_up],
                 record_outputs_tower[_tgt_tower_num_up],
                 _,
             ) = self.branch_operation_mode(
                 sim_conds=sim_conds[_tgt_tower_num_up],
                 stream_conds=self.stream_conds[_tgt_tower_num_up],
                 mode=_tgt_mode,
-                variables=tower_vars,
                 tower_num=_tgt_tower_num_up,
+                state_manager=self.state_manager,
             )
             # 下流 (上流のマテバラ出力を使用)
             if cond1:
@@ -309,18 +294,16 @@ class GasAdosorptionBreakthroughsimulator:
             else:
                 _tgt_mode = up_and_down_mode_list[1][1]
             _tgt_tower_num_down = mode_list.index(_tgt_mode) + 1
-            tower_vars = self.state_manager.to_legacy_format()[_tgt_tower_num_down]
             (
-                new_variables_tower[_tgt_tower_num_down],
                 record_outputs_tower[_tgt_tower_num_down],
                 _,
             ) = self.branch_operation_mode(
                 sim_conds=sim_conds[_tgt_tower_num_down],
                 stream_conds=self.stream_conds[_tgt_tower_num_down],
                 mode=_tgt_mode,
-                variables=tower_vars,
-                other_tower_params=record_outputs_tower[_tgt_tower_num_up]["material"],
                 tower_num=_tgt_tower_num_down,
+                state_manager=self.state_manager,
+                other_tower_params=record_outputs_tower[_tgt_tower_num_up]["material"],
             )
             # 残りの塔
             for tgt_tower_num in range(1, 1 + self.num_tower):
@@ -328,17 +311,15 @@ class GasAdosorptionBreakthroughsimulator:
                 if tgt_tower_num in [_tgt_tower_num_up, _tgt_tower_num_down]:
                     continue
                 _tgt_mode = mode_list[tgt_tower_num - 1]
-                tower_vars = self.state_manager.to_legacy_format()[tgt_tower_num]
                 (
-                    new_variables_tower[tgt_tower_num],
                     record_outputs_tower[tgt_tower_num],
                     _,
                 ) = self.branch_operation_mode(
                     sim_conds=sim_conds[tgt_tower_num],
                     stream_conds=self.stream_conds[tgt_tower_num],
                     mode=_tgt_mode,
-                    variables=tower_vars,
                     tower_num=tgt_tower_num,
+                    state_manager=self.state_manager,
                 )
         # 2. 均圧の加圧と減圧がある場合
         elif ("均圧_加圧" in mode_list) and ("均圧_減圧" in mode_list):
@@ -349,34 +330,30 @@ class GasAdosorptionBreakthroughsimulator:
             _tgt_tower_num_press = mode_list.index(_tgt_mode_pre) + 1
             # 減圧から実施
             # NOTE: 加圧側の全圧を引数として渡す
-            tower_vars = self.state_manager.to_legacy_format()[_tgt_tower_num_depress]
             press_tower_pressure = self.state_manager.towers[_tgt_tower_num_press].total_press
             (
-                new_variables_tower[_tgt_tower_num_depress],
                 record_outputs_tower[_tgt_tower_num_depress],
                 all_outputs,
             ) = self.branch_operation_mode(
                 sim_conds=sim_conds[_tgt_tower_num_depress],
                 stream_conds=self.stream_conds[_tgt_tower_num_depress],
                 mode=_tgt_mode_dep,
-                variables=tower_vars,
-                other_tower_params=press_tower_pressure,
                 tower_num=_tgt_tower_num_depress,
+                state_manager=self.state_manager,
+                other_tower_params=press_tower_pressure,
             )
             # 加圧
             # NOTE: 減圧側の均圧配管流量を引数として渡す
-            tower_vars = self.state_manager.to_legacy_format()[_tgt_tower_num_press]
             (
-                new_variables_tower[_tgt_tower_num_press],
                 record_outputs_tower[_tgt_tower_num_press],
                 _,
             ) = self.branch_operation_mode(
                 sim_conds=sim_conds[_tgt_tower_num_press],
                 stream_conds=self.stream_conds[_tgt_tower_num_press],
                 mode=_tgt_mode_pre,
-                variables=tower_vars,
-                other_tower_params=all_outputs["downflow_params"],
                 tower_num=_tgt_tower_num_press,
+                state_manager=self.state_manager,
+                other_tower_params=all_outputs["downflow_params"],
             )
             # 残りの塔
             for tgt_tower_num in range(1, 1 + self.num_tower):
@@ -384,17 +361,15 @@ class GasAdosorptionBreakthroughsimulator:
                 if tgt_tower_num in [_tgt_tower_num_depress, _tgt_tower_num_press]:
                     continue
                 _tgt_mode = mode_list[tgt_tower_num - 1]
-                tower_vars = self.state_manager.to_legacy_format()[tgt_tower_num]
                 (
-                    new_variables_tower[tgt_tower_num],
                     record_outputs_tower[tgt_tower_num],
                     _,
                 ) = self.branch_operation_mode(
                     sim_conds=sim_conds[tgt_tower_num],
                     stream_conds=self.stream_conds[tgt_tower_num],
                     mode=_tgt_mode,
-                    variables=tower_vars,
                     tower_num=tgt_tower_num,
+                    state_manager=self.state_manager,
                 )
         # 3. 独立運転
         else:
@@ -402,19 +377,19 @@ class GasAdosorptionBreakthroughsimulator:
             for tgt_tower_num in range(1, 1 + self.num_tower):
                 _tgt_mode = mode_list[tgt_tower_num - 1]
                 (
-                    new_variables_tower[tgt_tower_num],
                     record_outputs_tower[tgt_tower_num],
                     _,
                 ) = self.branch_operation_mode(
                     sim_conds=sim_conds[tgt_tower_num],
                     stream_conds=self.stream_conds[tgt_tower_num],
                     mode=_tgt_mode,
-                    variables=variables_tower[tgt_tower_num],
+                    tower_num=tgt_tower_num,
+                    state_manager=self.state_manager,
                 )
 
-        return new_variables_tower, record_outputs_tower
+        return record_outputs_tower
 
-    def branch_operation_mode(self, sim_conds, stream_conds, mode, variables, other_tower_params=None, tower_num=None):
+    def branch_operation_mode(self, sim_conds, stream_conds, mode, tower_num, state_manager, other_tower_params=None):
         """稼働モードxの時のガス吸着計算を行う
 
         Args:
@@ -436,24 +411,25 @@ class GasAdosorptionBreakthroughsimulator:
             sim_conds_copy["INFLOW_GAS_COND"]["fr_co2"] = 20
             sim_conds_copy["INFLOW_GAS_COND"]["fr_n2"] = 25.2
             calc_output = operation_models.initial_adsorption(
-                sim_conds=sim_conds_copy, stream_conds=stream_conds, variables=variables
+                sim_conds=sim_conds_copy, stream_conds=stream_conds, state_manager=state_manager, tower_num=tower_num
             )
         # 停止
         elif mode == "停止":
             calc_output = operation_models.stop_mode(
-                sim_conds=sim_conds, stream_conds=stream_conds, variables=variables
+                sim_conds=sim_conds, stream_conds=stream_conds, state_manager=state_manager, tower_num=tower_num
             )
         # 流通吸着_単独/上流
         elif mode == "流通吸着_単独/上流":
             calc_output = operation_models.flow_adsorption_single_or_upstream(
-                sim_conds=sim_conds, stream_conds=stream_conds, variables=variables
+                sim_conds=sim_conds, stream_conds=stream_conds, state_manager=state_manager, tower_num=tower_num
             )
         # 流通吸着_下流
         elif mode == "流通吸着_下流":
             calc_output = operation_models.flow_adsorption_downstream(
                 sim_conds=sim_conds,
                 stream_conds=stream_conds,
-                variables=variables,
+                state_manager=state_manager,
+                tower_num=tower_num,
                 inflow_gas=other_tower_params,
             )
         # バッチ吸着_上流
@@ -461,7 +437,8 @@ class GasAdosorptionBreakthroughsimulator:
             calc_output = operation_models.batch_adsorption_upstream(
                 sim_conds=sim_conds,
                 stream_conds=stream_conds,
-                variables=variables,
+                state_manager=state_manager,
+                tower_num=tower_num,
                 is_series_operation=True,
             )
         # バッチ吸着_下流
@@ -471,7 +448,8 @@ class GasAdosorptionBreakthroughsimulator:
             calc_output = operation_models.batch_adsorption_downstream(
                 sim_conds=sim_conds,
                 stream_conds=stream_conds,
-                variables=variables,
+                state_manager=state_manager,
+                tower_num=tower_num,
                 is_series_operation=True,
                 inflow_gas=other_tower_params,
                 stagnant_mf=self.stagnant_mf,
@@ -481,7 +459,8 @@ class GasAdosorptionBreakthroughsimulator:
             calc_output = operation_models.equalization_pressure_depressurization(
                 sim_conds=sim_conds,
                 stream_conds=stream_conds,
-                variables=variables,
+                state_manager=state_manager,
+                tower_num=tower_num,
                 downstream_tower_pressure=other_tower_params,
             )
         # 均圧_加圧
@@ -489,151 +468,38 @@ class GasAdosorptionBreakthroughsimulator:
             calc_output = operation_models.equalization_pressure_pressurization(
                 sim_conds=sim_conds,
                 stream_conds=stream_conds,
-                variables=variables,
+                state_manager=state_manager,
+                tower_num=tower_num,
                 upstream_params=other_tower_params,
             )
             self.stagnant_mf = calc_output["material"]
         # 真空脱着
         elif mode == "真空脱着":
             calc_output = operation_models.desorption_by_vacuuming(
-                sim_conds=sim_conds, stream_conds=stream_conds, variables=variables
+                sim_conds=sim_conds, stream_conds=stream_conds, state_manager=state_manager, tower_num=tower_num
             )
 
-        ### 2. 状態変数の抽出 ----------------------------------------
-        if tower_num is not None:
-            self.state_manager.update_from_calc_output(tower_num, mode, calc_output)
-            new_variables = self.state_manager.to_legacy_format()[tower_num]
-        else:
-            new_variables = self._extract_state_vars(mode, variables, calc_output)
+        ### 2. 状態変数の更新 ----------------------------------------
+        self.state_manager.update_from_calc_output(tower_num, mode, calc_output)
 
         ### 3. 記録項目の抽出 ----------------------------------------
         # a. マテバラ・熱バラ
         key_list = ["material", "heat", "heat_wall", "heat_lid"]
         other_outputs = {key: calc_output[key] for key in key_list}
         # b. その他状態変数
-        key_list = ["total_press", "mf_co2", "mf_n2", "vacuum_amt_co2", "vacuum_amt_n2"]
-        other_outputs["others"] = {key: new_variables[key] for key in key_list}
+        tower = self.state_manager.towers[tower_num]
 
-        return new_variables, other_outputs, calc_output
+        other_outputs["others"] = {
+            "total_press": tower.total_press,
+            "mf_co2": tower.mf_co2.copy(),
+            "mf_n2": tower.mf_n2.copy(),
+            "vacuum_amt_co2": tower.vacuum_amt_co2,
+            "vacuum_amt_n2": tower.vacuum_amt_n2,
+        }
 
-    def _extract_state_vars(self, mode, variables, calc_output):
-        """吸着計算結果から状態変数を抽出する
+        return other_outputs, calc_output
 
-        Args:
-            mode (int): 稼働モード
-            variables (dict): 状態変数
-            timestamp (float): 現在時刻t
-
-        Returns:
-            dict: 更新後の各塔の状態変数
-            dict: 記録用の計算結果
-        """
-        new_variables = {}
-        # 温度
-        new_variables["temp"] = {}
-        for stream in range(1, 1 + self.num_str):
-            new_variables["temp"][stream] = {}
-            for section in range(1, 1 + self.num_sec):
-                new_variables["temp"][stream][section] = calc_output["heat"][stream][section]["temp_reached"]
-        # 温度（壁面）
-        new_variables["temp_wall"] = {}
-        for section in range(1, 1 + self.num_sec):
-            new_variables["temp_wall"][section] = calc_output["heat_wall"][section]["temp_reached"]
-        # 上下蓋の温度
-        new_variables["temp_lid"] = {}
-        for position in ["up", "down"]:
-            new_variables["temp_lid"][position] = calc_output["heat_lid"][position]["temp_reached"]
-        # 熱電対温度
-        new_variables["temp_thermo"] = {}
-        for stream in range(1, 1 + self.num_str):
-            new_variables["temp_thermo"][stream] = {}
-            for section in range(1, 1 + self.num_sec):
-                new_variables["temp_thermo"][stream][section] = calc_output["heat"][stream][section][
-                    "temp_thermocouple_reached"
-                ]
-        # 既存吸着量
-        new_variables["adsorp_amt"] = {}
-        for stream in range(1, 1 + self.num_str):
-            new_variables["adsorp_amt"][stream] = {}
-            for section in range(1, 1 + self.num_sec):
-                new_variables["adsorp_amt"][stream][section] = calc_output["material"][stream][section][
-                    "accum_adsorp_amt"
-                ]
-        # モル分率
-        new_variables["mf_co2"] = {}
-        new_variables["mf_n2"] = {}
-        if mode in [
-            "初回ガス導入",
-            "流通吸着_単独/上流",
-            "バッチ吸着_上流",
-            "均圧_加圧",
-            "均圧_減圧",
-            "バッチ吸着_下流",
-            "流通吸着_下流",
-        ]:
-            for stream in range(1, 1 + self.num_str):
-                new_variables["mf_co2"][stream] = {}
-                new_variables["mf_n2"][stream] = {}
-                for section in range(1, 1 + self.num_sec):  # 吸着時は「流出モル分率」
-                    new_variables["mf_co2"][stream][section] = calc_output["material"][stream][section][
-                        "outflow_mf_co2"
-                    ]
-                    new_variables["mf_n2"][stream][section] = calc_output["material"][stream][section]["outflow_mf_n2"]
-        elif mode in ["真空脱着"]:
-            for stream in range(1, 1 + self.num_str):
-                new_variables["mf_co2"][stream] = {}
-                new_variables["mf_n2"][stream] = {}
-                for section in range(1, 1 + self.num_sec):  # 脱着時は「脱着後のモル分率」
-                    new_variables["mf_co2"][stream][section] = calc_output["mol_fraction"][stream][section][
-                        "mf_co2_after_vacuum"
-                    ]
-                    new_variables["mf_n2"][stream][section] = calc_output["mol_fraction"][stream][section][
-                        "mf_n2_after_vacuum"
-                    ]
-        elif mode in ["停止"]:
-            for stream in range(1, 1 + self.num_str):
-                new_variables["mf_co2"][stream] = {}
-                new_variables["mf_n2"][stream] = {}
-                for section in range(1, 1 + self.num_sec):  # 停止時は直前のモル分率
-                    new_variables["mf_co2"][stream][section] = variables["mf_co2"][stream][section]
-                    new_variables["mf_n2"][stream][section] = variables["mf_n2"][stream][section]
-        # 壁―, 層伝熱係数
-        new_variables["heat_t_coef"] = {}
-        new_variables["heat_t_coef_wall"] = {}
-        for stream in range(1, 1 + self.num_str):
-            new_variables["heat_t_coef"][stream] = {}
-            new_variables["heat_t_coef_wall"][stream] = {}
-            for section in range(1, 1 + self.num_sec):
-                new_variables["heat_t_coef"][stream][section] = calc_output["heat"][stream][section]["hw1"]
-                new_variables["heat_t_coef_wall"][stream][section] = calc_output["heat"][stream][section]["u1"]
-        # 全圧
-        if mode in ["初回ガス導入", "バッチ吸着_上流", "均圧_加圧", "バッチ吸着_下流"]:
-            new_variables["total_press"] = calc_output["pressure_after_batch_adsorption"]
-        elif mode in ["均圧_減圧", "流通吸着_単独/上流", "流通吸着_下流"]:
-            new_variables["total_press"] = calc_output["total_press"]
-        elif mode in ["真空脱着"]:
-            new_variables["total_press"] = calc_output["pressure_after_desorption"]
-        else:
-            new_variables["total_press"] = variables["total_press"]
-        # CO2, N2回収量 [mol]
-        if mode in ["真空脱着"]:
-            new_variables["vacuum_amt_co2"] = calc_output["accum_vacuum_amt"]["accum_vacuum_amt_co2"]
-            new_variables["vacuum_amt_n2"] = calc_output["accum_vacuum_amt"]["accum_vacuum_amt_n2"]
-        else:
-            new_variables["vacuum_amt_co2"] = 0
-            new_variables["vacuum_amt_n2"] = 0
-        # 流出CO2分圧
-        new_variables["outflow_pco2"] = {}
-        for stream in range(1, 1 + self.num_str):
-            new_variables["outflow_pco2"][stream] = {}
-            for section in range(1, 1 + self.num_sec):
-                new_variables["outflow_pco2"][stream][section] = calc_output["material"][stream][section][
-                    "outflow_pco2"
-                ]
-
-        return new_variables
-
-    def _create_termination_cond(self, termination_cond_str, variables_tower, timestamp, timestamp_p):
+    def _create_termination_cond(self, termination_cond_str, timestamp, timestamp_p):
         """文字列の終了条件からブール値の終了条件を作成する
 
         Args:

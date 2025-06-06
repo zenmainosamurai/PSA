@@ -8,6 +8,8 @@ from typing import Tuple
 
 import CoolProp.CoolProp as CP
 
+from state_variables import StateVariables
+
 
 # ------------------------------------------------------------------
 # 1. 物性値: 気体熱伝導率
@@ -112,7 +114,8 @@ def calc_heat_transfer_coef(
     section: int,
     temp_now: float,
     mode: int,
-    variables: dict,
+    state_manager: StateVariables,
+    tower_num: int,
     material_output: dict,
     vacuum_pumping_results: dict | None = None,
 ) -> tuple[float, float]:
@@ -133,14 +136,15 @@ def calc_heat_transfer_coef(
             hw1 (float): 壁-層伝熱係数 [W/m2/K]
             u1 (float): 層伝熱係数 [W/m2/K
     """
+    tower = state_manager.towers[tower_num]
     T_K = temp_now + 273.15
 
     if mode == 0:  # 吸着
         mf_co2 = material_output["inflow_mf_co2"]
         mf_n2 = material_output["inflow_mf_n2"]
     elif mode == 2:  # 脱着
-        mf_co2 = variables["mf_co2"][stream][section]
-        mf_n2 = variables["mf_n2"][stream][section]
+        mf_co2 = tower.mf_co2[stream - 1, section - 1]
+        mf_n2 = tower.mf_n2[stream - 1, section - 1]
     else:  # その他はとりあえず吸着と同様
         mf_co2 = material_output["inflow_mf_co2"]
         mf_n2 = material_output["inflow_mf_n2"]
