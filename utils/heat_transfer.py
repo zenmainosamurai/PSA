@@ -151,20 +151,20 @@ def calc_heat_transfer_coef(
 
     # ---- 物性値 -----------------------------------------------------
     kf = compute_gas_k(T_K, mf_co2, mf_n2)  # 気体熱伝導率
-    kp = sim_conds["PACKED_BED_COND"]["lambda_col"]
+    kp = sim_conds["PACKED_BED_COND"]["thermal_conductivity"]
 
-    epsilon = sim_conds["PACKED_BED_COND"]["epsilon"]
-    epsilon_p = sim_conds["PACKED_BED_COND"]["epsilon_p"]
-    dp = sim_conds["PACKED_BED_COND"]["dp"]
-    Lbed = sim_conds["PACKED_BED_COND"]["Lbed"]
-    num_sec = sim_conds["COMMON_COND"]["NUM_SEC"]
+    epsilon = sim_conds["PACKED_BED_COND"]["average_porosity"]
+    epsilon_p = sim_conds["PACKED_BED_COND"]["emissivity"]
+    dp = sim_conds["PACKED_BED_COND"]["average_particle_diameter"]
+    Lbed = sim_conds["PACKED_BED_COND"]["height"]
+    num_sec = sim_conds["COMMON_COND"]["num_sections"]
 
     # ---- ke0 (放射補正) --------------------------------------------
     ke0 = _yagi_kunii_radiation(T_K, kf, kp, epsilon, epsilon_p, dp)
 
     # ---- 流量関係 ---------------------------------------------------
     # ストリーム換算直径 d1
-    d1 = 2.0 * (stream_conds[stream]["Sstream"] / math.pi) ** 0.5
+    d1 = 2.0 * (stream_conds[stream]["cross_section"] / math.pi) ** 0.5
 
     # NOTE: 気体粘度 μ, 比熱 cp は大気圧を仮定
     P_ATM = 0.101325e6
@@ -179,14 +179,14 @@ def calc_heat_transfer_coef(
         f0 = (
             (material_output["inflow_fr_co2"] + material_output["inflow_fr_n2"])
             / 1e6
-            / (sim_conds["COMMON_COND"]["dt"] * 60.0)
+            / (sim_conds["COMMON_COND"]["calculation_step_time"] * 60.0)
         )
     elif mode == 2:  # 脱着時は排気ガス体積流量 [m3/s]
-        f0 = vacuum_pumping_results["vacuum_rate_N"] / 60.0 * stream_conds[stream]["streamratio"]
+        f0 = vacuum_pumping_results["vacuum_rate_N"] / 60.0 * stream_conds[stream]["area_fraction"]
     else:
         f0 = 0.0  # NOTE: この処理で正しいか確認
 
-    vcol = f0 / stream_conds[stream]["Sstream"]  # 空塔速度[m/s]
+    vcol = f0 / stream_conds[stream]["cross_section"]  # 空塔速度[m/s]
     nu = mu / material_output["gas_density"]  # 気体動粘度[m2/s]
     Rep = 1.0 if vcol == 0 else vcol * dp / nu  # 粒子レイノルズ数
 
@@ -194,7 +194,7 @@ def calc_heat_transfer_coef(
     ke, habs, dlat, hw1_raw = _axial_flow_correction(ke0, kf, dp, d1, Pr, Rep, epsilon, Lbed, num_sec)
 
     # ---- 壁-層伝熱係数補正 -----------------------------------------
-    hw1 = hw1_raw * sim_conds["DRUM_WALL_COND"]["coef_hw1"]
+    hw1 = hw1_raw * sim_conds["VESSEL_COND"]["wall_to_bed_htc_correction_factor"]
 
     # ---- 層伝熱係数 u1 ---------------------------------------------
     u1 = 1.0 / (dlat / ke + 1.0 / habs)

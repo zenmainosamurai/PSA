@@ -39,8 +39,8 @@ class GasAdosorptionBreakthroughsimulator:
                 "触媒充填層条件",
                 "導入ガス条件",
                 "容器壁条件",
-                "上蓋の条件",
-                "下蓋の条件",
+                "蓋条件",
+                "底条件",
                 "均圧配管条件",
                 "真空引き配管条件",
                 "熱電対条件",
@@ -49,9 +49,9 @@ class GasAdosorptionBreakthroughsimulator:
         )
         self.sim_conds = init_functions.read_sim_conds(df_sim_conds)
         self.num_tower = 3  # 塔数
-        self.dt = self.sim_conds[1]["COMMON_COND"]["dt"]  # dt
-        self.num_str = self.sim_conds[1]["COMMON_COND"]["NUM_STR"]  # ストリーム分割数
-        self.num_sec = self.sim_conds[1]["COMMON_COND"]["NUM_SEC"]  # セクション分割数
+        self.dt = self.sim_conds[1]["COMMON_COND"]["calculation_step_time"]  # dt
+        self.num_str = self.sim_conds[1]["COMMON_COND"]["num_streams"]  # ストリーム分割数
+        self.num_sec = self.sim_conds[1]["COMMON_COND"]["num_sections"]  # セクション分割数
 
         # stream条件の初期化
         self.stream_conds = {}
@@ -201,11 +201,11 @@ class GasAdosorptionBreakthroughsimulator:
             # NOTE: 圧力平均化の位置
             # 圧力の平均化
             total_press_mean = (
-                tower_up.total_press * self.sim_conds[tower_num_up]["PACKED_BED_COND"]["v_space"]
-                + tower_dw.total_press * self.sim_conds[tower_num_dw]["PACKED_BED_COND"]["v_space"]
+                tower_up.total_press * self.sim_conds[tower_num_up]["PACKED_BED_COND"]["void_volume"]
+                + tower_dw.total_press * self.sim_conds[tower_num_dw]["PACKED_BED_COND"]["void_volume"]
             ) / (
-                self.sim_conds[tower_num_up]["PACKED_BED_COND"]["v_space"]
-                + self.sim_conds[tower_num_dw]["PACKED_BED_COND"]["v_space"]
+                self.sim_conds[tower_num_up]["PACKED_BED_COND"]["void_volume"]
+                + self.sim_conds[tower_num_dw]["PACKED_BED_COND"]["void_volume"]
             )
             tower_up.total_press = total_press_mean
             tower_dw.total_press = total_press_mean
@@ -408,8 +408,8 @@ class GasAdosorptionBreakthroughsimulator:
         if mode == "初回ガス導入":
             # 0. 前準備
             sim_conds_copy = deepcopy(sim_conds)
-            sim_conds_copy["INFLOW_GAS_COND"]["fr_co2"] = 20
-            sim_conds_copy["INFLOW_GAS_COND"]["fr_n2"] = 25.2
+            sim_conds_copy["FEED_GAS_COND"]["co2_flow_rate"] = 20
+            sim_conds_copy["FEED_GAS_COND"]["n2_flow_rate"] = 25.2
             calc_output = operation_models.initial_adsorption(
                 sim_conds=sim_conds_copy, stream_conds=stream_conds, state_manager=state_manager, tower_num=tower_num
             )
@@ -490,9 +490,9 @@ class GasAdosorptionBreakthroughsimulator:
         tower = self.state_manager.towers[tower_num]
 
         other_outputs["others"] = {
-            "total_press": tower.total_press,
-            "mf_co2": tower.mf_co2.copy(),
-            "mf_n2": tower.mf_n2.copy(),
+            "total_pressure": tower.total_press,
+            "co2_mole_fraction": tower.mf_co2.copy(),
+            "n2_mole_fraction": tower.mf_n2.copy(),
             "vacuum_amt_co2": tower.vacuum_amt_co2,
             "vacuum_amt_n2": tower.vacuum_amt_n2,
         }

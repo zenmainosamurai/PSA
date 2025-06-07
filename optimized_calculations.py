@@ -74,15 +74,15 @@ class OptimizedCalculations:
             P_PUMP = (tower.total_press - P_resist) * 1e6
             P_PUMP = max(0, P_PUMP)
 
-            vacuum_rate = 25 * (sim_conds["VACUUMING_PIPE_COND"]["Dpipe"] ** 4) * P_PUMP / 2
+            vacuum_rate = 25 * (sim_conds["VACUUM_PIPING_COND"]["diameter"] ** 4) * P_PUMP / 2
             vacuum_rate_N = vacuum_rate / 0.1013 * P_PUMP * 1e-6
-            linear_velocity = vacuum_rate / sim_conds["VACUUMING_PIPE_COND"]["Spipe"]
-            Re = rho * linear_velocity * sim_conds["VACUUMING_PIPE_COND"]["Dpipe"] / mu if mu != 0 else 0
+            linear_velocity = vacuum_rate / sim_conds["VACUUM_PIPING_COND"]["cross_section"]
+            Re = rho * linear_velocity * sim_conds["VACUUM_PIPING_COND"]["diameter"] / mu if mu != 0 else 0
             lambda_f = 64 / Re if Re != 0 else 0
             P_resist = (
                 lambda_f
-                * sim_conds["VACUUMING_PIPE_COND"]["Lpipe"]
-                / sim_conds["VACUUMING_PIPE_COND"]["Dpipe"]
+                * sim_conds["VACUUM_PIPING_COND"]["length"]
+                / sim_conds["VACUUM_PIPING_COND"]["diameter"]
                 * linear_velocity**2
                 / (2 * 9.81)
             ) * 1e-6
@@ -92,7 +92,7 @@ class OptimizedCalculations:
 
         # CO2回収濃度計算
         vacuum_rate_mol = 101325 * vacuum_rate_N / 8.314 / T_K
-        vacuum_amt = vacuum_rate_mol * sim_conds["COMMON_COND"]["dt"]
+        vacuum_amt = vacuum_rate_mol * sim_conds["COMMON_COND"]["calculation_step_time"]
         vacuum_amt_co2 = vacuum_amt * _mean_mf_co2
         vacuum_amt_n2 = vacuum_amt * _mean_mf_n2
 
@@ -101,10 +101,10 @@ class OptimizedCalculations:
         vacuum_co2_mf = (accum_vacuum_amt_co2 / (accum_vacuum_amt_co2 + accum_vacuum_amt_n2)) * 100
 
         # 排気後圧力計算
-        case_inner_mol_amt = (P_PUMP + P_resist * 1e6) * sim_conds["VACUUMING_PIPE_COND"]["Vspace"] / 8.314 / T_K
+        case_inner_mol_amt = (P_PUMP + P_resist * 1e6) * sim_conds["VACUUM_PIPING_COND"]["space_volume"] / 8.314 / T_K
         case_inner_mol_amt_after_vacuum = max(0, case_inner_mol_amt - vacuum_amt)
         total_press_after_vacuum = (
-            case_inner_mol_amt_after_vacuum * 8.314 * T_K / sim_conds["VACUUMING_PIPE_COND"]["Vspace"] * 1e-6
+            case_inner_mol_amt_after_vacuum * 8.314 * T_K / sim_conds["VACUUM_PIPING_COND"]["space_volume"] * 1e-6
         )
 
         return {
@@ -166,7 +166,7 @@ def calculate_mass_balance_for_adsorption_optimized(
     tower = state_manager.towers[tower_num]
 
     # レガシー形式の変数を作成（既存の関数との互換性のため）
-    variables = {"temp": {}, "adsorp_amt": {}, "total_press": tower.total_press, "outflow_pco2": {}}
+    variables = {"temp": {}, "adsorp_amt": {}, "total_pressure": tower.total_press, "outflow_pco2": {}}
 
     # 必要な部分のみレガシー形式に変換
     for s in range(1, state_manager.num_streams + 1):

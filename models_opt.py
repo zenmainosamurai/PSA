@@ -53,9 +53,7 @@ class GasAdosorption_for_Optimize:
         print("")
 
         # 最適化結果の読み込み
-        storage = optuna.storages.RDBStorage(
-            url=f"sqlite:///{self.opt_path}/optimize.db"
-        )
+        storage = optuna.storages.RDBStorage(url=f"sqlite:///{self.opt_path}/optimize.db")
         study = optuna.create_study(
             study_name="GasAdsorption",
             directions=["minimize"] * self.num_objective,
@@ -69,8 +67,7 @@ class GasAdosorption_for_Optimize:
         # csv化
         df_opt = study.trials_dataframe()
         df_opt["best_trial"] = [
-            1 if num in [trial.number for trial in study.best_trials] else 0
-            for num in range(len(study.trials))
+            1 if num in [trial.number for trial in study.best_trials] else 0 for num in range(len(study.trials))
         ]
         df_opt.to_csv(self.opt_path + "/study.csv", index=False)
         # 可視化
@@ -88,38 +85,38 @@ class GasAdosorption_for_Optimize:
             params_dict = {
                 1: {
                     "PACKED_BED_COND": {
-                        "ks_adsorp": df_tgt["params_ks_adsorp_1"],
-                        "ks_desorp": df_tgt["params_ks_desorp_1"],
-                        "vacuume_pressure": df_tgt["vacuume_pressure_1"],
+                        "adsorption_mass_transfer_coeff": df_tgt["params_ks_adsorp_1"],
+                        "desorption_mass_transfer_coeff": df_tgt["params_ks_desorp_1"],
+                        "initial_internal_pressure": df_tgt["vacuume_pressure_1"],
                     },
-                    # "DRUM_WALL_COND": {
-                    #     "coef_hw1": df_tgt["params_coef_hw1"],},
-                    "INFLOW_GAS_COND": {
-                        "adsorp_heat_co2": df_tgt["params_adsorp_heat_co2"],
+                    # "VESSEL_COND": {
+                    #     "wall_to_bed_htc_correction_factor": df_tgt["params_coef_hw1"],},
+                    "FEED_GAS_COND": {
+                        "co2_adsorption_heat": df_tgt["params_adsorp_heat_co2"],
                     },
                 },
                 2: {
                     "PACKED_BED_COND": {
-                        "ks_adsorp": df_tgt["params_ks_adsorp_2"],
-                        "ks_desorp": df_tgt["params_ks_desorp_2"],
-                        "vacuume_pressure": df_tgt["vacuume_pressure_2"],
+                        "adsorption_mass_transfer_coeff": df_tgt["params_ks_adsorp_2"],
+                        "desorption_mass_transfer_coeff": df_tgt["params_ks_desorp_2"],
+                        "initial_internal_pressure": df_tgt["vacuume_pressure_2"],
                     },
-                    # "DRUM_WALL_COND": {
-                    #     "coef_hw1": df_tgt["params_coef_hw1"],},
-                    "INFLOW_GAS_COND": {
-                        "adsorp_heat_co2": df_tgt["params_adsorp_heat_co2"],
+                    # "VESSEL_COND": {
+                    #     "wall_to_bed_htc_correction_factor": df_tgt["params_coef_hw1"],},
+                    "FEED_GAS_COND": {
+                        "co2_adsorption_heat": df_tgt["params_adsorp_heat_co2"],
                     },
                 },
                 3: {
                     "PACKED_BED_COND": {
-                        "ks_adsorp": df_tgt["params_ks_adsorp_3"],
-                        "ks_desorp": df_tgt["params_ks_desorp_3"],
-                        "vacuume_pressure": df_tgt["vacuume_pressure_3"],
+                        "adsorption_mass_transfer_coeff": df_tgt["params_ks_adsorp_3"],
+                        "desorption_mass_transfer_coeff": df_tgt["params_ks_desorp_3"],
+                        "initial_internal_pressure": df_tgt["vacuume_pressure_3"],
                     },
-                    # "DRUM_WALL_COND": {
-                    #     "coef_hw1": df_tgt["params_coef_hw1"],},
-                    "INFLOW_GAS_COND": {
-                        "adsorp_heat_co2": df_tgt["params_adsorp_heat_co2"],
+                    # "VESSEL_COND": {
+                    #     "wall_to_bed_htc_correction_factor": df_tgt["params_coef_hw1"],},
+                    "FEED_GAS_COND": {
+                        "co2_adsorption_heat": df_tgt["params_adsorp_heat_co2"],
                     },
                 },
             }
@@ -140,26 +137,20 @@ class GasAdosorption_for_Optimize:
                         instance.sim_conds[_tower_num][cond_category][cond_name] = value
             # 追加の初期化
             for _tower_num in [1, 2, 3]:
-                instance.sim_conds[_tower_num] = init_functions.add_sim_conds(
-                    instance.sim_conds[_tower_num]
-                )
+                instance.sim_conds[_tower_num] = init_functions.add_sim_conds(instance.sim_conds[_tower_num])
             # stream条件の初期化
             instance.stream_conds = {}
             for _tower_num in [1, 2, 3]:
                 instance.stream_conds[_tower_num] = {}
                 for stream in range(1, 1 + instance.num_str):
-                    instance.stream_conds[_tower_num][stream] = (
-                        init_functions.init_stream_conds(  # 各ストリーム
-                            instance.sim_conds[_tower_num],
-                            stream,
-                            instance.stream_conds[_tower_num],
-                        )
-                    )
-                instance.stream_conds[_tower_num][stream + 1] = (
-                    init_functions.init_drum_wall_conds(  # 壁面
+                    instance.stream_conds[_tower_num][stream] = init_functions.init_stream_conds(  # 各ストリーム
                         instance.sim_conds[_tower_num],
+                        stream,
                         instance.stream_conds[_tower_num],
                     )
+                instance.stream_conds[_tower_num][stream + 1] = init_functions.init_drum_wall_conds(  # 壁面
+                    instance.sim_conds[_tower_num],
+                    instance.stream_conds[_tower_num],
                 )
             # 再シミュレーション
             instance.execute_simulation()
@@ -189,62 +180,38 @@ class GasAdosorption_for_Optimize:
         params_dict = {
             1: {
                 "PACKED_BED_COND": {
-                    "ks_adsorp": trial.suggest_float(
-                        "ks_adsorp_1", 1e-8, 1e3, log=True
-                    ),
-                    "ks_desorp": trial.suggest_float(
-                        "ks_desorp_1", 1e-8, 1e3, log=True
-                    ),
-                    "vacuume_pressure": trial.suggest_uniform(
-                        "vacuume_pressure_1", 1, 10
-                    ),
+                    "adsorption_mass_transfer_coeff": trial.suggest_float("ks_adsorp_1", 1e-8, 1e3, log=True),
+                    "desorption_mass_transfer_coeff": trial.suggest_float("ks_desorp_1", 1e-8, 1e3, log=True),
+                    "initial_internal_pressure": trial.suggest_uniform("vacuume_pressure_1", 1, 10),
                 },
-                # "DRUM_WALL_COND": {
-                #     "coef_hw1": trial.suggest_float("coef_hw1", 1e-5, 1e1, log=True),},
-                "INFLOW_GAS_COND": {
-                    "adsorp_heat_co2": trial.suggest_float(
-                        "adsorp_heat_co2", 100, 3000
-                    ),
+                # "VESSEL_COND": {
+                #     "wall_to_bed_htc_correction_factor": trial.suggest_float("wall_to_bed_htc_correction_factor", 1e-5, 1e1, log=True),},
+                "FEED_GAS_COND": {
+                    "co2_adsorption_heat": trial.suggest_float("co2_adsorption_heat", 100, 3000),
                 },
             },
             2: {
                 "PACKED_BED_COND": {
-                    "ks_adsorp": trial.suggest_float(
-                        "ks_adsorp_2", 1e-8, 1e3, log=True
-                    ),
-                    "ks_desorp": trial.suggest_float(
-                        "ks_desorp_2", 1e-8, 1e3, log=True
-                    ),
-                    "vacuume_pressure": trial.suggest_uniform(
-                        "vacuume_pressure_2", 1, 10
-                    ),
+                    "adsorption_mass_transfer_coeff": trial.suggest_float("ks_adsorp_2", 1e-8, 1e3, log=True),
+                    "desorption_mass_transfer_coeff": trial.suggest_float("ks_desorp_2", 1e-8, 1e3, log=True),
+                    "initial_internal_pressure": trial.suggest_uniform("vacuume_pressure_2", 1, 10),
                 },
-                # "DRUM_WALL_COND": {
-                #     "coef_hw1": trial.suggest_float("coef_hw1", 1e-5, 1e1, log=True),},
-                "INFLOW_GAS_COND": {
-                    "adsorp_heat_co2": trial.suggest_float(
-                        "adsorp_heat_co2", 100, 3000
-                    ),
+                # "VESSEL_COND": {
+                #     "wall_to_bed_htc_correction_factor": trial.suggest_float("wall_to_bed_htc_correction_factor", 1e-5, 1e1, log=True),},
+                "FEED_GAS_COND": {
+                    "co2_adsorption_heat": trial.suggest_float("co2_adsorption_heat", 100, 3000),
                 },
             },
             3: {
                 "PACKED_BED_COND": {
-                    "ks_adsorp": trial.suggest_float(
-                        "ks_adsorp_3", 1e-8, 1e3, log=True
-                    ),
-                    "ks_desorp": trial.suggest_float(
-                        "ks_desorp_3", 5e-2, 1e3, log=True
-                    ),
-                    "vacuume_pressure": trial.suggest_uniform(
-                        "vacuume_pressure_3", 1, 10
-                    ),
+                    "adsorption_mass_transfer_coeff": trial.suggest_float("ks_adsorp_3", 1e-8, 1e3, log=True),
+                    "desorption_mass_transfer_coeff": trial.suggest_float("ks_desorp_3", 5e-2, 1e3, log=True),
+                    "initial_internal_pressure": trial.suggest_uniform("vacuume_pressure_3", 1, 10),
                 },
-                # "DRUM_WALL_COND": {
-                #     "coef_hw1": trial.suggest_float("coef_hw1", 1e-5, 1e1, log=True),},
-                "INFLOW_GAS_COND": {
-                    "adsorp_heat_co2": trial.suggest_float(
-                        "adsorp_heat_co2", 100, 3000
-                    ),
+                # "VESSEL_COND": {
+                #     "wall_to_bed_htc_correction_factor": trial.suggest_float("wall_to_bed_htc_correction_factor", 1e-5, 1e1, log=True),},
+                "FEED_GAS_COND": {
+                    "co2_adsorption_heat": trial.suggest_float("co2_adsorption_heat", 100, 3000),
                 },
             },
         }
@@ -272,25 +239,19 @@ class GasAdosorption_for_Optimize:
                     instance.sim_conds[_tower_num][cond_category][cond_name] = value
         # 追加の初期化
         for _tower_num in [1, 2, 3]:
-            instance.sim_conds[_tower_num] = init_functions.add_sim_conds(
-                instance.sim_conds[_tower_num]
-            )
+            instance.sim_conds[_tower_num] = init_functions.add_sim_conds(instance.sim_conds[_tower_num])
         # stream条件の初期化
         instance.stream_conds = {}
         for _tower_num in [1, 2, 3]:
             instance.stream_conds[_tower_num] = {}
             for stream in range(1, 1 + instance.num_str):
-                instance.stream_conds[_tower_num][stream] = (
-                    init_functions.init_stream_conds(  # 各ストリーム
-                        instance.sim_conds[_tower_num],
-                        stream,
-                        instance.stream_conds[_tower_num],
-                    )
+                instance.stream_conds[_tower_num][stream] = init_functions.init_stream_conds(  # 各ストリーム
+                    instance.sim_conds[_tower_num],
+                    stream,
+                    instance.stream_conds[_tower_num],
                 )
-            instance.stream_conds[_tower_num][stream + 1] = (
-                init_functions.init_drum_wall_conds(  # 壁面
-                    instance.sim_conds[_tower_num], instance.stream_conds[_tower_num]
-                )
+            instance.stream_conds[_tower_num][stream + 1] = init_functions.init_drum_wall_conds(  # 壁面
+                instance.sim_conds[_tower_num], instance.stream_conds[_tower_num]
             )
 
         ### ◆前準備 ------------------------------------------------
@@ -340,21 +301,14 @@ class GasAdosorption_for_Optimize:
                 values[f"T{_tower_num}_temp_{i+1}"] = []
                 for j in range(num_data):
                     values[f"T{_tower_num}_temp_{i+1}"].append(
-                        record_dict[_tower_num]["heat"][j][stream][section][
-                            "temp_reached"
-                        ]
+                        record_dict[_tower_num]["heat"][j][stream][section]["temp_reached"]
                     )
         df_sim = pd.DataFrame(values, index=record_dict[1]["timestamp"])
         df_sim.index.name = "timestamp"
         # 観測値の用意
-        df_obs = instance.df_obs.loc[
-            : df_sim.index[-1], :
-        ]  # シミュレーション区間のみ抽出
+        df_obs = instance.df_obs.loc[: df_sim.index[-1], :]  # シミュレーション区間のみ抽出
         # 計算値と観測値のindexを合わせる
-        common_index = [
-            np.argmin(np.abs(instance.df_obs.index[i] - df_sim.index))
-            for i in range(len(df_obs))
-        ]
+        common_index = [np.argmin(np.abs(instance.df_obs.index[i] - df_sim.index)) for i in range(len(df_obs))]
         df_sim = df_sim.iloc[common_index]
 
         # スコア計算
@@ -481,9 +435,7 @@ class GasAdosorption_for_Optimize:
         plt.close()
         # 散布図行列_objectives
         if self.num_objective != 1:
-            df_tgt = df_opt[
-                [f"values_{num}" for num in range(self.num_objective)] + ["best_trial"]
-            ]
+            df_tgt = df_opt[[f"values_{num}" for num in range(self.num_objective)] + ["best_trial"]]
             df_tgt.columns = self.objective_name + ["best_trial"]
             plt.figure(figsize=(16, 16), tight_layout=True)
             sns.pairplot(
@@ -500,12 +452,8 @@ class GasAdosorption_for_Optimize:
         num_state = int(len(params_list))  # パラメータの数
         if num_state != 1:  # 状態変数が複数のときのみ
             # best_trialによる色分け
-            df_tgt = df_opt[
-                [f"params_{p_name}" for p_name in params_list] + ["best_trial"]
-            ]
-            df_tgt.columns = list(params_list) + [
-                "best_trial"
-            ]  # 色分け用にbest_tiralを追加
+            df_tgt = df_opt[[f"params_{p_name}" for p_name in params_list] + ["best_trial"]]
+            df_tgt.columns = list(params_list) + ["best_trial"]  # 色分け用にbest_tiralを追加
             plt.figure(figsize=(16, 16), tight_layout=True)
             pp = sns.pairplot(
                 df_tgt,
@@ -521,12 +469,8 @@ class GasAdosorption_for_Optimize:
             plt.close()
             # 各目的関数による色分け
             for i, obj_name in enumerate(self.objective_name):
-                df_tgt = df_opt[
-                    [f"params_{p_name}" for p_name in params_list] + [f"values_{i}"]
-                ]
-                df_tgt.columns = list(params_list) + [
-                    f"values_{i}"
-                ]  # 色分け用にvaluesを追加
+                df_tgt = df_opt[[f"params_{p_name}" for p_name in params_list] + [f"values_{i}"]]
+                df_tgt.columns = list(params_list) + [f"values_{i}"]  # 色分け用にvaluesを追加
                 df_tgt = df_tgt.replace([np.inf, -np.inf], np.nan)
                 df_tgt.dropna()
                 df_tgt[obj_name] = pd.qcut(df_tgt[f"values_{i}"], q=5)

@@ -43,7 +43,7 @@ class Assimilator:
         filepath = const.CONDITIONS_DIR + self.cond_id + "/assim_conds.yml"
         with open(filepath, encoding="utf-8") as f:
             self.assim_conds = yaml.safe_load(f)
-        self.dt = self.simulator.sim_conds[1]["dt"]
+        self.dt = self.simulator.sim_conds[1]["calculation_step_time"]
         self.ukf = self._init_ukf()
         self.obs_index = 0
         # 対数尤度記録用リスト
@@ -185,7 +185,7 @@ class Assimilator:
         # 中間変数(圧力)の上書き
         _tgt_index = self.df_obs.index[np.abs(self.df_obs.index - (timestamp)).argmin()]
         for _tower_num in range(1, 1 + self.num_tower):
-            middle_vars[_tower_num]["total_press"] = self.simulator.df_obs.loc[_tgt_index, f"T{_tower_num}_press"]
+            middle_vars[_tower_num]["total_pressure"] = self.simulator.df_obs.loc[_tgt_index, f"T{_tower_num}_press"]
         # プロセス番号抽出
         p = 1 + sum([1 if timestamp > x else 0 for x in self.simulator.df_operation["手動終了時刻"]])
         # 各塔の稼働モード抽出
@@ -391,19 +391,19 @@ class Assimilator:
                     i += 1
         # 5. モル分率(co2)
         for _tower_num in range(1, 1 + self.num_tower):
-            middle_vars[_tower_num]["mf_co2"] = {}
+            middle_vars[_tower_num]["co2_mole_fraction"] = {}
             for stream in range(1, 1 + self.num_str):
-                middle_vars[_tower_num]["mf_co2"][stream] = {}
+                middle_vars[_tower_num]["co2_mole_fraction"][stream] = {}
                 for section in range(1, 1 + self.num_sec):
-                    middle_vars[_tower_num]["mf_co2"][stream][section] = s_bfr[i]
+                    middle_vars[_tower_num]["co2_mole_fraction"][stream][section] = s_bfr[i]
                     i += 1
         # 6. モル分率(n2)
         for _tower_num in range(1, 1 + self.num_tower):
-            middle_vars[_tower_num]["mf_n2"] = {}
+            middle_vars[_tower_num]["n2_mole_fraction"] = {}
             for stream in range(1, 1 + self.num_str):
-                middle_vars[_tower_num]["mf_n2"][stream] = {}
+                middle_vars[_tower_num]["n2_mole_fraction"][stream] = {}
                 for section in range(1, 1 + self.num_sec):
-                    middle_vars[_tower_num]["mf_n2"][stream][section] = s_bfr[i]
+                    middle_vars[_tower_num]["n2_mole_fraction"][stream][section] = s_bfr[i]
                     i += 1
         # 7. 層伝熱係数
         for _tower_num in range(1, 1 + self.num_tower):
@@ -423,7 +423,7 @@ class Assimilator:
                     i += 1
         # 9. 全圧
         for _tower_num in range(1, 1 + self.num_tower):
-            middle_vars[_tower_num]["total_press"] = s_bfr[i]
+            middle_vars[_tower_num]["total_pressure"] = s_bfr[i]
             i += 1
         # 10. CO2,N2回収量
         for _tower_num in range(1, 1 + self.num_tower):
@@ -471,12 +471,12 @@ class Assimilator:
         for _tower_num in range(1, 1 + self.num_tower):
             for stream in range(1, 1 + self.num_str):
                 for section in range(1, 1 + self.num_sec):
-                    s.append(middle_vars[_tower_num]["mf_co2"][stream][section])
+                    s.append(middle_vars[_tower_num]["co2_mole_fraction"][stream][section])
         # 6. モル分率(n2)
         for _tower_num in range(1, 1 + self.num_tower):
             for stream in range(1, 1 + self.num_str):
                 for section in range(1, 1 + self.num_sec):
-                    s.append(middle_vars[_tower_num]["mf_n2"][stream][section])
+                    s.append(middle_vars[_tower_num]["n2_mole_fraction"][stream][section])
         # 7. 層伝熱係数
         for _tower_num in range(1, 1 + self.num_tower):
             for stream in range(1, 1 + self.num_str):
@@ -489,7 +489,7 @@ class Assimilator:
                     s.append(middle_vars[_tower_num]["heat_t_coef_wall"][stream][section])
         # 9. 全圧
         for _tower_num in range(1, 1 + self.num_tower):
-            s.append(middle_vars[_tower_num]["total_press"])
+            s.append(middle_vars[_tower_num]["total_pressure"])
         # 10. CO2,N2回収量
         for _tower_num in range(1, 1 + self.num_tower):
             s.append(middle_vars[_tower_num]["vacuum_amt_co2"])

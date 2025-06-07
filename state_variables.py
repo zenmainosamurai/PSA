@@ -45,19 +45,19 @@ class StateVariables:
     def _init_tower_state(self, tower_num: int) -> TowerStateArrays:
         """各塔の状態変数を初期化"""
         # 外気温度
-        temp_outside = self.sim_conds[tower_num]["DRUM_WALL_COND"]["temp_outside"]
+        temp_outside = self.sim_conds[tower_num]["VESSEL_COND"]["ambient_temperature"]
 
         # 2D配列の初期化
         temp_2d = np.full((self.num_streams, self.num_sections), temp_outside, dtype=np.float64)
 
         # モル分率の初期化
-        mf_co2_init = self.sim_conds[tower_num]["INFLOW_GAS_COND"]["mf_co2"]
-        mf_n2_init = self.sim_conds[tower_num]["INFLOW_GAS_COND"]["mf_n2"]
+        mf_co2_init = self.sim_conds[tower_num]["FEED_GAS_COND"]["co2_mole_fraction"]
+        mf_n2_init = self.sim_conds[tower_num]["FEED_GAS_COND"]["n2_mole_fraction"]
         mf_co2_2d = np.full((self.num_streams, self.num_sections), mf_co2_init, dtype=np.float64)
         mf_n2_2d = np.full((self.num_streams, self.num_sections), mf_n2_init, dtype=np.float64)
 
         # 吸着量の初期化
-        init_adsorp = self.sim_conds[tower_num]["PACKED_BED_COND"]["init_adsorp_amt"]
+        init_adsorp = self.sim_conds[tower_num]["PACKED_BED_COND"]["initial_adsorption_amount"]
         adsorp_2d = np.full((self.num_streams, self.num_sections), init_adsorp, dtype=np.float64)
 
         # 伝熱係数の初期化
@@ -65,7 +65,7 @@ class StateVariables:
         heat_coef_wall_2d = np.full((self.num_streams, self.num_sections), 14.0, dtype=np.float64)
 
         # 流出CO2分圧の初期化
-        total_press_init = self.sim_conds[tower_num]["INFLOW_GAS_COND"]["total_press"]
+        total_press_init = self.sim_conds[tower_num]["FEED_GAS_COND"]["total_pressure"]
         outflow_pco2_2d = np.full((self.num_streams, self.num_sections), total_press_init, dtype=np.float64)
 
         # 1D配列の初期化
@@ -147,7 +147,7 @@ class StateVariables:
         elif mode in ["初回ガス導入", "バッチ吸着_上流", "均圧_加圧", "バッチ吸着_下流"]:
             tower.total_press = calc_output["pressure_after_batch_adsorption"]
         elif mode in ["均圧_減圧", "流通吸着_単独/上流", "流通吸着_下流"]:
-            tower.total_press = calc_output["total_press"]
+            tower.total_press = calc_output["total_pressure"]
         elif mode == "真空脱着":
             tower.total_press = calc_output["pressure_after_desorption"]
 

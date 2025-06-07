@@ -186,10 +186,10 @@ def plot_csv_outputs(tgt_foldapath, df_obs, tgt_sections, tower_num, timestamp, 
     plt_cell = 1
 
     # 1. 全圧
-    filename = tgt_foldapath + f"/csv/tower_{tower_num}/others/total_press.csv"
+    filename = tgt_foldapath + f"/csv/tower_{tower_num}/others/total_pressure.csv"
     df = pd.read_csv(filename, index_col="timestamp")
     plt.subplot(3, 2, plt_cell)
-    plt.plot(df["total_press"], label="計算値")
+    plt.plot(df["total_pressure"], label="計算値")
     plt.plot(df_obs.loc[:timestamp, f"T{tower_num}_press"], label="観測値", c="black")  # 観測値もプロット
     plt.title("全圧 [MPaA]")
     plt.legend()
@@ -209,7 +209,7 @@ def plot_csv_outputs(tgt_foldapath, df_obs, tgt_sections, tower_num, timestamp, 
     plt_cell += 1
 
     # 2. モル分率
-    for _tgt_name in ["mf_co2", "mf_n2"]:
+    for _tgt_name in ["co2_mole_fraction", "n2_mole_fraction"]:
         filename = tgt_foldapath + f"/csv/tower_{tower_num}/others/{_tgt_name}.csv"
         df = pd.read_csv(filename, index_col="timestamp")
         plt.subplot(3, 2, plt_cell)
@@ -286,15 +286,15 @@ def outputs_to_csv(tgt_foldapath, record_dict, common_conds):
         values = []
         for i in range(len(record_dict[_tgt_name])):
             values_tmp = []
-            for stream in range(1, 1 + common_conds["NUM_STR"]):
-                for section in range(1, 1 + common_conds["NUM_SEC"]):
+            for stream in range(1, 1 + common_conds["num_streams"]):
+                for section in range(1, 1 + common_conds["num_sections"]):
                     for value in record_dict[_tgt_name][i][stream][section].values():
                         values_tmp.append(value)
             values.append(values_tmp)
         # カラム名の抽出
         columns = []
-        for stream in range(1, 1 + common_conds["NUM_STR"]):
-            for section in range(1, 1 + common_conds["NUM_SEC"]):
+        for stream in range(1, 1 + common_conds["num_streams"]):
+            for section in range(1, 1 + common_conds["num_sections"]):
                 for key in record_dict[_tgt_name][i][stream][section].keys():
                     columns.append(key + "-" + str(stream).zfill(3) + "-" + str(section).zfill(3))
         # df化
@@ -330,7 +330,7 @@ def outputs_to_csv(tgt_foldapath, record_dict, common_conds):
     os.makedirs(_foldapath, exist_ok=True)
     # 全圧
     values = []
-    _tgt_col = "total_press"
+    _tgt_col = "total_pressure"
     for i in range(len(record_dict[tgt_name])):
         values.append(record_dict[tgt_name][i][_tgt_col])
     df = pd.DataFrame(values, columns=[_tgt_col], index=record_dict["timestamp"])
@@ -362,18 +362,18 @@ def outputs_to_csv(tgt_foldapath, record_dict, common_conds):
     df.index.name = "timestamp"
     df.to_csv(_foldapath + f"{_tgt_col}.csv")
     # モル分率
-    for _tgt_col in ["mf_co2", "mf_n2"]:
+    for _tgt_col in ["co2_mole_fraction", "n2_mole_fraction"]:
         values = []
         for i in range(len(record_dict[tgt_name])):
             values_tmp = []
-            for stream in range(common_conds["NUM_STR"]):
-                for section in range(common_conds["NUM_SEC"]):
+            for stream in range(common_conds["num_streams"]):
+                for section in range(common_conds["num_sections"]):
                     values_tmp.append(record_dict[tgt_name][i][_tgt_col][stream, section])
             values.append(values_tmp)
         # カラム名の抽出
         columns = []
-        for stream in range(1, 1 + common_conds["NUM_STR"]):
-            for section in range(1, 1 + common_conds["NUM_SEC"]):
+        for stream in range(1, 1 + common_conds["num_streams"]):
+            for section in range(1, 1 + common_conds["num_sections"]):
                 columns.append(_tgt_col + "-" + str(stream).zfill(3) + "-" + str(section).zfill(3))
         df = pd.DataFrame(values, columns=columns, index=record_dict["timestamp"])
         df.index.name = "timestamp"
