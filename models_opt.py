@@ -85,8 +85,8 @@ class GasAdosorption_for_Optimize:
             params_dict = {
                 1: {
                     "PACKED_BED_COND": {
-                        "adsorption_mass_transfer_coeff": df_tgt["params_ks_adsorp_1"],
-                        "desorption_mass_transfer_coeff": df_tgt["params_ks_desorp_1"],
+                        "adsorption_mass_transfer_coef": df_tgt["params_ks_adsorp_1"],
+                        "desorption_mass_transfer_coef": df_tgt["params_ks_desorp_1"],
                         "initial_internal_pressure": df_tgt["vacuume_pressure_1"],
                     },
                     # "VESSEL_COND": {
@@ -97,8 +97,8 @@ class GasAdosorption_for_Optimize:
                 },
                 2: {
                     "PACKED_BED_COND": {
-                        "adsorption_mass_transfer_coeff": df_tgt["params_ks_adsorp_2"],
-                        "desorption_mass_transfer_coeff": df_tgt["params_ks_desorp_2"],
+                        "adsorption_mass_transfer_coef": df_tgt["params_ks_adsorp_2"],
+                        "desorption_mass_transfer_coef": df_tgt["params_ks_desorp_2"],
                         "initial_internal_pressure": df_tgt["vacuume_pressure_2"],
                     },
                     # "VESSEL_COND": {
@@ -109,8 +109,8 @@ class GasAdosorption_for_Optimize:
                 },
                 3: {
                     "PACKED_BED_COND": {
-                        "adsorption_mass_transfer_coeff": df_tgt["params_ks_adsorp_3"],
-                        "desorption_mass_transfer_coeff": df_tgt["params_ks_desorp_3"],
+                        "adsorption_mass_transfer_coef": df_tgt["params_ks_adsorp_3"],
+                        "desorption_mass_transfer_coef": df_tgt["params_ks_desorp_3"],
                         "initial_internal_pressure": df_tgt["vacuume_pressure_3"],
                     },
                     # "VESSEL_COND": {
@@ -180,8 +180,8 @@ class GasAdosorption_for_Optimize:
         params_dict = {
             1: {
                 "PACKED_BED_COND": {
-                    "adsorption_mass_transfer_coeff": trial.suggest_float("ks_adsorp_1", 1e-8, 1e3, log=True),
-                    "desorption_mass_transfer_coeff": trial.suggest_float("ks_desorp_1", 1e-8, 1e3, log=True),
+                    "adsorption_mass_transfer_coef": trial.suggest_float("ks_adsorp_1", 1e-8, 1e3, log=True),
+                    "desorption_mass_transfer_coef": trial.suggest_float("ks_desorp_1", 1e-8, 1e3, log=True),
                     "initial_internal_pressure": trial.suggest_uniform("vacuume_pressure_1", 1, 10),
                 },
                 # "VESSEL_COND": {
@@ -192,8 +192,8 @@ class GasAdosorption_for_Optimize:
             },
             2: {
                 "PACKED_BED_COND": {
-                    "adsorption_mass_transfer_coeff": trial.suggest_float("ks_adsorp_2", 1e-8, 1e3, log=True),
-                    "desorption_mass_transfer_coeff": trial.suggest_float("ks_desorp_2", 1e-8, 1e3, log=True),
+                    "adsorption_mass_transfer_coef": trial.suggest_float("ks_adsorp_2", 1e-8, 1e3, log=True),
+                    "desorption_mass_transfer_coef": trial.suggest_float("ks_desorp_2", 1e-8, 1e3, log=True),
                     "initial_internal_pressure": trial.suggest_uniform("vacuume_pressure_2", 1, 10),
                 },
                 # "VESSEL_COND": {
@@ -204,8 +204,8 @@ class GasAdosorption_for_Optimize:
             },
             3: {
                 "PACKED_BED_COND": {
-                    "adsorption_mass_transfer_coeff": trial.suggest_float("ks_adsorp_3", 1e-8, 1e3, log=True),
-                    "desorption_mass_transfer_coeff": trial.suggest_float("ks_desorp_3", 5e-2, 1e3, log=True),
+                    "adsorption_mass_transfer_coef": trial.suggest_float("ks_adsorp_3", 1e-8, 1e3, log=True),
+                    "desorption_mass_transfer_coef": trial.suggest_float("ks_desorp_3", 5e-2, 1e3, log=True),
                     "initial_internal_pressure": trial.suggest_uniform("vacuume_pressure_3", 1, 10),
                 },
                 # "VESSEL_COND": {

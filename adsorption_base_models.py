@@ -115,7 +115,7 @@ def calculate_mass_balance_for_adsorption(
     # 理論新規吸着量 [cm3/g-abs]
     if adsorp_amt_equilibrium >= adsorp_amt_current:
         adsorp_amt_estimate_abs = (
-            sim_conds["PACKED_BED_COND"]["adsorption_mass_transfer_coeff"]
+            sim_conds["PACKED_BED_COND"]["adsorption_mass_transfer_coef"]
             ** (adsorp_amt_current / adsorp_amt_equilibrium)
             / sim_conds["PACKED_BED_COND"]["adsorbent_bulk_density"]
             * 6
@@ -133,7 +133,7 @@ def calculate_mass_balance_for_adsorption(
         adsorp_amt_estimate = min(adsorp_amt_estimate, inflow_fr_co2)
     else:
         adsorp_amt_estimate_abs = (
-            sim_conds["PACKED_BED_COND"]["desorption_mass_transfer_coeff"]
+            sim_conds["PACKED_BED_COND"]["desorption_mass_transfer_coef"]
             ** (adsorp_amt_current / adsorp_amt_equilibrium)
             / sim_conds["PACKED_BED_COND"]["adsorbent_bulk_density"]
             * 6
@@ -284,7 +284,7 @@ def calculate_mass_balance_for_desorption(
     # 理論新規吸着量 [cm3/g-abs]
     if adsorp_amt_equilibrium >= adsorp_amt_current:
         adsorp_amt_estimate_abs = (
-            sim_conds["PACKED_BED_COND"]["adsorption_mass_transfer_coeff"]
+            sim_conds["PACKED_BED_COND"]["adsorption_mass_transfer_coef"]
             ** (adsorp_amt_current / adsorp_amt_equilibrium)
             / sim_conds["PACKED_BED_COND"]["adsorbent_bulk_density"]
             * 6
@@ -302,7 +302,7 @@ def calculate_mass_balance_for_desorption(
         adsorp_amt_estimate = min(adsorp_amt_estimate, inflow_fr_co2)
     else:
         adsorp_amt_estimate_abs = (
-            sim_conds["PACKED_BED_COND"]["desorption_mass_transfer_coeff"]
+            sim_conds["PACKED_BED_COND"]["desorption_mass_transfer_coef"]
             ** (adsorp_amt_current / adsorp_amt_equilibrium)
             / sim_conds["PACKED_BED_COND"]["adsorbent_bulk_density"]
             * 6

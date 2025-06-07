@@ -16,7 +16,7 @@ class CommonConditions:
         # 型変換と検証
         self.num_streams = int(self.num_streams)
         self.num_sections = int(self.num_sections)
-        self.dt = float(self.dt)
+        self.calculation_step_time = float(self.calculation_step_time)
 
 
 @dataclass
@@ -136,6 +136,10 @@ class PipingConditions:
     cross_section: float
     volume: float
 
+    def __post_init__(self):
+        for field_name in self.__dataclass_fields__:
+            setattr(self, field_name, float(getattr(self, field_name)))
+
 
 @dataclass
 class EqualizingPipingConditions(PipingConditions):
@@ -151,10 +155,6 @@ class VacuumPipingConditions(PipingConditions):
     """真空引き配管条件"""
 
     space_volume: float
-
-    def __post_init__(self):
-        for field_name in self.__dataclass_fields__:
-            setattr(self, field_name, float(getattr(self, field_name)))
 
 
 @dataclass
@@ -243,8 +243,8 @@ class SimulationConditions:
             packed_bed=PackedBedConditions(**self._extract_params(sheets["触媒充填層条件"], col)),
             feed_gas=FeedGasConditions(**self._extract_params(sheets["導入ガス条件"], col)),
             vessel=VesselConditions(**self._extract_params(sheets["容器壁条件"], col)),
-            lid=LidConditions(**self._extract_params(sheets["蓋条件"], col)),
-            bottom=BottomConditions(**self._extract_params(sheets["底条件"], col)),
+            lid=EndCoverConditions(**self._extract_params(sheets["蓋条件"], col)),
+            bottom=EndCoverConditions(**self._extract_params(sheets["底条件"], col)),
             equalizing_piping=EqualizingPipingConditions(**self._extract_params(sheets["均圧配管条件"], col)),
             vacuum_piping=VacuumPipingConditions(**self._extract_params(sheets["真空引き配管条件"], col)),
             thermocouple=ThermocoupleConditions(**self._extract_params(sheets["熱電対条件"], col)),
