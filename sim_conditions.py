@@ -75,7 +75,7 @@ class FeedGasConditions:
     enthalpy: float
     co2_specific_heat_capacity: float
     n2_specific_heat_capacity: float
-    average_heat_capacity: float
+    average_specific_heat_capacity: float
     heat_capacity_per_hour: float
     co2_adsorption_heat: float
     n2_adsorption_heat: float
@@ -147,7 +147,7 @@ class EqualizingPipingConditions(PipingConditions):
 
     flow_velocity_correction_factor: float
     main_part_volume: float
-    branch_part_volume: float
+    isolated_equalizing_volume: float
 
 
 @dataclass
