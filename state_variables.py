@@ -1,6 +1,7 @@
 import numpy as np
 from dataclasses import dataclass
 from typing import Dict, Any
+from sim_conditions import SimulationConditions
 
 
 @dataclass
@@ -31,7 +32,7 @@ class TowerStateArrays:
 class StateVariables:
     """最適化された状態変数管理クラス"""
 
-    def __init__(self, num_towers: int, num_streams: int, num_sections: int, sim_conds: Dict):
+    def __init__(self, num_towers: int, num_streams: int, num_sections: int, sim_conds: SimulationConditions):
         self.num_towers = num_towers
         self.num_streams = num_streams
         self.num_sections = num_sections
@@ -44,20 +45,21 @@ class StateVariables:
 
     def _init_tower_state(self, tower_num: int) -> TowerStateArrays:
         """各塔の状態変数を初期化"""
+        tower_cond = self.sim_conds.get_tower(tower_num)
         # 外気温度
-        temp_outside = self.sim_conds[tower_num]["VESSEL_COND"]["ambient_temperature"]
+        temp_outside = tower_cond.vessel.ambient_temperature
 
         # 2D配列の初期化
         temp_2d = np.full((self.num_streams, self.num_sections), temp_outside, dtype=np.float64)
 
         # モル分率の初期化
-        mf_co2_init = self.sim_conds[tower_num]["FEED_GAS_COND"]["co2_mole_fraction"]
-        mf_n2_init = self.sim_conds[tower_num]["FEED_GAS_COND"]["n2_mole_fraction"]
+        mf_co2_init = tower_cond.feed_gas.co2_mole_fraction
+        mf_n2_init = tower_cond.feed_gas.n2_mole_fraction
         mf_co2_2d = np.full((self.num_streams, self.num_sections), mf_co2_init, dtype=np.float64)
         mf_n2_2d = np.full((self.num_streams, self.num_sections), mf_n2_init, dtype=np.float64)
 
         # 吸着量の初期化
-        init_adsorp = self.sim_conds[tower_num]["PACKED_BED_COND"]["initial_adsorption_amount"]
+        init_adsorp = tower_cond.packed_bed.initial_adsorption_amount
         adsorp_2d = np.full((self.num_streams, self.num_sections), init_adsorp, dtype=np.float64)
 
         # 伝熱係数の初期化
@@ -65,7 +67,7 @@ class StateVariables:
         heat_coef_wall_2d = np.full((self.num_streams, self.num_sections), 14.0, dtype=np.float64)
 
         # 流出CO2分圧の初期化
-        total_press_init = self.sim_conds[tower_num]["FEED_GAS_COND"]["total_pressure"]
+        total_press_init = tower_cond.feed_gas.total_pressure
         outflow_pco2_2d = np.full((self.num_streams, self.num_sections), total_press_init, dtype=np.float64)
 
         # 1D配列の初期化

@@ -6,6 +6,8 @@ import math
 import glob
 from utils import const
 
+from sim_conditions import CommonConditions
+
 
 def plot_csv_outputs(tgt_foldapath, df_obs, tgt_sections, tower_num, timestamp, df_p_end):
     """熱バラ計算結果の可視化
@@ -270,7 +272,7 @@ def plot_csv_outputs(tgt_foldapath, df_obs, tgt_sections, tower_num, timestamp, 
     plt.close()
 
 
-def outputs_to_csv(tgt_foldapath, record_dict, common_conds):
+def outputs_to_csv(tgt_foldapath, record_dict, common_conds: CommonConditions):
     """計算結果をcsv出力する
 
     Args:
@@ -286,15 +288,15 @@ def outputs_to_csv(tgt_foldapath, record_dict, common_conds):
         values = []
         for i in range(len(record_dict[_tgt_name])):
             values_tmp = []
-            for stream in range(1, 1 + common_conds["num_streams"]):
-                for section in range(1, 1 + common_conds["num_sections"]):
+            for stream in range(1, 1 + common_conds.num_streams):
+                for section in range(1, 1 + common_conds.num_sections):
                     for value in record_dict[_tgt_name][i][stream][section].values():
                         values_tmp.append(value)
             values.append(values_tmp)
         # カラム名の抽出
         columns = []
-        for stream in range(1, 1 + common_conds["num_streams"]):
-            for section in range(1, 1 + common_conds["num_sections"]):
+        for stream in range(1, 1 + common_conds.num_streams):
+            for section in range(1, 1 + common_conds.num_sections):
                 for key in record_dict[_tgt_name][i][stream][section].keys():
                     columns.append(key + "-" + str(stream).zfill(3) + "-" + str(section).zfill(3))
         # df化
@@ -366,14 +368,14 @@ def outputs_to_csv(tgt_foldapath, record_dict, common_conds):
         values = []
         for i in range(len(record_dict[tgt_name])):
             values_tmp = []
-            for stream in range(common_conds["num_streams"]):
-                for section in range(common_conds["num_sections"]):
+            for stream in range(common_conds.num_streams):
+                for section in range(common_conds.num_sections):
                     values_tmp.append(record_dict[tgt_name][i][_tgt_col][stream, section])
             values.append(values_tmp)
         # カラム名の抽出
         columns = []
-        for stream in range(1, 1 + common_conds["num_streams"]):
-            for section in range(1, 1 + common_conds["num_sections"]):
+        for stream in range(1, 1 + common_conds.num_streams):
+            for section in range(1, 1 + common_conds.num_sections):
                 columns.append(_tgt_col + "-" + str(stream).zfill(3) + "-" + str(section).zfill(3))
         df = pd.DataFrame(values, columns=columns, index=record_dict["timestamp"])
         df.index.name = "timestamp"

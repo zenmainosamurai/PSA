@@ -198,6 +198,7 @@ class StreamConditions:
     outer_perimeter: float
     outer_boundary_area: float
     adsorbent_mass: float
+    wall_weight: Optional[float] = field(default=None)
 
 
 class SimulationConditions:
@@ -302,6 +303,7 @@ class SimulationConditions:
             outer_perimeter=2 * math.pi * outer_radius,
             outer_boundary_area=2 * math.pi * outer_radius * tower.packed_bed.height,
             adsorbent_mass=0,  # 壁面には吸着材なし
+            wall_weight=tower.vessel.wall_total_weight,
         )
 
     def get_tower(self, tower_num: int) -> TowerConditions:

@@ -3,6 +3,8 @@ import pandas as pd
 import adsorption_base_models
 import warnings
 
+from sim_conditions import TowerConditions
+
 warnings.simplefilter("ignore")
 
 
@@ -11,7 +13,7 @@ class CellCalculator:
 
     @staticmethod
     def calculate_mass_and_heat_balance(
-        sim_conds,
+        sim_conds: TowerConditions,
         stream_conds,
         state_manager,
         tower_num,
@@ -29,7 +31,8 @@ class CellCalculator:
         heat_balance_results = {}
         mole_fraction_results = {} if mode == 2 else None  # 脱着モードの場合のみ
 
-        for stream in range(1, 1 + sim_conds["COMMON_COND"]["num_streams"]):
+        num_streams = sim_conds.common.num_streams
+        for stream in range(1, 1 + num_streams):
             mass_balance_results[stream] = {}
             heat_balance_results[stream] = {}
             if mole_fraction_results is not None:
@@ -82,7 +85,8 @@ class CellCalculator:
             )
 
             # Section 2以降の計算
-            for section in range(2, 1 + sim_conds["COMMON_COND"]["num_sections"]):
+            num_sections = sim_conds.common.num_sections
+            for section in range(2, 1 + num_sections):
                 if is_valve_closed:
                     # 弁閉鎖モードの場合
                     result = mass_balance_func(
@@ -127,7 +131,9 @@ class CellCalculator:
         return mass_balance_results, heat_balance_results, mole_fraction_results
 
     @staticmethod
-    def calculate_wall_heat_balance(sim_conds, stream_conds, state_manager, tower_num, heat_balance_results):
+    def calculate_wall_heat_balance(
+        sim_conds: TowerConditions, stream_conds, state_manager, tower_num, heat_balance_results
+    ):
         """壁面熱バランスの計算"""
         wall_heat_balance_results = {}
 
@@ -137,18 +143,20 @@ class CellCalculator:
             section=1,
             state_manager=state_manager,
             tower_num=tower_num,
-            heat_output=heat_balance_results[sim_conds["COMMON_COND"]["num_streams"]][1],
+            heat_output=heat_balance_results[sim_conds.common.num_streams][1],
             heat_wall_output=None,
         )
 
-        for section in range(2, 1 + sim_conds["COMMON_COND"]["num_sections"]):
+        num_sections = sim_conds.common.num_sections
+        num_streams = sim_conds.common.num_streams
+        for section in range(2, 1 + num_sections):
             wall_heat_balance_results[section] = adsorption_base_models.calculate_heat_balance_for_wall(
                 sim_conds=sim_conds,
                 stream_conds=stream_conds,
                 section=section,
                 state_manager=state_manager,
                 tower_num=tower_num,
-                heat_output=heat_balance_results[sim_conds["COMMON_COND"]["num_streams"]][section],
+                heat_output=heat_balance_results[num_streams][section],
                 heat_wall_output=wall_heat_balance_results[section - 1],
             )
 
@@ -176,28 +184,27 @@ class CellCalculator:
     @staticmethod
     def distribute_inflow_gas(sim_conds, stream_conds, inflow_gas):
         """上流からの流入ガスを各ストリームに分配"""
-        most_down_section = sim_conds["COMMON_COND"]["num_sections"]
+        most_down_section = sim_conds.common.num_sections
+        num_streams = sim_conds.common.num_streams
 
         total_outflow_co2 = sum(
-            inflow_gas[stream][most_down_section]["outflow_fr_co2"]
-            for stream in range(1, 1 + sim_conds["COMMON_COND"]["num_streams"])
+            inflow_gas[stream][most_down_section]["outflow_fr_co2"] for stream in range(1, 1 + num_streams)
         )
         total_outflow_n2 = sum(
-            inflow_gas[stream][most_down_section]["outflow_fr_n2"]
-            for stream in range(1, 1 + sim_conds["COMMON_COND"]["num_streams"])
+            inflow_gas[stream][most_down_section]["outflow_fr_n2"] for stream in range(1, 1 + num_streams)
         )
 
         distributed_inflows = {}
-        for stream in range(1, 1 + sim_conds["COMMON_COND"]["num_streams"]):
+        for stream in range(1, 1 + num_streams):
             distributed_inflows[stream] = {
-                "outflow_fr_co2": total_outflow_co2 * stream_conds[stream]["area_fraction"],
-                "outflow_fr_n2": total_outflow_n2 * stream_conds[stream]["area_fraction"],
+                "outflow_fr_co2": total_outflow_co2 * stream_conds[stream].area_fraction,
+                "outflow_fr_n2": total_outflow_n2 * stream_conds[stream].area_fraction,
             }
 
         return distributed_inflows
 
 
-def initial_adsorption(sim_conds, stream_conds, state_manager, tower_num, is_series_operation=False):
+def initial_adsorption(sim_conds: TowerConditions, stream_conds, state_manager, tower_num, is_series_operation=False):
     """吸着開始時の圧力調整"""
     mode = 0  # 吸着
     calculator = CellCalculator()
@@ -272,7 +279,7 @@ def stop_mode(sim_conds, stream_conds, state_manager, tower_num):
     }
 
 
-def flow_adsorption_single_or_upstream(sim_conds, stream_conds, state_manager, tower_num):
+def flow_adsorption_single_or_upstream(sim_conds: TowerConditions, stream_conds, state_manager, tower_num):
     """流通吸着（単独/直列吸着の上流）"""
     mode = 0  # 吸着
     calculator = CellCalculator()
@@ -299,7 +306,7 @@ def flow_adsorption_single_or_upstream(sim_conds, stream_conds, state_manager, t
     )
 
     # 圧力計算
-    pressure_after_flow_adsorption = sim_conds["FEED_GAS_COND"]["total_pressure"]
+    pressure_after_flow_adsorption = sim_conds.feed_gas.total_pressure
 
     return {
         "material": mass_balance_results,
@@ -310,14 +317,14 @@ def flow_adsorption_single_or_upstream(sim_conds, stream_conds, state_manager, t
     }
 
 
-def batch_adsorption_upstream(sim_conds, stream_conds, state_manager, tower_num, is_series_operation):
+def batch_adsorption_upstream(sim_conds: TowerConditions, stream_conds, state_manager, tower_num, is_series_operation):
     """バッチ吸着（上流）"""
     # 初期のバッチ吸着と同じ仕組み
     return initial_adsorption(sim_conds, stream_conds, state_manager, tower_num, is_series_operation)
 
 
 def equalization_pressure_depressurization(
-    sim_conds, stream_conds, state_manager, tower_num, downstream_tower_pressure
+    sim_conds: TowerConditions, stream_conds, state_manager, tower_num, downstream_tower_pressure
 ):
     """バッチ均圧（減圧）"""
     mode = 0  # 吸着
@@ -374,7 +381,7 @@ def equalization_pressure_depressurization(
     }
 
 
-def desorption_by_vacuuming(sim_conds, stream_conds, state_manager, tower_num):
+def desorption_by_vacuuming(sim_conds: TowerConditions, stream_conds, state_manager, tower_num):
     """真空脱着"""
     mode = 2  # 脱着
     calculator = CellCalculator()
@@ -426,21 +433,24 @@ def desorption_by_vacuuming(sim_conds, stream_conds, state_manager, tower_num):
     }
 
 
-def equalization_pressure_pressurization(sim_conds, stream_conds, state_manager, tower_num, upstream_params):
+def equalization_pressure_pressurization(
+    sim_conds: TowerConditions, stream_conds, state_manager, tower_num, upstream_params
+):
     """バッチ均圧（加圧）"""
     mode = 0  # 吸着
     calculator = CellCalculator()
 
     # 上流側で計算した流出量を各セクションの流入ガスとして設定
     inflow_gas_dict = {}
-    for stream in range(1, 1 + sim_conds["COMMON_COND"]["num_streams"]):
+    num_streams = sim_conds.common.num_streams
+    for stream in range(1, 1 + num_streams):
         inflow_gas_dict[stream] = upstream_params["outflow_fr"][stream]
 
     # マスバランス・熱バランス計算（特殊な流入ガス処理）
     mass_balance_results = {}
     heat_balance_results = {}
 
-    for stream in range(1, 1 + sim_conds["COMMON_COND"]["num_streams"]):
+    for stream in range(1, 1 + num_streams):
         mass_balance_results[stream] = {}
         heat_balance_results[stream] = {}
 
@@ -469,7 +479,8 @@ def equalization_pressure_pressurization(sim_conds, stream_conds, state_manager,
         )
 
         # Section 2以降
-        for section in range(2, 1 + sim_conds["COMMON_COND"]["num_sections"]):
+        num_sections = sim_conds.common.num_sections
+        for section in range(2, 1 + num_sections):
             mass_balance_results[stream][section] = adsorption_base_models.calculate_mass_balance_for_adsorption(
                 sim_conds=sim_conds,
                 stream_conds=stream_conds,
@@ -516,7 +527,7 @@ def equalization_pressure_pressurization(sim_conds, stream_conds, state_manager,
 
 
 def batch_adsorption_downstream(
-    sim_conds, stream_conds, state_manager, tower_num, is_series_operation, inflow_gas, stagnant_mf
+    sim_conds: TowerConditions, stream_conds, state_manager, tower_num, is_series_operation, inflow_gas, stagnant_mf
 ):
     """バッチ吸着（下流）"""
     mode = 0  # 吸着
@@ -529,7 +540,8 @@ def batch_adsorption_downstream(
     mass_balance_results = {}
     heat_balance_results = {}
 
-    for stream in range(1, 1 + sim_conds["COMMON_COND"]["num_streams"]):
+    num_streams = sim_conds.common.num_streams
+    for stream in range(1, 1 + num_streams):
         mass_balance_results[stream] = {}
         heat_balance_results[stream] = {}
 
@@ -559,7 +571,8 @@ def batch_adsorption_downstream(
         )
 
         # Section 2以降
-        for section in range(2, 1 + sim_conds["COMMON_COND"]["num_sections"]):
+        num_sections = sim_conds.common.num_sections
+        for section in range(2, 1 + num_sections):
             mass_balance_results[stream][section] = adsorption_base_models.calculate_mass_balance_for_adsorption(
                 sim_conds=sim_conds,
                 stream_conds=stream_conds,
@@ -607,7 +620,7 @@ def batch_adsorption_downstream(
     }
 
 
-def flow_adsorption_downstream(sim_conds, stream_conds, state_manager, tower_num, inflow_gas):
+def flow_adsorption_downstream(sim_conds: TowerConditions, stream_conds, state_manager, tower_num, inflow_gas):
     """流通吸着（下流）"""
     mode = 0  # 吸着
     calculator = CellCalculator()
@@ -619,7 +632,8 @@ def flow_adsorption_downstream(sim_conds, stream_conds, state_manager, tower_num
     mass_balance_results = {}
     heat_balance_results = {}
 
-    for stream in range(1, 1 + sim_conds["COMMON_COND"]["num_streams"]):
+    num_streams = sim_conds.common.num_streams
+    for stream in range(1, 1 + num_streams):
         mass_balance_results[stream] = {}
         heat_balance_results[stream] = {}
 
@@ -648,7 +662,8 @@ def flow_adsorption_downstream(sim_conds, stream_conds, state_manager, tower_num
         )
 
         # Section 2以降
-        for section in range(2, 1 + sim_conds["COMMON_COND"]["num_sections"]):
+        num_sections = sim_conds.common.num_sections
+        for section in range(2, 1 + num_sections):
             mass_balance_results[stream][section] = adsorption_base_models.calculate_mass_balance_for_adsorption(
                 sim_conds=sim_conds,
                 stream_conds=stream_conds,
@@ -683,7 +698,7 @@ def flow_adsorption_downstream(sim_conds, stream_conds, state_manager, tower_num
     )
 
     # 全圧
-    pressure_after_flow_adsorption = sim_conds["FEED_GAS_COND"]["total_pressure"]
+    pressure_after_flow_adsorption = sim_conds.feed_gas.total_pressure
 
     return {
         "material": mass_balance_results,
