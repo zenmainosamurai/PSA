@@ -109,7 +109,7 @@ def _axial_flow_correction(
 # 4. 外部公開関数: calc_heat_transfer_coef
 # ------------------------------------------------------------------
 def calc_heat_transfer_coef(
-    sim_conds: TowerConditions,
+    tower_conds: TowerConditions,
     stream: int,
     section: int,
     temp_now: float,
@@ -122,7 +122,7 @@ def calc_heat_transfer_coef(
     """層伝熱係数、壁-層伝熱係数を算出する
 
     Args:
-        sim_conds(dict):
+        tower_conds(dict):
         stream_conds(dict):
         stream(int):
         section(int):
@@ -137,7 +137,7 @@ def calc_heat_transfer_coef(
             u1 (float): 層伝熱係数 [W/m2/K
     """
     tower = state_manager.towers[tower_num]
-    stream_conds = sim_conds.stream_conditions
+    stream_conds = tower_conds.stream_conditions
     T_K = temp_now + 273.15
 
     if mode == 0:  # 吸着
@@ -152,13 +152,13 @@ def calc_heat_transfer_coef(
 
     # ---- 物性値 -----------------------------------------------------
     kf = compute_gas_k(T_K, mf_co2, mf_n2)  # 気体熱伝導率
-    kp = sim_conds.packed_bed.thermal_conductivity
+    kp = tower_conds.packed_bed.thermal_conductivity
 
-    epsilon = sim_conds.packed_bed.average_porosity
-    epsilon_p = sim_conds.packed_bed.emissivity
-    dp = sim_conds.packed_bed.average_particle_diameter
-    Lbed = sim_conds.packed_bed.height
-    num_sec = sim_conds.common.num_sections
+    epsilon = tower_conds.packed_bed.average_porosity
+    epsilon_p = tower_conds.packed_bed.emissivity
+    dp = tower_conds.packed_bed.average_particle_diameter
+    Lbed = tower_conds.packed_bed.height
+    num_sec = tower_conds.common.num_sections
 
     # ---- ke0 (放射補正) --------------------------------------------
     ke0 = _yagi_kunii_radiation(T_K, kf, kp, epsilon, epsilon_p, dp)
@@ -180,7 +180,7 @@ def calc_heat_transfer_coef(
         f0 = (
             (material_output["inflow_fr_co2"] + material_output["inflow_fr_n2"])
             / 1e6
-            / (sim_conds.common.calculation_step_time * 60.0)
+            / (tower_conds.common.calculation_step_time * 60.0)
         )
     elif mode == 2:  # 脱着時は排気ガス体積流量 [m3/s]
         f0 = vacuum_pumping_results["vacuum_rate_N"] / 60.0 * stream_conds[stream].area_fraction
@@ -195,7 +195,7 @@ def calc_heat_transfer_coef(
     ke, habs, dlat, hw1_raw = _axial_flow_correction(ke0, kf, dp, d1, Pr, Rep, epsilon, Lbed, num_sec)
 
     # ---- 壁-層伝熱係数補正 -----------------------------------------
-    hw1 = hw1_raw * sim_conds.vessel.wall_to_bed_htc_correction_factor
+    hw1 = hw1_raw * tower_conds.vessel.wall_to_bed_htc_correction_factor
 
     # ---- 層伝熱係数 u1 ---------------------------------------------
     u1 = 1.0 / (dlat / ke + 1.0 / habs)

@@ -13,7 +13,7 @@ class CellCalculator:
 
     @staticmethod
     def calculate_mass_and_heat_balance(
-        sim_conds: TowerConditions,
+        tower_conds: TowerConditions,
         state_manager,
         tower_num,
         mode,
@@ -30,7 +30,7 @@ class CellCalculator:
         heat_balance_results = {}
         mole_fraction_results = {} if mode == 2 else None  # 脱着モードの場合のみ
 
-        num_streams = sim_conds.common.num_streams
+        num_streams = tower_conds.common.num_streams
         for stream in range(1, 1 + num_streams):
             mass_balance_results[stream] = {}
             heat_balance_results[stream] = {}
@@ -44,7 +44,7 @@ class CellCalculator:
             else:
                 # 通常のマスバランス計算
                 kwargs = {
-                    "sim_conds": sim_conds,
+                    "tower_conds": tower_conds,
                     "stream": stream,
                     "section": 1,
                     "state_manager": state_manager,
@@ -70,7 +70,7 @@ class CellCalculator:
                 mass_balance_results[stream][1] = result
 
             heat_balance_results[stream][1] = heat_balance_func(
-                sim_conds=sim_conds,
+                tower_conds=tower_conds,
                 stream=stream,
                 section=1,
                 state_manager=state_manager,
@@ -82,7 +82,7 @@ class CellCalculator:
             )
 
             # Section 2以降の計算
-            num_sections = sim_conds.common.num_sections
+            num_sections = tower_conds.common.num_sections
             for section in range(2, 1 + num_sections):
                 if is_valve_closed:
                     # 弁閉鎖モードの場合
@@ -92,7 +92,7 @@ class CellCalculator:
                 else:
                     # 通常のマスバランス計算
                     kwargs = {
-                        "sim_conds": sim_conds,
+                        "tower_conds": tower_conds,
                         "stream": stream,
                         "section": section,
                         "state_manager": state_manager,
@@ -112,7 +112,7 @@ class CellCalculator:
                     mass_balance_results[stream][section] = result
 
                 heat_balance_results[stream][section] = heat_balance_func(
-                    sim_conds=sim_conds,
+                    tower_conds=tower_conds,
                     stream=stream,
                     section=section,
                     state_manager=state_manager,
@@ -126,24 +126,24 @@ class CellCalculator:
         return mass_balance_results, heat_balance_results, mole_fraction_results
 
     @staticmethod
-    def calculate_wall_heat_balance(sim_conds: TowerConditions, state_manager, tower_num, heat_balance_results):
+    def calculate_wall_heat_balance(tower_conds: TowerConditions, state_manager, tower_num, heat_balance_results):
         """壁面熱バランスの計算"""
         wall_heat_balance_results = {}
 
         wall_heat_balance_results[1] = adsorption_base_models.calculate_heat_balance_for_wall(
-            sim_conds=sim_conds,
+            tower_conds=tower_conds,
             section=1,
             state_manager=state_manager,
             tower_num=tower_num,
-            heat_output=heat_balance_results[sim_conds.common.num_streams][1],
+            heat_output=heat_balance_results[tower_conds.common.num_streams][1],
             heat_wall_output=None,
         )
 
-        num_sections = sim_conds.common.num_sections
-        num_streams = sim_conds.common.num_streams
+        num_sections = tower_conds.common.num_sections
+        num_streams = tower_conds.common.num_streams
         for section in range(2, 1 + num_sections):
             wall_heat_balance_results[section] = adsorption_base_models.calculate_heat_balance_for_wall(
-                sim_conds=sim_conds,
+                tower_conds=tower_conds,
                 section=section,
                 state_manager=state_manager,
                 tower_num=tower_num,
@@ -155,14 +155,14 @@ class CellCalculator:
 
     @staticmethod
     def calculate_lid_heat_balance(
-        sim_conds, state_manager, tower_num, heat_balance_results, wall_heat_balance_results
+        tower_conds, state_manager, tower_num, heat_balance_results, wall_heat_balance_results
     ):
         """蓋熱バランスの計算"""
         lid_heat_balance_results = {}
 
         for position in ["up", "down"]:
             lid_heat_balance_results[position] = adsorption_base_models.calculate_heat_balance_for_lid(
-                sim_conds=sim_conds,
+                tower_conds=tower_conds,
                 position=position,
                 state_manager=state_manager,
                 tower_num=tower_num,
@@ -173,11 +173,11 @@ class CellCalculator:
         return lid_heat_balance_results
 
     @staticmethod
-    def distribute_inflow_gas(sim_conds: TowerConditions, inflow_gas):
+    def distribute_inflow_gas(tower_conds: TowerConditions, inflow_gas):
         """上流からの流入ガスを各ストリームに分配"""
-        stream_conds = sim_conds.stream_conditions
-        most_down_section = sim_conds.common.num_sections
-        num_streams = sim_conds.common.num_streams
+        stream_conds = tower_conds.stream_conditions
+        most_down_section = tower_conds.common.num_sections
+        num_streams = tower_conds.common.num_streams
 
         total_outflow_co2 = sum(
             inflow_gas[stream][most_down_section]["outflow_fr_co2"] for stream in range(1, 1 + num_streams)
@@ -196,14 +196,14 @@ class CellCalculator:
         return distributed_inflows
 
 
-def initial_adsorption(sim_conds: TowerConditions, state_manager, tower_num, is_series_operation=False):
+def initial_adsorption(tower_conds: TowerConditions, state_manager, tower_num, is_series_operation=False):
     """吸着開始時の圧力調整"""
     mode = 0  # 吸着
     calculator = CellCalculator()
 
     # マスバランス・熱バランス計算
     mass_balance_results, heat_balance_results, _ = calculator.calculate_mass_and_heat_balance(
-        sim_conds,
+        tower_conds,
         state_manager,
         tower_num,
         mode,
@@ -213,17 +213,20 @@ def initial_adsorption(sim_conds: TowerConditions, state_manager, tower_num, is_
 
     # 壁面熱バランス計算
     wall_heat_balance_results = calculator.calculate_wall_heat_balance(
-        sim_conds, state_manager, tower_num, heat_balance_results
+        tower_conds, state_manager, tower_num, heat_balance_results
     )
 
     # 蓋熱バランス計算
     lid_heat_balance_results = calculator.calculate_lid_heat_balance(
-        sim_conds, state_manager, tower_num, heat_balance_results, wall_heat_balance_results
+        tower_conds, state_manager, tower_num, heat_balance_results, wall_heat_balance_results
     )
 
     # バッチ吸着後圧力変化
     pressure_after_batch_adsorption = adsorption_base_models.calculate_pressure_after_batch_adsorption(
-        sim_conds=sim_conds, state_manager=state_manager, tower_num=tower_num, is_series_operation=is_series_operation
+        tower_conds=tower_conds,
+        state_manager=state_manager,
+        tower_num=tower_num,
+        is_series_operation=is_series_operation,
     )
 
     return {
@@ -235,14 +238,14 @@ def initial_adsorption(sim_conds: TowerConditions, state_manager, tower_num, is_
     }
 
 
-def stop_mode(sim_conds: TowerConditions, state_manager, tower_num):
+def stop_mode(tower_conds: TowerConditions, state_manager, tower_num):
     """停止モード"""
     mode = 1  # 弁停止モード
     calculator = CellCalculator()
 
     # マスバランス・熱バランス計算（弁閉鎖用の関数を使用）
     mass_balance_results, heat_balance_results, _ = calculator.calculate_mass_and_heat_balance(
-        sim_conds,
+        tower_conds,
         state_manager,
         tower_num,
         mode,
@@ -253,12 +256,12 @@ def stop_mode(sim_conds: TowerConditions, state_manager, tower_num):
 
     # 壁面熱バランス計算
     wall_heat_balance_results = calculator.calculate_wall_heat_balance(
-        sim_conds, state_manager, tower_num, heat_balance_results
+        tower_conds, state_manager, tower_num, heat_balance_results
     )
 
     # 蓋熱バランス計算
     lid_heat_balance_results = calculator.calculate_lid_heat_balance(
-        sim_conds, state_manager, tower_num, heat_balance_results, wall_heat_balance_results
+        tower_conds, state_manager, tower_num, heat_balance_results, wall_heat_balance_results
     )
 
     return {
@@ -269,14 +272,14 @@ def stop_mode(sim_conds: TowerConditions, state_manager, tower_num):
     }
 
 
-def flow_adsorption_single_or_upstream(sim_conds: TowerConditions, state_manager, tower_num):
+def flow_adsorption_single_or_upstream(tower_conds: TowerConditions, state_manager, tower_num):
     """流通吸着（単独/直列吸着の上流）"""
     mode = 0  # 吸着
     calculator = CellCalculator()
 
     # マスバランス・熱バランス計算
     mass_balance_results, heat_balance_results, _ = calculator.calculate_mass_and_heat_balance(
-        sim_conds,
+        tower_conds,
         state_manager,
         tower_num,
         mode,
@@ -286,16 +289,16 @@ def flow_adsorption_single_or_upstream(sim_conds: TowerConditions, state_manager
 
     # 壁面熱バランス計算
     wall_heat_balance_results = calculator.calculate_wall_heat_balance(
-        sim_conds, state_manager, tower_num, heat_balance_results
+        tower_conds, state_manager, tower_num, heat_balance_results
     )
 
     # 蓋熱バランス計算
     lid_heat_balance_results = calculator.calculate_lid_heat_balance(
-        sim_conds, state_manager, tower_num, heat_balance_results, wall_heat_balance_results
+        tower_conds, state_manager, tower_num, heat_balance_results, wall_heat_balance_results
     )
 
     # 圧力計算
-    pressure_after_flow_adsorption = sim_conds.feed_gas.total_pressure
+    pressure_after_flow_adsorption = tower_conds.feed_gas.total_pressure
 
     return {
         "material": mass_balance_results,
@@ -306,14 +309,14 @@ def flow_adsorption_single_or_upstream(sim_conds: TowerConditions, state_manager
     }
 
 
-def batch_adsorption_upstream(sim_conds: TowerConditions, state_manager, tower_num, is_series_operation):
+def batch_adsorption_upstream(tower_conds: TowerConditions, state_manager, tower_num, is_series_operation):
     """バッチ吸着（上流）"""
     # 初期のバッチ吸着と同じ仕組み
-    return initial_adsorption(sim_conds, state_manager, tower_num, is_series_operation)
+    return initial_adsorption(tower_conds, state_manager, tower_num, is_series_operation)
 
 
 def equalization_pressure_depressurization(
-    sim_conds: TowerConditions, state_manager, tower_num, downstream_tower_pressure
+    tower_conds: TowerConditions, state_manager, tower_num, downstream_tower_pressure
 ):
     """バッチ均圧（減圧）"""
     mode = 0  # 吸着
@@ -321,7 +324,7 @@ def equalization_pressure_depressurization(
 
     # 上流管からの流入計算
     depressurization_results = adsorption_base_models.calculate_pressure_after_depressurization(
-        sim_conds=sim_conds,
+        tower_conds=tower_conds,
         state_manager=state_manager,
         tower_num=tower_num,
         downstream_tower_pressure=downstream_tower_pressure,
@@ -329,7 +332,7 @@ def equalization_pressure_depressurization(
 
     # マスバランス・熱バランス計算（均圧配管流量を考慮）
     mass_balance_results, heat_balance_results, _ = calculator.calculate_mass_and_heat_balance(
-        sim_conds,
+        tower_conds,
         state_manager,
         tower_num,
         mode,
@@ -340,17 +343,17 @@ def equalization_pressure_depressurization(
 
     # 壁面熱バランス計算
     wall_heat_balance_results = calculator.calculate_wall_heat_balance(
-        sim_conds, state_manager, tower_num, heat_balance_results
+        tower_conds, state_manager, tower_num, heat_balance_results
     )
 
     # 蓋熱バランス計算
     lid_heat_balance_results = calculator.calculate_lid_heat_balance(
-        sim_conds, state_manager, tower_num, heat_balance_results, wall_heat_balance_results
+        tower_conds, state_manager, tower_num, heat_balance_results, wall_heat_balance_results
     )
 
     # 下流塔の圧力と流入量計算
     downstream_flow_and_pressure = adsorption_base_models.calculate_downstream_flow_after_depressurization(
-        sim_conds=sim_conds,
+        tower_conds=tower_conds,
         state_manager=state_manager,
         tower_num=tower_num,
         mass_balance_results=mass_balance_results,
@@ -368,19 +371,19 @@ def equalization_pressure_depressurization(
     }
 
 
-def desorption_by_vacuuming(sim_conds: TowerConditions, state_manager, tower_num):
+def desorption_by_vacuuming(tower_conds: TowerConditions, state_manager, tower_num):
     """真空脱着"""
     mode = 2  # 脱着
     calculator = CellCalculator()
 
     # 排気後圧力の計算
     vacuum_pumping_results = adsorption_base_models.calculate_pressure_after_vacuum_pumping(
-        sim_conds=sim_conds, state_manager=state_manager, tower_num=tower_num
+        tower_conds=tower_conds, state_manager=state_manager, tower_num=tower_num
     )
 
     # マスバランス・熱バランス計算（脱着用）
     mass_balance_results, heat_balance_results, mole_fraction_results = calculator.calculate_mass_and_heat_balance(
-        sim_conds,
+        tower_conds,
         state_manager,
         tower_num,
         mode,
@@ -391,17 +394,17 @@ def desorption_by_vacuuming(sim_conds: TowerConditions, state_manager, tower_num
 
     # 壁面熱バランス計算
     wall_heat_balance_results = calculator.calculate_wall_heat_balance(
-        sim_conds, state_manager, tower_num, heat_balance_results
+        tower_conds, state_manager, tower_num, heat_balance_results
     )
 
     # 蓋熱バランス計算
     lid_heat_balance_results = calculator.calculate_lid_heat_balance(
-        sim_conds, state_manager, tower_num, heat_balance_results, wall_heat_balance_results
+        tower_conds, state_manager, tower_num, heat_balance_results, wall_heat_balance_results
     )
 
     # 脱着後の全圧
     pressure_after_desorption = adsorption_base_models.calculate_pressure_after_desorption(
-        sim_conds=sim_conds,
+        tower_conds=tower_conds,
         state_manager=state_manager,
         tower_num=tower_num,
         mole_fraction_results=mole_fraction_results,
@@ -419,14 +422,14 @@ def desorption_by_vacuuming(sim_conds: TowerConditions, state_manager, tower_num
     }
 
 
-def equalization_pressure_pressurization(sim_conds: TowerConditions, state_manager, tower_num, upstream_params):
+def equalization_pressure_pressurization(tower_conds: TowerConditions, state_manager, tower_num, upstream_params):
     """バッチ均圧（加圧）"""
     mode = 0  # 吸着
     calculator = CellCalculator()
 
     # 上流側で計算した流出量を各セクションの流入ガスとして設定
     inflow_gas_dict = {}
-    num_streams = sim_conds.common.num_streams
+    num_streams = tower_conds.common.num_streams
     for stream in range(1, 1 + num_streams):
         inflow_gas_dict[stream] = upstream_params["outflow_fr"][stream]
 
@@ -440,7 +443,7 @@ def equalization_pressure_pressurization(sim_conds: TowerConditions, state_manag
 
         # Section 1（上流からの流入）
         mass_balance_results[stream][1] = adsorption_base_models.calculate_mass_balance_for_adsorption(
-            sim_conds=sim_conds,
+            tower_conds=tower_conds,
             stream=stream,
             section=1,
             state_manager=state_manager,
@@ -449,7 +452,7 @@ def equalization_pressure_pressurization(sim_conds: TowerConditions, state_manag
         )
 
         heat_balance_results[stream][1] = adsorption_base_models.calculate_heat_balance_for_bed(
-            sim_conds=sim_conds,
+            tower_conds=tower_conds,
             stream=stream,
             section=1,
             state_manager=state_manager,
@@ -461,10 +464,10 @@ def equalization_pressure_pressurization(sim_conds: TowerConditions, state_manag
         )
 
         # Section 2以降
-        num_sections = sim_conds.common.num_sections
+        num_sections = tower_conds.common.num_sections
         for section in range(2, 1 + num_sections):
             mass_balance_results[stream][section] = adsorption_base_models.calculate_mass_balance_for_adsorption(
-                sim_conds=sim_conds,
+                tower_conds=tower_conds,
                 stream=stream,
                 section=section,
                 state_manager=state_manager,
@@ -473,7 +476,7 @@ def equalization_pressure_pressurization(sim_conds: TowerConditions, state_manag
             )
 
             heat_balance_results[stream][section] = adsorption_base_models.calculate_heat_balance_for_bed(
-                sim_conds=sim_conds,
+                tower_conds=tower_conds,
                 stream=stream,
                 section=section,
                 state_manager=state_manager,
@@ -486,12 +489,12 @@ def equalization_pressure_pressurization(sim_conds: TowerConditions, state_manag
 
     # 壁面熱バランス計算
     wall_heat_balance_results = calculator.calculate_wall_heat_balance(
-        sim_conds, state_manager, tower_num, heat_balance_results
+        tower_conds, state_manager, tower_num, heat_balance_results
     )
 
     # 蓋熱バランス計算
     lid_heat_balance_results = calculator.calculate_lid_heat_balance(
-        sim_conds, state_manager, tower_num, heat_balance_results, wall_heat_balance_results
+        tower_conds, state_manager, tower_num, heat_balance_results, wall_heat_balance_results
     )
 
     # バッチ吸着後圧力変化（上流側で計算済みの値を使用）
@@ -507,27 +510,27 @@ def equalization_pressure_pressurization(sim_conds: TowerConditions, state_manag
 
 
 def batch_adsorption_downstream(
-    sim_conds: TowerConditions, state_manager, tower_num, is_series_operation, inflow_gas, stagnant_mf
+    tower_conds: TowerConditions, state_manager, tower_num, is_series_operation, inflow_gas, stagnant_mf
 ):
     """バッチ吸着（下流）"""
     mode = 0  # 吸着
     calculator = CellCalculator()
 
     # 流入ガスを各ストリームに分配
-    distributed_inflows = calculator.distribute_inflow_gas(sim_conds, inflow_gas)
+    distributed_inflows = calculator.distribute_inflow_gas(tower_conds, inflow_gas)
 
     # マスバランス・熱バランス計算（分配された流入ガスを使用）
     mass_balance_results = {}
     heat_balance_results = {}
 
-    num_streams = sim_conds.common.num_streams
+    num_streams = tower_conds.common.num_streams
     for stream in range(1, 1 + num_streams):
         mass_balance_results[stream] = {}
         heat_balance_results[stream] = {}
 
         # Section 1（上流からの流入）
         mass_balance_results[stream][1] = adsorption_base_models.calculate_mass_balance_for_adsorption(
-            sim_conds=sim_conds,
+            tower_conds=tower_conds,
             stream=stream,
             section=1,
             state_manager=state_manager,
@@ -537,7 +540,7 @@ def batch_adsorption_downstream(
         )
 
         heat_balance_results[stream][1] = adsorption_base_models.calculate_heat_balance_for_bed(
-            sim_conds=sim_conds,
+            tower_conds=tower_conds,
             stream=stream,
             section=1,
             state_manager=state_manager,
@@ -549,10 +552,10 @@ def batch_adsorption_downstream(
         )
 
         # Section 2以降
-        num_sections = sim_conds.common.num_sections
+        num_sections = tower_conds.common.num_sections
         for section in range(2, 1 + num_sections):
             mass_balance_results[stream][section] = adsorption_base_models.calculate_mass_balance_for_adsorption(
-                sim_conds=sim_conds,
+                tower_conds=tower_conds,
                 stream=stream,
                 section=section,
                 state_manager=state_manager,
@@ -561,7 +564,7 @@ def batch_adsorption_downstream(
             )
 
             heat_balance_results[stream][section] = adsorption_base_models.calculate_heat_balance_for_bed(
-                sim_conds=sim_conds,
+                tower_conds=tower_conds,
                 stream=stream,
                 section=section,
                 state_manager=state_manager,
@@ -574,17 +577,20 @@ def batch_adsorption_downstream(
 
     # 壁面熱バランス計算
     wall_heat_balance_results = calculator.calculate_wall_heat_balance(
-        sim_conds, state_manager, tower_num, heat_balance_results
+        tower_conds, state_manager, tower_num, heat_balance_results
     )
 
     # 蓋熱バランス計算
     lid_heat_balance_results = calculator.calculate_lid_heat_balance(
-        sim_conds, state_manager, tower_num, heat_balance_results, wall_heat_balance_results
+        tower_conds, state_manager, tower_num, heat_balance_results, wall_heat_balance_results
     )
 
     # バッチ吸着後圧力変化
     pressure_after_batch_adsorption = adsorption_base_models.calculate_pressure_after_batch_adsorption(
-        sim_conds=sim_conds, state_manager=state_manager, tower_num=tower_num, is_series_operation=is_series_operation
+        tower_conds=tower_conds,
+        state_manager=state_manager,
+        tower_num=tower_num,
+        is_series_operation=is_series_operation,
     )
 
     return {
@@ -596,26 +602,26 @@ def batch_adsorption_downstream(
     }
 
 
-def flow_adsorption_downstream(sim_conds: TowerConditions, state_manager, tower_num, inflow_gas):
+def flow_adsorption_downstream(tower_conds: TowerConditions, state_manager, tower_num, inflow_gas):
     """流通吸着（下流）"""
     mode = 0  # 吸着
     calculator = CellCalculator()
 
     # 流入ガスを各ストリームに分配
-    distributed_inflows = calculator.distribute_inflow_gas(sim_conds, inflow_gas)
+    distributed_inflows = calculator.distribute_inflow_gas(tower_conds, inflow_gas)
 
     # マスバランス・熱バランス計算（分配された流入ガスを使用）
     mass_balance_results = {}
     heat_balance_results = {}
 
-    num_streams = sim_conds.common.num_streams
+    num_streams = tower_conds.common.num_streams
     for stream in range(1, 1 + num_streams):
         mass_balance_results[stream] = {}
         heat_balance_results[stream] = {}
 
         # Section 1（上流からの流入）
         mass_balance_results[stream][1] = adsorption_base_models.calculate_mass_balance_for_adsorption(
-            sim_conds=sim_conds,
+            tower_conds=tower_conds,
             stream=stream,
             section=1,
             state_manager=state_manager,
@@ -624,7 +630,7 @@ def flow_adsorption_downstream(sim_conds: TowerConditions, state_manager, tower_
         )
 
         heat_balance_results[stream][1] = adsorption_base_models.calculate_heat_balance_for_bed(
-            sim_conds=sim_conds,
+            tower_conds=tower_conds,
             stream=stream,
             section=1,
             state_manager=state_manager,
@@ -636,10 +642,10 @@ def flow_adsorption_downstream(sim_conds: TowerConditions, state_manager, tower_
         )
 
         # Section 2以降
-        num_sections = sim_conds.common.num_sections
+        num_sections = tower_conds.common.num_sections
         for section in range(2, 1 + num_sections):
             mass_balance_results[stream][section] = adsorption_base_models.calculate_mass_balance_for_adsorption(
-                sim_conds=sim_conds,
+                tower_conds=tower_conds,
                 stream=stream,
                 section=section,
                 state_manager=state_manager,
@@ -648,7 +654,7 @@ def flow_adsorption_downstream(sim_conds: TowerConditions, state_manager, tower_
             )
 
             heat_balance_results[stream][section] = adsorption_base_models.calculate_heat_balance_for_bed(
-                sim_conds=sim_conds,
+                tower_conds=tower_conds,
                 stream=stream,
                 section=section,
                 state_manager=state_manager,
@@ -661,16 +667,16 @@ def flow_adsorption_downstream(sim_conds: TowerConditions, state_manager, tower_
 
     # 壁面熱バランス計算
     wall_heat_balance_results = calculator.calculate_wall_heat_balance(
-        sim_conds, state_manager, tower_num, heat_balance_results
+        tower_conds, state_manager, tower_num, heat_balance_results
     )
 
     # 蓋熱バランス計算
     lid_heat_balance_results = calculator.calculate_lid_heat_balance(
-        sim_conds, state_manager, tower_num, heat_balance_results, wall_heat_balance_results
+        tower_conds, state_manager, tower_num, heat_balance_results, wall_heat_balance_results
     )
 
     # 全圧
-    pressure_after_flow_adsorption = sim_conds.feed_gas.total_pressure
+    pressure_after_flow_adsorption = tower_conds.feed_gas.total_pressure
 
     return {
         "material": mass_balance_results,

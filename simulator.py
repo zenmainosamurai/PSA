@@ -381,26 +381,26 @@ class GasAdosorptionBreakthroughsimulator:
             tower_conds_copy.feed_gas.co2_flow_rate = 20
             tower_conds_copy.feed_gas.n2_flow_rate = 25.2
             calc_output = operation_models.initial_adsorption(
-                sim_conds=tower_conds_copy, state_manager=state_manager, tower_num=tower_num
+                tower_conds=tower_conds_copy, state_manager=state_manager, tower_num=tower_num
             )
         elif mode == "停止":
             calc_output = operation_models.stop_mode(
-                sim_conds=tower_conds, state_manager=state_manager, tower_num=tower_num
+                tower_conds=tower_conds, state_manager=state_manager, tower_num=tower_num
             )
         elif mode == "流通吸着_単独/上流":
             calc_output = operation_models.flow_adsorption_single_or_upstream(
-                sim_conds=tower_conds, state_manager=state_manager, tower_num=tower_num
+                tower_conds=tower_conds, state_manager=state_manager, tower_num=tower_num
             )
         elif mode == "流通吸着_下流":
             calc_output = operation_models.flow_adsorption_downstream(
-                sim_conds=tower_conds,
+                tower_conds=tower_conds,
                 state_manager=state_manager,
                 tower_num=tower_num,
                 inflow_gas=other_tower_params,
             )
         elif mode == "バッチ吸着_上流":
             calc_output = operation_models.batch_adsorption_upstream(
-                sim_conds=tower_conds,
+                tower_conds=tower_conds,
                 state_manager=state_manager,
                 tower_num=tower_num,
                 is_series_operation=True,
@@ -409,7 +409,7 @@ class GasAdosorptionBreakthroughsimulator:
             if self.stagnant_mf is None:
                 self.logger.warning("stagnant_mf計算前にバッチ吸着_下流が呼ばれました")
             calc_output = operation_models.batch_adsorption_downstream(
-                sim_conds=tower_conds,
+                tower_conds=tower_conds,
                 state_manager=state_manager,
                 tower_num=tower_num,
                 is_series_operation=True,
@@ -418,14 +418,14 @@ class GasAdosorptionBreakthroughsimulator:
             )
         elif mode == "均圧_減圧":
             calc_output = operation_models.equalization_pressure_depressurization(
-                sim_conds=tower_conds,
+                tower_conds=tower_conds,
                 state_manager=state_manager,
                 tower_num=tower_num,
                 downstream_tower_pressure=other_tower_params,
             )
         elif mode == "均圧_加圧":
             calc_output = operation_models.equalization_pressure_pressurization(
-                sim_conds=tower_conds,
+                tower_conds=tower_conds,
                 state_manager=state_manager,
                 tower_num=tower_num,
                 upstream_params=other_tower_params,
@@ -433,7 +433,7 @@ class GasAdosorptionBreakthroughsimulator:
             self.stagnant_mf = calc_output["material"]
         elif mode == "真空脱着":
             calc_output = operation_models.desorption_by_vacuuming(
-                sim_conds=tower_conds, state_manager=state_manager, tower_num=tower_num
+                tower_conds=tower_conds, state_manager=state_manager, tower_num=tower_num
             )
 
         ### 2. 状態変数の更新 ----------------------------------------
