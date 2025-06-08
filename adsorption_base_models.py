@@ -26,7 +26,6 @@ warnings.simplefilter("error")
 
 def calculate_mass_balance_for_adsorption(
     sim_conds: TowerConditions,
-    stream_conds: Dict[int, StreamConditions],
     stream: int,
     section: int,
     state_manager: StateVariables,
@@ -50,6 +49,7 @@ def calculate_mass_balance_for_adsorption(
     """
     ### マテバラ計算開始 ------------------------------------------------
     tower = state_manager.towers[tower_num]
+    stream_conds = sim_conds.stream_conditions
 
     # セクション吸着材量 [g]
     Mabs = stream_conds[stream].adsorbent_mass / sim_conds.common.num_sections
@@ -226,7 +226,6 @@ def calculate_mass_balance_for_adsorption(
 
 def calculate_mass_balance_for_desorption(
     sim_conds: TowerConditions,
-    stream_conds: Dict[int, StreamConditions],
     stream: int,
     section: int,
     state_manager: StateVariables,
@@ -247,6 +246,7 @@ def calculate_mass_balance_for_desorption(
     """
     ### 現在気相モル量 = 流入モル量の計算 -------------------
     tower = state_manager.towers[tower_num]
+    stream_conds = sim_conds.stream_conditions
     # セクション空間割合
     space_ratio_section = (
         stream_conds[stream].area_fraction
@@ -413,7 +413,6 @@ def calculate_mass_balance_for_valve_closed(stream: int, section: int, state_man
 
 def calculate_heat_balance_for_bed(
     sim_conds: TowerConditions,
-    stream_conds: Dict[int, StreamConditions],
     stream,
     section,
     state_manager: StateVariables,
@@ -439,6 +438,7 @@ def calculate_heat_balance_for_bed(
     """
     ### 前準備 ------------------------------------------------------
     tower = state_manager.towers[tower_num]
+    stream_conds = sim_conds.stream_conditions
 
     # セクション現在温度 [℃]
     temp_now = tower.temp[stream - 1, section - 1]
@@ -489,7 +489,6 @@ def calculate_heat_balance_for_bed(
     if mode == 0:
         hw1, u1 = _heat_transfer_coef(
             sim_conds,
-            stream_conds,
             stream,
             section,
             temp_now,
@@ -506,7 +505,6 @@ def calculate_heat_balance_for_bed(
         # u1 = variables["heat_t_coef_wall"][stream][section]
         hw1, u1 = _heat_transfer_coef(
             sim_conds,
-            stream_conds,
             stream,
             section,
             temp_now,
@@ -559,7 +557,6 @@ def calculate_heat_balance_for_bed(
     # セクション到達温度 [℃]
     args = {
         "sim_conds": sim_conds,
-        "stream_conds": stream_conds,
         "gas_cp": gas_cp,
         "Mgas": Mgas,
         "temp_now": temp_now,
@@ -618,7 +615,6 @@ def calculate_heat_balance_for_bed(
 
 def calculate_heat_balance_for_wall(
     sim_conds: TowerConditions,
-    stream_conds: Dict[int, StreamConditions],
     section,
     state_manager: StateVariables,
     tower_num,
@@ -637,6 +633,7 @@ def calculate_heat_balance_for_wall(
         dict: 壁面熱バラ出力
     """
     tower = state_manager.towers[tower_num]
+    stream_conds = sim_conds.stream_conditions
     # セクション現在温度 [℃]
     temp_now = tower.temp_wall[section - 1]
     # 内側セクション温度 [℃]
@@ -693,7 +690,6 @@ def calculate_heat_balance_for_wall(
     # セクション到達温度 [℃]
     args = {
         "sim_conds": sim_conds,
-        "stream_conds": stream_conds,
         "temp_now": temp_now,
         "Hwin": Hwin,
         "Hwout": Hwout,
@@ -1027,7 +1023,6 @@ def calculate_pressure_after_depressurization(
 
 def calculate_downstream_flow_after_depressurization(
     sim_conds: TowerConditions,
-    stream_conds: Dict[int, StreamConditions],
     state_manager: StateVariables,
     tower_num: int,
     mass_balance_results,
@@ -1049,6 +1044,7 @@ def calculate_downstream_flow_after_depressurization(
         float: 下流塔への流出N2流量 [cm3]
     """
     tower = state_manager.towers[tower_num]
+    stream_conds = sim_conds.stream_conditions
     ### 下流塔の圧力計算 ----------------------------------------------
     # 容器内平均温度 [℃]
     T_K = (
@@ -1230,7 +1226,6 @@ def _calculate_equilibrium_adsorption_amount(P, T):
 def _optimize_bed_temperature(
     temp_reached,
     sim_conds: TowerConditions,
-    stream_conds,
     gas_cp,
     Mgas,
     temp_now,
@@ -1250,6 +1245,8 @@ def _optimize_bed_temperature(
     Returns:
         float: 充填層が受ける熱の熱収支基準と時間基準の差分
     """
+    stream_conds = sim_conds.stream_conditions
+
     # 流入ガスが受け取る熱 [J]
     Hgas = gas_cp * Mgas * (temp_reached - temp_now)
     # 充填層が受け取る熱(ΔT基準) [J]
@@ -1267,13 +1264,13 @@ def _optimize_bed_temperature(
 def _optimize_wall_temperature(
     temp_reached,
     sim_conds: TowerConditions,
-    stream_conds: Dict[int, StreamConditions],
     temp_now,
     Hwin,
     Hwout,
     Hbb,
     Hroof,
 ):
+    stream_conds = sim_conds.stream_conditions
     """壁面の到達温度算出におけるソルバー用関数
 
     Args:

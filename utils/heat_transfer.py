@@ -110,7 +110,6 @@ def _axial_flow_correction(
 # ------------------------------------------------------------------
 def calc_heat_transfer_coef(
     sim_conds: TowerConditions,
-    stream_conds: Dict[int, StreamConditions],
     stream: int,
     section: int,
     temp_now: float,
@@ -138,6 +137,7 @@ def calc_heat_transfer_coef(
             u1 (float): 層伝熱係数 [W/m2/K
     """
     tower = state_manager.towers[tower_num]
+    stream_conds = sim_conds.stream_conditions
     T_K = temp_now + 273.15
 
     if mode == 0:  # 吸着

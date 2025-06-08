@@ -171,21 +171,6 @@ class ThermocoupleConditions:
 
 
 @dataclass
-class TowerConditions:
-    """塔ごとの条件"""
-
-    common: CommonConditions
-    packed_bed: PackedBedConditions
-    feed_gas: FeedGasConditions
-    vessel: VesselConditions
-    lid: EndCoverConditions
-    bottom: EndCoverConditions
-    equalizing_piping: EqualizingPipingConditions
-    vacuum_piping: VacuumPipingConditions
-    thermocouple: ThermocoupleConditions
-
-
-@dataclass
 class StreamConditions:
     """ストリーム条件"""
 
@@ -201,13 +186,65 @@ class StreamConditions:
     wall_weight: Optional[float] = field(default=None)
 
 
+@dataclass
+class TowerConditions:
+    """塔ごとの条件"""
+
+    common: CommonConditions
+    packed_bed: PackedBedConditions
+    feed_gas: FeedGasConditions
+    vessel: VesselConditions
+    lid: EndCoverConditions
+    bottom: EndCoverConditions
+    equalizing_piping: EqualizingPipingConditions
+    vacuum_piping: VacuumPipingConditions
+    thermocouple: ThermocoupleConditions
+
+    stream_conditions: Dict[int, StreamConditions] = field(default_factory=dict)
+
+    def initialize_stream_conditions(self):
+        num_streams = self.common.num_streams
+        dr = self.packed_bed.radius / num_streams
+        for stream in range(1, num_streams + 1):
+            inner_radius = (stream - 1) * dr
+            outer_radius = stream * dr
+            cross_section = math.pi * (outer_radius**2 - inner_radius**2)
+            self.stream_conditions[stream] = StreamConditions(
+                inner_radius=inner_radius,
+                outer_radius=outer_radius,
+                cross_section=cross_section,
+                area_fraction=cross_section / self.packed_bed.cross_section,
+                innter_perimeter=2 * math.pi * inner_radius,
+                inner_boundary_area=2 * math.pi * inner_radius * self.packed_bed.height,
+                outer_perimeter=2 * math.pi * outer_radius,
+                outer_boundary_area=2 * math.pi * outer_radius * self.packed_bed.height,
+                adsorbent_mass=self.packed_bed.adsorbent_mass * (cross_section / self.packed_bed.cross_section),
+            )
+        # 壁面条件
+        outermost_stream = self.stream_conditions[num_streams]
+        inner_radius = outermost_stream.outer_radius
+        outer_radius = self.vessel.radius
+        cross_section = math.pi * (outer_radius**2 - inner_radius**2)
+        self.stream_conditions[num_streams + 1] = StreamConditions(
+            inner_radius=inner_radius,
+            outer_radius=outer_radius,
+            cross_section=cross_section,
+            area_fraction=0,  # 壁面は面積分率なし
+            innter_perimeter=2 * math.pi * inner_radius,
+            inner_boundary_area=2 * math.pi * inner_radius * self.packed_bed.height,
+            outer_perimeter=2 * math.pi * outer_radius,
+            outer_boundary_area=2 * math.pi * outer_radius * self.packed_bed.height,
+            adsorbent_mass=0,  # 壁面には吸着材なし
+            wall_weight=self.vessel.wall_total_weight,
+        )
+
+
 class SimulationConditions:
     """シミュレーション条件全体を管理するクラス"""
 
     def __init__(self, cond_id: str):
         self.cond_id = cond_id
         self.towers: Dict[int, TowerConditions] = {}
-        self.stream_conditions: Dict[int, Dict[int, StreamConditions]] = {}
         self._load_conditions()
 
     def _load_conditions(self):
@@ -232,8 +269,9 @@ class SimulationConditions:
 
         # 各塔の条件を読み込み
         for tower_num in range(1, 4):
-            self.towers[tower_num] = self._create_tower_conditions(sheets, tower_num)
-            self._initialize_stream_conditions(tower_num)
+            tower = self._create_tower_conditions(sheets, tower_num)
+            tower.initialize_stream_conditions()
+            self.towers[tower_num] = tower
 
     def _create_tower_conditions(self, sheets: Dict[str, pd.DataFrame], tower_num: int) -> TowerConditions:
         """各塔の条件を作成"""
@@ -255,64 +293,13 @@ class SimulationConditions:
         """DataFrameから指定列のパラメータを辞書として抽出"""
         return {param: df.loc[param, col] for param in df.index if pd.notna(df.loc[param, col])}
 
-    def _initialize_stream_conditions(self, tower_num: int):
-        """ストリーム条件を初期化"""
-        tower = self.towers[tower_num]
-        self.stream_conditions[tower_num] = {}
-
-        # 各ストリームの条件を計算
-        for stream in range(1, tower.common.num_streams + 1):
-            self.stream_conditions[tower_num][stream] = self._create_stream_conditions(tower, stream)
-
-        # 壁面条件を追加
-        self.stream_conditions[tower_num][tower.common.num_streams + 1] = self._create_wall_conditions(tower)
-
-    def _create_stream_conditions(self, tower: TowerConditions, stream: int) -> StreamConditions:
-        """ストリーム条件を作成"""
-        dr = tower.packed_bed.radius / tower.common.num_streams
-        inner_radius = (stream - 1) * dr
-        outer_radius = stream * dr
-        cross_section = math.pi * (outer_radius**2 - inner_radius**2)
-
-        return StreamConditions(
-            inner_radius=inner_radius,
-            outer_radius=outer_radius,
-            cross_section=cross_section,
-            area_fraction=cross_section / tower.packed_bed.cross_section,
-            innter_perimeter=2 * math.pi * inner_radius,
-            inner_boundary_area=2 * math.pi * inner_radius * tower.packed_bed.height,
-            outer_perimeter=2 * math.pi * outer_radius,
-            outer_boundary_area=2 * math.pi * outer_radius * tower.packed_bed.height,
-            adsorbent_mass=tower.packed_bed.adsorbent_mass * (cross_section / tower.packed_bed.cross_section),
-        )
-
-    def _create_wall_conditions(self, tower: TowerConditions) -> StreamConditions:
-        """壁面（最外ストリーム）条件を作成"""
-        second_outermost_stream = self.stream_conditions[1][tower.common.num_streams]
-        inner_radius = second_outermost_stream.outer_radius
-        outer_radius = tower.vessel.radius
-        cross_section = math.pi * (outer_radius**2 - inner_radius**2)
-
-        return StreamConditions(
-            inner_radius=inner_radius,
-            outer_radius=outer_radius,
-            cross_section=cross_section,
-            area_fraction=0,  # NOTE: inner_radius, outer_radiusの参照方法から最外ストリームのことだと思ったが違う？
-            innter_perimeter=2 * math.pi * inner_radius,
-            inner_boundary_area=2 * math.pi * inner_radius * tower.packed_bed.height,
-            outer_perimeter=2 * math.pi * outer_radius,
-            outer_boundary_area=2 * math.pi * outer_radius * tower.packed_bed.height,
-            adsorbent_mass=0,  # 壁面には吸着材なし
-            wall_weight=tower.vessel.wall_total_weight,
-        )
-
     def get_tower(self, tower_num: int) -> TowerConditions:
         """指定した塔の条件を取得"""
         return self.towers[tower_num]
 
     def get_stream(self, tower_num: int, stream: int) -> StreamConditions:
         """指定した塔・ストリームの条件を取得"""
-        return self.stream_conditions[tower_num][stream]
+        return self.get_tower(tower_num).stream_conditions[stream]
 
     @property
     def num_towers(self) -> int:
