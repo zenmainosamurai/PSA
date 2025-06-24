@@ -32,7 +32,7 @@ def calculate_mass_balance_for_adsorption(
     tower_num: int,
     inflow_gas=None,
     flow_amt_depress=None,
-    stagnant_mode=None,
+    residual_gas_composition=None,
 ):
     """任意セルのマテリアルバランスを計算する
         吸着モード
@@ -41,7 +41,7 @@ def calculate_mass_balance_for_adsorption(
         stream (int): 対象セルのstream番号
         section (int): 対象セルのsection番号
         variables (dict): 温度等の状態変数
-        inflow_gas (dict): 上部セルの出力値
+        inflow_gas (dict): 上流セル・塔からの流出ガス情報
         flow_amt_depress (float): 上流均圧菅からの全流量
 
     Returns:
@@ -86,12 +86,12 @@ def calculate_mass_balance_for_adsorption(
         inflow_fr_co2 = inflow_gas["outflow_fr_co2"]
         inflow_fr_n2 = inflow_gas["outflow_fr_n2"]
     # 流入ガスモル分率
-    if (stagnant_mode is None) | (section != 1):
+    if (residual_gas_composition is None) | (section != 1):
         inflow_mf_co2 = inflow_fr_co2 / (inflow_fr_co2 + inflow_fr_n2)
         inflow_mf_n2 = inflow_fr_n2 / (inflow_fr_co2 + inflow_fr_n2)
     else:
-        inflow_mf_co2 = stagnant_mode[stream][1]["inflow_mf_co2"]
-        inflow_mf_n2 = stagnant_mode[stream][1]["inflow_mf_n2"]
+        inflow_mf_co2 = residual_gas_composition[stream][1]["inflow_mf_co2"]
+        inflow_mf_n2 = residual_gas_composition[stream][1]["inflow_mf_n2"]
     # 全圧 [MPaA]
     total_press = tower.total_press
     # CO2分圧 [MPaA]

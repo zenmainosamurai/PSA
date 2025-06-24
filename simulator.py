@@ -1,5 +1,6 @@
 from copy import deepcopy
 import os
+import sys
 
 import numpy as np
 import pandas as pd
@@ -52,8 +53,8 @@ class GasAdosorptionBreakthroughsimulator:
         filepath = const.CONDITIONS_DIR + self.cond_id + "/" + "稼働工程表.xlsx"
         self.df_operation = pd.read_excel(filepath, index_col="工程", sheet_name="工程")
 
-        # その他初期化
-        self.stagnant_mf: dict | None = None
+        # 塔内の残留ガス情報
+        self.residual_gas_composition: dict | None = None
 
         self.state_manager = StateVariables(self.num_tower, self.num_str, self.num_sec, self.sim_conds)
 
@@ -219,7 +220,7 @@ class GasAdosorptionBreakthroughsimulator:
             上流や減圧は優先するなど、計算する順番を制御する
 
         Args:
-            mode_list (list): モード番号のリスト
+            mode_list (list): [塔1のモード, 塔2のモード, 塔3のモード]
             variables_tower (dict): 各塔の状態変数
 
         Returns:
@@ -237,117 +238,116 @@ class GasAdosorptionBreakthroughsimulator:
             ["流通吸着_単独/上流", "流通吸着_下流"],  # [上流, 下流]
             ["バッチ吸着_上流", "バッチ吸着_下流"],
         ]
-        cond1 = (up_and_down_mode_list[0][0] in mode_list) and (up_and_down_mode_list[0][1] in mode_list)
-        cond2 = (up_and_down_mode_list[1][0] in mode_list) and (up_and_down_mode_list[1][1] in mode_list)
-        if cond1 | cond2:
-            # 上流から実施
-            if cond1:
-                # モード抽出
-                _tgt_mode = up_and_down_mode_list[0][0]
+        has_flow_adsorption_pair = (up_and_down_mode_list[0][0] in mode_list) and (
+            up_and_down_mode_list[0][1] in mode_list
+        )
+        has_batch_adsorption_pair = (up_and_down_mode_list[1][0] in mode_list) and (
+            up_and_down_mode_list[1][1] in mode_list
+        )
+        # 3塔のうち2塔で上流・下流の組み合わせがある場合
+        if has_flow_adsorption_pair | has_batch_adsorption_pair:
+            if has_flow_adsorption_pair:
+                upstream_mode = up_and_down_mode_list[0][0]
+                downstream_mode = up_and_down_mode_list[0][1]
             else:
-                _tgt_mode = up_and_down_mode_list[1][0]
-            # 塔番号
-            _tgt_tower_num_up = mode_list.index(_tgt_mode) + 1
-            # ガス吸着計算実施
+                upstream_mode = up_and_down_mode_list[1][0]
+                downstream_mode = up_and_down_mode_list[1][1]
+            upstream_tower_num = mode_list.index(upstream_mode) + 1
+            downstream_tower_num = mode_list.index(downstream_mode) + 1
+            # 上流塔のガス吸着計算
             (
-                record_outputs_tower[_tgt_tower_num_up],
+                record_outputs_tower[upstream_tower_num],
                 _,
             ) = self.branch_operation_mode(
-                tower_conds=sim_conds.get_tower(_tgt_tower_num_up),
-                mode=_tgt_mode,
-                tower_num=_tgt_tower_num_up,
+                tower_conds=sim_conds.get_tower(upstream_tower_num),
+                mode=upstream_mode,
+                tower_num=upstream_tower_num,
                 state_manager=self.state_manager,
             )
-            # 下流 (上流のマテバラ出力を使用)
-            if cond1:
-                _tgt_mode = up_and_down_mode_list[0][1]
-            else:
-                _tgt_mode = up_and_down_mode_list[1][1]
-            _tgt_tower_num_down = mode_list.index(_tgt_mode) + 1
+            # 下流塔の計算
             (
-                record_outputs_tower[_tgt_tower_num_down],
+                record_outputs_tower[downstream_tower_num],
                 _,
             ) = self.branch_operation_mode(
-                tower_conds=sim_conds.get_tower(_tgt_tower_num_down),
-                mode=_tgt_mode,
-                tower_num=_tgt_tower_num_down,
+                tower_conds=sim_conds.get_tower(downstream_tower_num),
+                mode=downstream_mode,
+                tower_num=downstream_tower_num,
                 state_manager=self.state_manager,
-                other_tower_params=record_outputs_tower[_tgt_tower_num_up]["material"],
+                other_tower_params=record_outputs_tower[upstream_tower_num]["material"],
             )
             # 残りの塔
-            for tgt_tower_num in range(1, 1 + self.num_tower):
-                # 上流・下流はスキップ
-                if tgt_tower_num in [_tgt_tower_num_up, _tgt_tower_num_down]:
+            for current_tower_num in range(1, 1 + self.num_tower):
+                # 上流・下流は計算済みなのでスキップ
+                if current_tower_num in [upstream_tower_num, downstream_tower_num]:
                     continue
-                _tgt_mode = mode_list[tgt_tower_num - 1]
+                current_mode = mode_list[current_tower_num - 1]
                 (
-                    record_outputs_tower[tgt_tower_num],
+                    record_outputs_tower[current_tower_num],
                     _,
                 ) = self.branch_operation_mode(
-                    tower_conds=sim_conds.get_tower(tgt_tower_num),
-                    mode=_tgt_mode,
-                    tower_num=tgt_tower_num,
+                    tower_conds=sim_conds.get_tower(current_tower_num),
+                    mode=current_mode,
+                    tower_num=current_tower_num,
                     state_manager=self.state_manager,
                 )
         # 2. 均圧の加圧と減圧がある場合
         elif ("均圧_加圧" in mode_list) and ("均圧_減圧" in mode_list):
             # 減圧と加圧の塔番号取得
-            _tgt_mode_dep = "均圧_減圧"
-            _tgt_tower_num_depress = mode_list.index(_tgt_mode_dep) + 1
-            _tgt_mode_pre = "均圧_加圧"
-            _tgt_tower_num_press = mode_list.index(_tgt_mode_pre) + 1
+            depressurization_mode = "均圧_減圧"
+            depressurization_tower_num = mode_list.index(depressurization_mode) + 1
+            pressurization_mode = "均圧_加圧"
+            pressurization_tower_num = mode_list.index(pressurization_mode) + 1
             # 減圧から実施
             # NOTE: 加圧側の全圧を引数として渡す
-            press_tower_pressure = self.state_manager.towers[_tgt_tower_num_press].total_press
+            pressurization_tower_pressure = self.state_manager.towers[pressurization_tower_num].total_press
             (
-                record_outputs_tower[_tgt_tower_num_depress],
+                record_outputs_tower[depressurization_tower_num],
                 all_outputs,
             ) = self.branch_operation_mode(
-                tower_conds=sim_conds.get_tower(_tgt_tower_num_depress),
-                mode=_tgt_mode_dep,
-                tower_num=_tgt_tower_num_depress,
+                tower_conds=sim_conds.get_tower(depressurization_tower_num),
+                mode=depressurization_mode,
+                tower_num=depressurization_tower_num,
                 state_manager=self.state_manager,
-                other_tower_params=press_tower_pressure,
+                other_tower_params=pressurization_tower_pressure,
             )
             # 加圧
             # NOTE: 減圧側の均圧配管流量を引数として渡す
             (
-                record_outputs_tower[_tgt_tower_num_press],
+                record_outputs_tower[pressurization_tower_num],
                 _,
             ) = self.branch_operation_mode(
-                tower_conds=sim_conds.get_tower(_tgt_tower_num_press),
-                mode=_tgt_mode_pre,
-                tower_num=_tgt_tower_num_press,
+                tower_conds=sim_conds.get_tower(pressurization_tower_num),
+                mode=pressurization_mode,
+                tower_num=pressurization_tower_num,
                 state_manager=self.state_manager,
                 other_tower_params=all_outputs["downflow_params"],
             )
             # 残りの塔
-            for tgt_tower_num in range(1, 1 + self.num_tower):
+            for current_tower_num in range(1, 1 + self.num_tower):
                 # 加圧・減圧はスキップ
-                if tgt_tower_num in [_tgt_tower_num_depress, _tgt_tower_num_press]:
+                if current_tower_num in [depressurization_tower_num, pressurization_tower_num]:
                     continue
-                _tgt_mode = mode_list[tgt_tower_num - 1]
+                current_mode = mode_list[current_tower_num - 1]
                 (
-                    record_outputs_tower[tgt_tower_num],
+                    record_outputs_tower[current_tower_num],
                     _,
                 ) = self.branch_operation_mode(
-                    tower_conds=sim_conds.get_tower(tgt_tower_num),
-                    mode=_tgt_mode,
-                    tower_num=tgt_tower_num,
+                    tower_conds=sim_conds.get_tower(current_tower_num),
+                    mode=current_mode,
+                    tower_num=current_tower_num,
                     state_manager=self.state_manager,
                 )
         # 3. 独立運転
         else:
-            # 残りの塔
-            for tgt_tower_num in range(1, 1 + self.num_tower):
-                _tgt_mode = mode_list[tgt_tower_num - 1]
+            for current_tower_num in range(1, 1 + self.num_tower):
+                current_mode = mode_list[current_tower_num - 1]
                 (
-                    record_outputs_tower[tgt_tower_num],
+                    record_outputs_tower[current_tower_num],
                     _,
                 ) = self.branch_operation_mode(
-                    tower_conds=sim_conds.get_tower(tgt_tower_num),
-                    mode=_tgt_mode,
-                    tower_num=tgt_tower_num,
+                    tower_conds=sim_conds.get_tower(current_tower_num),
+                    mode=current_mode,
+                    tower_num=current_tower_num,
                     state_manager=self.state_manager,
                 )
 
@@ -406,15 +406,15 @@ class GasAdosorptionBreakthroughsimulator:
                 is_series_operation=True,
             )
         elif mode == "バッチ吸着_下流":
-            if self.stagnant_mf is None:
-                self.logger.warning("stagnant_mf計算前にバッチ吸着_下流が呼ばれました")
+            if self.residual_gas_composition is None:
+                self.logger.warning("residual_gas_composition計算前にバッチ吸着_下流が呼ばれました")
             calc_output = operation_models.batch_adsorption_downstream(
                 tower_conds=tower_conds,
                 state_manager=state_manager,
                 tower_num=tower_num,
                 is_series_operation=True,
                 inflow_gas=other_tower_params,
-                stagnant_mf=self.stagnant_mf,
+                residual_gas_composition=self.residual_gas_composition,
             )
         elif mode == "均圧_減圧":
             calc_output = operation_models.equalization_pressure_depressurization(
@@ -430,7 +430,7 @@ class GasAdosorptionBreakthroughsimulator:
                 tower_num=tower_num,
                 upstream_params=other_tower_params,
             )
-            self.stagnant_mf = calc_output["material"]
+            self.residual_gas_composition = calc_output["material"]
         elif mode == "真空脱着":
             calc_output = operation_models.desorption_by_vacuuming(
                 tower_conds=tower_conds, state_manager=state_manager, tower_num=tower_num

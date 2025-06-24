@@ -510,7 +510,7 @@ def equalization_pressure_pressurization(tower_conds: TowerConditions, state_man
 
 
 def batch_adsorption_downstream(
-    tower_conds: TowerConditions, state_manager, tower_num, is_series_operation, inflow_gas, stagnant_mf
+    tower_conds: TowerConditions, state_manager, tower_num, is_series_operation, inflow_gas, residual_gas_composition
 ):
     """バッチ吸着（下流）"""
     mode = 0  # 吸着
@@ -536,7 +536,7 @@ def batch_adsorption_downstream(
             state_manager=state_manager,
             tower_num=tower_num,
             inflow_gas=distributed_inflows[stream],
-            stagnant_mode=stagnant_mf,
+            residual_gas_composition=residual_gas_composition,
         )
 
         heat_balance_results[stream][1] = adsorption_base_models.calculate_heat_balance_for_bed(
