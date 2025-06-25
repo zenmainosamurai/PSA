@@ -180,17 +180,17 @@ class CellCalculator:
         num_streams = tower_conds.common.num_streams
 
         total_outflow_co2 = sum(
-            inflow_gas[stream][most_down_section]["outflow_fr_co2"] for stream in range(1, 1 + num_streams)
+            inflow_gas[stream][most_down_section]["outlet_co2_volume"] for stream in range(1, 1 + num_streams)
         )
         total_outflow_n2 = sum(
-            inflow_gas[stream][most_down_section]["outflow_fr_n2"] for stream in range(1, 1 + num_streams)
+            inflow_gas[stream][most_down_section]["outlet_n2_volume"] for stream in range(1, 1 + num_streams)
         )
 
         distributed_inflows = {}
         for stream in range(1, 1 + num_streams):
             distributed_inflows[stream] = {
-                "outflow_fr_co2": total_outflow_co2 * stream_conds[stream].area_fraction,
-                "outflow_fr_n2": total_outflow_n2 * stream_conds[stream].area_fraction,
+                "outlet_co2_volume": total_outflow_co2 * stream_conds[stream].area_fraction,
+                "outlet_n2_volume": total_outflow_n2 * stream_conds[stream].area_fraction,
             }
 
         return distributed_inflows

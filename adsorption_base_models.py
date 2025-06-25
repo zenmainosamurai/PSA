@@ -52,30 +52,30 @@ def calculate_mass_balance_for_adsorption(
     stream_conds = tower_conds.stream_conditions
 
     # セクション吸着材量 [g]
-    Mabs = stream_conds[stream].adsorbent_mass / tower_conds.common.num_sections
+    section_adsorbent_mass = stream_conds[stream].adsorbent_mass / tower_conds.common.num_sections
     # 流入CO2, N2流量 [cm3]
     if (section == 1) & (inflow_gas is None) & (flow_amt_depress is None):  # 最上流セルの流入ガスによる吸着など
-        inflow_fr_co2 = (
+        inlet_co2_volume = (
             tower_conds.feed_gas.co2_flow_rate
             * tower_conds.common.calculation_step_time
             * stream_conds[stream].area_fraction
             * 1000
         )
-        inflow_fr_n2 = (
+        inlet_n2_volume = (
             tower_conds.feed_gas.n2_flow_rate
             * tower_conds.common.calculation_step_time
             * stream_conds[stream].area_fraction
             * 1000
         )
     elif (section == 1) & (flow_amt_depress is not None):  # 減圧時の最上流セルのみ対象
-        inflow_fr_co2 = (
+        inlet_co2_volume = (
             tower_conds.feed_gas.co2_mole_fraction
             * flow_amt_depress
             * tower_conds.common.calculation_step_time
             * stream_conds[stream].area_fraction
             * 1000
         )
-        inflow_fr_n2 = (
+        inlet_n2_volume = (
             tower_conds.feed_gas.n2_mole_fraction
             * flow_amt_depress
             * tower_conds.common.calculation_step_time
@@ -83,142 +83,149 @@ def calculate_mass_balance_for_adsorption(
             * 1000
         )
     elif inflow_gas is not None:  # 下流セクションや下流塔での吸着など
-        inflow_fr_co2 = inflow_gas["outflow_fr_co2"]
-        inflow_fr_n2 = inflow_gas["outflow_fr_n2"]
+        inlet_co2_volume = inflow_gas["outlet_co2_volume"]
+        inlet_n2_volume = inflow_gas["outlet_n2_volume"]
     # 流入ガスモル分率
     if (residual_gas_composition is None) | (section != 1):
-        inflow_mf_co2 = inflow_fr_co2 / (inflow_fr_co2 + inflow_fr_n2)
-        inflow_mf_n2 = inflow_fr_n2 / (inflow_fr_co2 + inflow_fr_n2)
+        inlet_co2_mole_fraction = inlet_co2_volume / (inlet_co2_volume + inlet_n2_volume)
+        inlet_n2_mole_fraction = inlet_n2_volume / (inlet_co2_volume + inlet_n2_volume)
     else:
-        inflow_mf_co2 = residual_gas_composition[stream][1]["inflow_mf_co2"]
-        inflow_mf_n2 = residual_gas_composition[stream][1]["inflow_mf_n2"]
+        inlet_co2_mole_fraction = residual_gas_composition[stream][1]["inlet_co2_mole_fraction"]
+        inlet_n2_mole_fraction = residual_gas_composition[stream][1]["inlet_n2_mole_fraction"]
     # 全圧 [MPaA]
     total_press = tower.total_press
     # CO2分圧 [MPaA]
-    p_co2 = total_press * inflow_mf_co2
+    co2_partial_pressure = total_press * inlet_co2_mole_fraction
     # 現在温度 [℃]
     temp = tower.temp[stream - 1, section - 1]
     # ガス密度 [kg/m3]
-    gas_density = tower_conds.feed_gas.co2_density * inflow_mf_co2 + tower_conds.feed_gas.n2_density * inflow_mf_n2
+    gas_density = (
+        tower_conds.feed_gas.co2_density * inlet_co2_mole_fraction
+        + tower_conds.feed_gas.n2_density * inlet_n2_mole_fraction
+    )
     # ガス比熱 [kJ/kg/K]
-    gas_cp = (
-        tower_conds.feed_gas.co2_specific_heat_capacity * inflow_mf_co2
-        + tower_conds.feed_gas.n2_specific_heat_capacity * inflow_mf_n2
+    gas_specific_heat = (
+        tower_conds.feed_gas.co2_specific_heat_capacity * inlet_co2_mole_fraction
+        + tower_conds.feed_gas.n2_specific_heat_capacity * inlet_n2_mole_fraction
     )
     # 現在雰囲気の平衡吸着量 [cm3/g-abs]
-    P_KPA = p_co2 * 1000  # [kPaA]
+    P_KPA = co2_partial_pressure * 1000  # [kPaA]
     T_K = temp + 273.15  # [K]
-    adsorp_amt_equilibrium = max(0.1, _calculate_equilibrium_adsorption_amount(P_KPA, T_K))
+    equilibrium_loading = max(0.1, _calculate_equilibrium_adsorption_amount(P_KPA, T_K))
     # 現在の既存吸着量 [cm3/g-abs]
-    adsorp_amt_current = tower.adsorp_amt[stream - 1, section - 1]
+    current_loading = tower.adsorp_amt[stream - 1, section - 1]
     # 理論新規吸着量 [cm3/g-abs]
-    if adsorp_amt_equilibrium >= adsorp_amt_current:
-        adsorp_amt_estimate_abs = (
-            tower_conds.packed_bed.adsorption_mass_transfer_coef ** (adsorp_amt_current / adsorp_amt_equilibrium)
+    if equilibrium_loading >= current_loading:
+        theoretical_loading_delta = (
+            tower_conds.packed_bed.adsorption_mass_transfer_coef ** (current_loading / equilibrium_loading)
             / tower_conds.packed_bed.adsorbent_bulk_density
             * 6
             * (1 - tower_conds.packed_bed.average_porosity)
             * tower_conds.packed_bed.particle_shape_factor
             / tower_conds.packed_bed.average_particle_diameter
-            * (adsorp_amt_equilibrium - adsorp_amt_current)
+            * (equilibrium_loading - current_loading)
             * tower_conds.common.calculation_step_time
             / 1e6
             * 60
         )
         # セクション理論新規吸着量 [cm3]
-        adsorp_amt_estimate = adsorp_amt_estimate_abs * Mabs
+        theoretical_uptake_volume = theoretical_loading_delta * section_adsorbent_mass
         # 実際のセクション新規吸着量 [cm3]
-        adsorp_amt_estimate = min(adsorp_amt_estimate, inflow_fr_co2)
+        actual_uptake_volume = min(theoretical_uptake_volume, inlet_co2_volume)
     else:
-        adsorp_amt_estimate_abs = (
-            tower_conds.packed_bed.desorption_mass_transfer_coef ** (adsorp_amt_current / adsorp_amt_equilibrium)
+        theoretical_loading_delta = (
+            tower_conds.packed_bed.desorption_mass_transfer_coef ** (current_loading / equilibrium_loading)
             / tower_conds.packed_bed.adsorbent_bulk_density
             * 6
             * (1 - tower_conds.packed_bed.average_porosity)
             * tower_conds.packed_bed.particle_shape_factor
             / tower_conds.packed_bed.average_particle_diameter
-            * (adsorp_amt_equilibrium - adsorp_amt_current)
+            * (equilibrium_loading - current_loading)
             * tower_conds.common.calculation_step_time
             / 1e6
             * 60
         )
         # セクション理論新規吸着量 [cm3]
-        adsorp_amt_estimate = adsorp_amt_estimate_abs * Mabs
+        theoretical_uptake_volume = theoretical_loading_delta * section_adsorbent_mass
         # 実際のセクション新規吸着量 [cm3]
-        adsorp_amt_estimate = max(adsorp_amt_estimate, -adsorp_amt_current)
+        actual_uptake_volume = max(theoretical_uptake_volume, -current_loading)
     # 実際の新規吸着量 [cm3/g-abs]
-    adsorp_amt_estimate_abs = adsorp_amt_estimate / Mabs
+    actual_loading_delta = actual_uptake_volume / section_adsorbent_mass
     # 時間経過後吸着量 [cm3/g-abs]
-    accum_adsorp_amt = adsorp_amt_current + adsorp_amt_estimate_abs
+    updated_loading = current_loading + actual_loading_delta
     # 下流流出CO2流量 [cm3]
-    outflow_fr_co2 = inflow_fr_co2 - adsorp_amt_estimate
+    outlet_co2_volume = inlet_co2_volume - actual_uptake_volume
     # 下流流出N2流量 [cm3]
-    outflow_fr_n2 = inflow_fr_n2
+    outlet_n2_volume = inlet_n2_volume
     # 流出CO2分率
-    outflow_mf_co2 = outflow_fr_co2 / (outflow_fr_co2 + outflow_fr_n2)
+    outlet_co2_mole_fraction = outlet_co2_volume / (outlet_co2_volume + outlet_n2_volume)
     # 流出N2分率
-    outflow_mf_n2 = outflow_fr_n2 / (outflow_fr_co2 + outflow_fr_n2)
+    outlet_n2_mole_fraction = outlet_n2_volume / (outlet_co2_volume + outlet_n2_volume)
 
     ### 流出CO2分圧のつじつま合わせ ------------------------------
 
     # 流出CO2分圧 [MPaA]
-    outflow_pco2 = total_press * outflow_mf_co2
+    outlet_co2_partial_pressure = total_press * outlet_co2_mole_fraction
     # 直前値より低い場合は直前値と同じになるように吸着量を変更
-    previous_outflow_pco2 = tower.outflow_pco2[stream - 1, section - 1]
-    if p_co2 >= previous_outflow_pco2:
-        if outflow_pco2 < previous_outflow_pco2:
+    previous_outlet_co2_partial_pressure = tower.outlet_co2_partial_pressure[stream - 1, section - 1]
+    if co2_partial_pressure >= previous_outlet_co2_partial_pressure:
+        if outlet_co2_partial_pressure < previous_outlet_co2_partial_pressure:
             # 直前値に置換
-            outflow_pco2 = previous_outflow_pco2
+            outlet_co2_partial_pressure = previous_outlet_co2_partial_pressure
             # セクション新規吸着量とそれに伴う各変数を逆算
-            adsorp_amt_estimate = inflow_fr_co2 - outflow_pco2 * inflow_fr_n2 / (total_press - outflow_pco2)
+            actual_uptake_volume = inlet_co2_volume - outlet_co2_partial_pressure * inlet_n2_volume / (
+                total_press - outlet_co2_partial_pressure
+            )
             # 実際の新規吸着量 [cm3/g-abs]
-            adsorp_amt_estimate_abs = adsorp_amt_estimate / Mabs
+            actual_loading_delta = actual_uptake_volume / section_adsorbent_mass
             # 時間経過後吸着量 [cm3/g-abs]
-            accum_adsorp_amt = adsorp_amt_current + adsorp_amt_estimate_abs
+            updated_loading = current_loading + actual_loading_delta
             # 下流流出CO2流量 [cm3]
-            outflow_fr_co2 = inflow_fr_co2 - adsorp_amt_estimate
+            outlet_co2_volume = inlet_co2_volume - actual_uptake_volume
             # 下流流出N2流量 [cm3]
-            outflow_fr_n2 = inflow_fr_n2
+            outlet_n2_volume = inlet_n2_volume
             # 流出CO2分率
-            outflow_mf_co2 = outflow_fr_co2 / (outflow_fr_co2 + outflow_fr_n2)
+            outlet_co2_mole_fraction = outlet_co2_volume / (outlet_co2_volume + outlet_n2_volume)
             # 流出N2分率
-            outflow_mf_n2 = outflow_fr_n2 / (outflow_fr_co2 + outflow_fr_n2)
+            outlet_n2_mole_fraction = outlet_n2_volume / (outlet_co2_volume + outlet_n2_volume)
     else:
-        if outflow_pco2 < p_co2:
+        if outlet_co2_partial_pressure < co2_partial_pressure:
             # co2分圧に置換
-            outflow_pco2 = p_co2
+            outlet_co2_partial_pressure = co2_partial_pressure
             # セクション新規吸着量とそれに伴う各変数を逆算
-            adsorp_amt_estimate = inflow_fr_co2 - outflow_pco2 * inflow_fr_n2 / (total_press - outflow_pco2)
+            actual_uptake_volume = inlet_co2_volume - outlet_co2_partial_pressure * inlet_n2_volume / (
+                total_press - outlet_co2_partial_pressure
+            )
             # 実際の新規吸着量 [cm3/g-abs]
-            adsorp_amt_estimate_abs = adsorp_amt_estimate / Mabs
+            actual_loading_delta = actual_uptake_volume / section_adsorbent_mass
             # 時間経過後吸着量 [cm3/g-abs]
-            accum_adsorp_amt = adsorp_amt_current + adsorp_amt_estimate_abs
+            updated_loading = current_loading + actual_loading_delta
             # 下流流出CO2流量 [cm3]
-            outflow_fr_co2 = inflow_fr_co2 - adsorp_amt_estimate
+            outlet_co2_volume = inlet_co2_volume - actual_uptake_volume
             # 下流流出N2流量 [cm3]
-            outflow_fr_n2 = inflow_fr_n2
+            outlet_n2_volume = inlet_n2_volume
             # 流出CO2分率
-            outflow_mf_co2 = outflow_fr_co2 / (outflow_fr_co2 + outflow_fr_n2)
+            outlet_co2_mole_fraction = outlet_co2_volume / (outlet_co2_volume + outlet_n2_volume)
             # 流出N2分率
-            outflow_mf_n2 = outflow_fr_n2 / (outflow_fr_co2 + outflow_fr_n2)
+            outlet_n2_mole_fraction = outlet_n2_volume / (outlet_co2_volume + outlet_n2_volume)
 
     output = {
-        "inflow_fr_co2": inflow_fr_co2,
-        "inflow_fr_n2": inflow_fr_n2,
-        "inflow_mf_co2": inflow_mf_co2,
-        "inflow_mf_n2": inflow_mf_n2,
+        "inlet_co2_volume": inlet_co2_volume,
+        "inlet_n2_volume": inlet_n2_volume,
+        "inlet_co2_mole_fraction": inlet_co2_mole_fraction,
+        "inlet_n2_mole_fraction": inlet_n2_mole_fraction,
         "gas_density": gas_density,
-        "gas_cp": gas_cp,
-        "adsorp_amt_equilibrium": adsorp_amt_equilibrium,  # 平衡吸着量
-        "adsorp_amt_estimate": adsorp_amt_estimate,
-        "accum_adsorp_amt": accum_adsorp_amt,
-        "outflow_fr_co2": outflow_fr_co2,
-        "outflow_fr_n2": outflow_fr_n2,
-        "outflow_mf_co2": outflow_mf_co2,
-        "outflow_mf_n2": outflow_mf_n2,
-        "adsorp_amt_estimate_abs": adsorp_amt_estimate_abs,
-        "p_co2": p_co2,
-        "outflow_pco2": outflow_pco2,
+        "gas_specific_heat": gas_specific_heat,
+        "equilibrium_loading": equilibrium_loading,  # 平衡吸着量
+        "actual_uptake_volume": actual_uptake_volume,
+        "updated_loading": updated_loading,
+        "outlet_co2_volume": outlet_co2_volume,
+        "outlet_n2_volume": outlet_n2_volume,
+        "outlet_co2_mole_fraction": outlet_co2_mole_fraction,
+        "outlet_n2_mole_fraction": outlet_n2_mole_fraction,
+        "theoretical_loading_delta ": theoretical_loading_delta,
+        "co2_partial_pressure": co2_partial_pressure,
+        "outlet_co2_partial_pressure": outlet_co2_partial_pressure,
     }
 
     return output
@@ -257,11 +264,11 @@ def calculate_mass_balance_for_desorption(
     # セクション空間現在物質量 [mol]
     mol_amt_section = vacuum_pumping_results["case_inner_mol_amt_after_vacuum"] * space_ratio_section
     # 現在気相モル量 [mol]
-    inflow_fr_co2 = mol_amt_section * tower.mf_co2[stream - 1, section - 1]
-    inflow_fr_n2 = mol_amt_section * tower.mf_n2[stream - 1, section - 1]
+    inlet_co2_volume = mol_amt_section * tower.mf_co2[stream - 1, section - 1]
+    inlet_n2_volume = mol_amt_section * tower.mf_n2[stream - 1, section - 1]
     # 現在気相ノルマル体積(=流入量) [cm3]
-    inflow_fr_co2 *= 22.4 * 1000
-    inflow_fr_n2 *= 22.4 * 1000
+    inlet_co2_volume *= 22.4 * 1000
+    inlet_n2_volume *= 22.4 * 1000
 
     ### 気相放出後モル量の計算 -----------------------------
     # 現在温度 [℃]
@@ -270,60 +277,60 @@ def calculate_mass_balance_for_desorption(
     mf_co2 = tower.mf_co2[stream - 1, section - 1]
     mf_n2 = tower.mf_n2[stream - 1, section - 1]
     # CO2分圧 [MPaA]
-    p_co2 = max(2.5e-3, vacuum_pumping_results["total_press_after_vacuum"] * mf_co2)
+    co2_partial_pressure = max(2.5e-3, vacuum_pumping_results["total_press_after_vacuum"] * mf_co2)
     # セクション吸着材量 [g]
-    Mabs = stream_conds[stream].adsorbent_mass / tower_conds.common.num_sections
+    section_adsorbent_mass = stream_conds[stream].adsorbent_mass / tower_conds.common.num_sections
     # 現在雰囲気の平衡吸着量 [cm3/g-abs]
-    P_KPA = p_co2 * 1000  # [MPaA] → [kPaA]
-    adsorp_amt_equilibrium = max(0.1, _calculate_equilibrium_adsorption_amount(P_KPA, T_K))
+    P_KPA = co2_partial_pressure * 1000  # [MPaA] → [kPaA]
+    equilibrium_loading = max(0.1, _calculate_equilibrium_adsorption_amount(P_KPA, T_K))
     # 現在の既存吸着量 [cm3/g-abs]
-    adsorp_amt_current = tower.adsorp_amt[stream - 1, section - 1]
+    current_loading = tower.adsorp_amt[stream - 1, section - 1]
     # 理論新規吸着量 [cm3/g-abs]
-    if adsorp_amt_equilibrium >= adsorp_amt_current:
-        adsorp_amt_estimate_abs = (
-            tower_conds.packed_bed.adsorption_mass_transfer_coef ** (adsorp_amt_current / adsorp_amt_equilibrium)
+    if equilibrium_loading >= current_loading:
+        theoretical_loading_delta = (
+            tower_conds.packed_bed.adsorption_mass_transfer_coef ** (current_loading / equilibrium_loading)
             / tower_conds.packed_bed.adsorbent_bulk_density
             * 6
             * (1 - tower_conds.packed_bed.average_porosity)
             * tower_conds.packed_bed.particle_shape_factor
             / tower_conds.packed_bed.average_particle_diameter
-            * (adsorp_amt_equilibrium - adsorp_amt_current)
+            * (equilibrium_loading - current_loading)
             * tower_conds.common.calculation_step_time
             / 1e6
             * 60
         )
         # セクション理論新規吸着量 [cm3]
-        adsorp_amt_estimate = adsorp_amt_estimate_abs * Mabs
+        theoretical_uptake_volume = theoretical_loading_delta * section_adsorbent_mass
         # 実際のセクション新規吸着量 [cm3]
-        adsorp_amt_estimate = min(adsorp_amt_estimate, inflow_fr_co2)
+        actual_uptake_volume = min(theoretical_uptake_volume, inlet_co2_volume)
     else:
-        adsorp_amt_estimate_abs = (
-            tower_conds.packed_bed.desorption_mass_transfer_coef ** (adsorp_amt_current / adsorp_amt_equilibrium)
+        theoretical_loading_delta = (
+            tower_conds.packed_bed.desorption_mass_transfer_coef ** (current_loading / equilibrium_loading)
             / tower_conds.packed_bed.adsorbent_bulk_density
             * 6
             * (1 - tower_conds.packed_bed.average_porosity)
             * tower_conds.packed_bed.particle_shape_factor
             / tower_conds.packed_bed.average_particle_diameter
-            * (adsorp_amt_equilibrium - adsorp_amt_current)
+            * (equilibrium_loading - current_loading)
             * tower_conds.common.calculation_step_time
             / 1e6
             * 60
         )
         # セクション理論新規吸着量 [cm3]
-        adsorp_amt_estimate = adsorp_amt_estimate_abs * Mabs
+        theoretical_uptake_volume = theoretical_loading_delta * section_adsorbent_mass
         # 実際のセクション新規吸着量 [cm3]
-        adsorp_amt_estimate = max(adsorp_amt_estimate, -adsorp_amt_current)
+        actual_uptake_volume = max(theoretical_uptake_volume, -current_loading)
     # 実際の新規吸着量 [cm3/g-abs]
-    adsorp_amt_estimate_abs = adsorp_amt_estimate / Mabs
+    theoretical_loading_delta = actual_uptake_volume / section_adsorbent_mass
     # 時間経過後吸着量 [cm3/g-abs]
-    accum_adsorp_amt = adsorp_amt_current + adsorp_amt_estimate_abs
+    updated_loading = current_loading + theoretical_loading_delta
     # 気相放出CO2量 [cm3]
-    desorp_mw_co2 = -1 * adsorp_amt_estimate
+    desorp_mw_co2 = -1 * actual_uptake_volume
     # 気相放出CO2量 [mol]
     desorp_mw_co2 = desorp_mw_co2 / 1000 / 22.4
     # 気相放出後モル量 [mol]
-    desorp_mw_co2_after_vacuum = inflow_fr_co2 + desorp_mw_co2
-    desorp_mw_n2_after_vacuum = inflow_fr_n2
+    desorp_mw_co2_after_vacuum = inlet_co2_volume + desorp_mw_co2
+    desorp_mw_n2_after_vacuum = inlet_n2_volume
     # 気相放出後全物質量 [mol]
     desorp_mw_all_after_vacuum = desorp_mw_co2_after_vacuum + desorp_mw_n2_after_vacuum
     # 気相放出後モル分率
@@ -339,29 +346,29 @@ def calculate_mass_balance_for_desorption(
     )
     # ガス比熱 [kJ/kg/K]
     # NOTE: 比熱と熱伝導率と粘度は大気圧を使用
-    gas_cp = (
+    gas_specific_heat = (
         CP.PropsSI("CPMASS", "T", T_K, "P", P_ATM, "co2") * mf_co2
         + CP.PropsSI("CPMASS", "T", T_K, "P", P_ATM, "nitrogen") * mf_n2
     ) * 1e-3
 
     # 出力
     output = {
-        "inflow_fr_co2": 0,
-        "inflow_fr_n2": 0,
-        "inflow_mf_co2": 0,
-        "inflow_mf_n2": 0,
+        "inlet_co2_volume": 0,
+        "inlet_n2_volume": 0,
+        "inlet_co2_mole_fraction": 0,
+        "inlet_n2_mole_fraction": 0,
         "gas_density": gas_density,
-        "gas_cp": gas_cp,
-        "adsorp_amt_equilibrium": adsorp_amt_equilibrium,  # 平衡吸着量
-        "adsorp_amt_estimate": adsorp_amt_estimate,
-        "accum_adsorp_amt": accum_adsorp_amt,
-        "outflow_fr_co2": 0,
-        "outflow_fr_n2": 0,
-        "outflow_mf_co2": 0,
-        "outflow_mf_n2": 0,
-        "adsorp_amt_estimate_abs": adsorp_amt_estimate_abs,
-        "p_co2": p_co2,
-        "outflow_pco2": tower.outflow_pco2[stream - 1, section - 1],
+        "gas_specific_heat": gas_specific_heat,
+        "equilibrium_loading": equilibrium_loading,  # 平衡吸着量
+        "actual_uptake_volume": actual_uptake_volume,
+        "updated_loading": updated_loading,
+        "outlet_co2_volume": 0,
+        "outlet_n2_volume": 0,
+        "outlet_co2_mole_fraction": 0,
+        "outlet_n2_mole_fraction": 0,
+        "theoretical_loading_delta ": theoretical_loading_delta,
+        "co2_partial_pressure": co2_partial_pressure,
+        "outlet_co2_partial_pressure": tower.outlet_co2_partial_pressure[stream - 1, section - 1],
     }
 
     # 出力２（モル分率）
@@ -390,22 +397,22 @@ def calculate_mass_balance_for_valve_closed(stream: int, section: int, state_man
     tower = state_manager.towers[tower_num]
     # 何の反応もしない
     output = {
-        "inflow_fr_co2": 0,
-        "inflow_fr_n2": 0,
-        "inflow_mf_co2": 0,
-        "inflow_mf_n2": 0,
+        "inlet_co2_volume": 0,
+        "inlet_n2_volume": 0,
+        "inlet_co2_mole_fraction": 0,
+        "inlet_n2_mole_fraction": 0,
         "gas_density": 0,
-        "gas_cp": 0,
-        "adsorp_amt_equilibrium": 0,
-        "adsorp_amt_estimate": 0,
-        "accum_adsorp_amt": tower.adsorp_amt[stream - 1, section - 1],
-        "outflow_fr_co2": 0,
-        "outflow_fr_n2": 0,
-        "outflow_mf_co2": 0,
-        "outflow_mf_n2": 0,
-        "adsorp_amt_estimate_abs": 0,
-        "p_co2": 0,
-        "outflow_pco2": tower.outflow_pco2[stream - 1, section - 1],
+        "gas_specific_heat": 0,
+        "equilibrium_loading": 0,
+        "actual_uptake_volume": 0,
+        "updated_loading": tower.adsorp_amt[stream - 1, section - 1],
+        "outlet_co2_volume": 0,
+        "outlet_n2_volume": 0,
+        "outlet_co2_mole_fraction": 0,
+        "outlet_n2_mole_fraction": 0,
+        "theoretical_loading_delta ": 0,
+        "co2_partial_pressure": 0,
+        "outlet_co2_partial_pressure": tower.outlet_co2_partial_pressure[stream - 1, section - 1],
     }
 
     return output
@@ -460,7 +467,7 @@ def calculate_heat_balance_for_bed(
         Habs = 0  # 弁停止モードでは0
     else:
         Habs = (
-            material_output["adsorp_amt_estimate"]
+            material_output["actual_uptake_volume"]
             / 1000
             / 22.4
             * tower_conds.feed_gas.co2_molecular_weight
@@ -471,14 +478,14 @@ def calculate_heat_balance_for_bed(
         Mgas = 0  # 弁停止・脱着モードでは0
     else:
         Mgas = (
-            material_output["inflow_fr_co2"] / 1000 / 22.4 * tower_conds.feed_gas.co2_molecular_weight
-            + material_output["inflow_fr_n2"] / 1000 / 22.4 * tower_conds.feed_gas.n2_molecular_weight
+            material_output["inlet_co2_volume"] / 1000 / 22.4 * tower_conds.feed_gas.co2_molecular_weight
+            + material_output["inlet_n2_volume"] / 1000 / 22.4 * tower_conds.feed_gas.n2_molecular_weight
         )
     # 流入ガス比熱 [J/g/K]
     if mode == 1:
-        gas_cp = 0  # 弁停止モードでは0
+        gas_specific_heat = 0  # 弁停止モードでは0
     else:
-        gas_cp = material_output["gas_cp"]
+        gas_specific_heat = material_output["gas_specific_heat"]
     # 内側境界面積 [m2]
     Ain = stream_conds[stream].inner_boundary_area / tower_conds.common.num_sections
     # 外側境界面積 [m2]
@@ -557,7 +564,7 @@ def calculate_heat_balance_for_bed(
     # セクション到達温度 [℃]
     args = {
         "tower_conds": tower_conds,
-        "gas_cp": gas_cp,
+        "gas_specific_heat": gas_specific_heat,
         "Mgas": Mgas,
         "temp_now": temp_now,
         "Habs": Habs,
@@ -1064,8 +1071,8 @@ def calculate_downstream_flow_after_depressurization(
     sum_outflow_fr = (
         sum(
             [
-                mass_balance_results[stream][most_down_section]["outflow_fr_co2"]
-                + mass_balance_results[stream][most_down_section]["outflow_fr_n2"]
+                mass_balance_results[stream][most_down_section]["outlet_co2_volume"]
+                + mass_balance_results[stream][most_down_section]["outlet_n2_volume"]
                 for stream in range(1, 1 + tower_conds.common.num_streams)
             ]
         )
@@ -1088,14 +1095,14 @@ def calculate_downstream_flow_after_depressurization(
     # 下流塔への合計流出CO2流量 [cm3]
     sum_outflow_fr_co2 = sum(
         [
-            mass_balance_results[stream][most_down_section]["outflow_fr_co2"]
+            mass_balance_results[stream][most_down_section]["outlet_co2_volume"]
             for stream in range(1, 1 + tower_conds.common.num_streams)
         ]
     )
     # 下流塔への合計流出N2流量 [cm3]
     sum_outflow_fr_n2 = sum(
         [
-            mass_balance_results[stream][most_down_section]["outflow_fr_n2"]
+            mass_balance_results[stream][most_down_section]["outlet_n2_volume"]
             for stream in range(1, 1 + tower_conds.common.num_streams)
         ]
     )
@@ -1103,8 +1110,8 @@ def calculate_downstream_flow_after_depressurization(
     outflow_fr = {}
     for stream in range(1, 1 + tower_conds.common.num_streams):
         outflow_fr[stream] = {}
-        outflow_fr[stream]["outflow_fr_co2"] = sum_outflow_fr_co2 * stream_conds[stream].area_fraction
-        outflow_fr[stream]["outflow_fr_n2"] = sum_outflow_fr_n2 * stream_conds[stream].area_fraction
+        outflow_fr[stream]["outlet_co2_volume"] = sum_outflow_fr_co2 * stream_conds[stream].area_fraction
+        outflow_fr[stream]["outlet_n2_volume"] = sum_outflow_fr_n2 * stream_conds[stream].area_fraction
 
     # 出力
     output = {
@@ -1221,18 +1228,18 @@ def _calculate_equilibrium_adsorption_amount(P, T):
         平衡吸着量
     """
     # 吸着等温式（シンボリック回帰による近似式）
-    adsorp_amt_equilibrium = (
+    equilibrium_loading = (
         P
         * (252.0724 - 0.50989705 * T)
         / (P - 3554.54819062669 * (1 - 0.0655247236249063 * np.sqrt(T)) ** 3 + 1.7354268)
     )
-    return adsorp_amt_equilibrium
+    return equilibrium_loading
 
 
 def _optimize_bed_temperature(
     temp_reached,
     tower_conds: TowerConditions,
-    gas_cp,
+    gas_specific_heat,
     Mgas,
     temp_now,
     Habs,
@@ -1254,7 +1261,7 @@ def _optimize_bed_temperature(
     stream_conds = tower_conds.stream_conditions
 
     # 流入ガスが受け取る熱 [J]
-    Hgas = gas_cp * Mgas * (temp_reached - temp_now)
+    Hgas = gas_specific_heat * Mgas * (temp_reached - temp_now)
     # 充填層が受け取る熱(ΔT基準) [J]
     Hbed_time = (
         tower_conds.packed_bed.heat_capacity

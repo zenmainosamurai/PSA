@@ -71,18 +71,18 @@ def compare_csv_files(dir1, dir2):
                     # 列名の比較
                     if not df1.columns.equals(df2.columns):
                         print(f"   列名が異なります")
-                        print(f"   ディレクトリ1の列: {list(df1.columns)}")
-                        print(f"   ディレクトリ2の列: {list(df2.columns)}")
-                    else:
-                        # 値の違いを確認
-                        diff_mask = df1 != df2
-                        if diff_mask.any().any():
-                            print(f"   値が異なる箇所があります")
-                            # 最初の数行の差分を表示
-                            for col in df1.columns:
-                                if diff_mask[col].any():
-                                    diff_rows = diff_mask[col].sum()
-                                    print(f"   列'{col}': {diff_rows}行で差分あり")
+                        # print(f"   ディレクトリ1の列: {list(df1.columns)}")
+                        # print(f"   ディレクトリ2の列: {list(df2.columns)}")
+                    # else:
+                    # 値の違いを確認
+                    diff_mask = df1 != df2
+                    if diff_mask.any().any():
+                        print(f"   値が異なる箇所があります")
+                        # 最初の数行の差分を表示
+                        for col in df1.columns:
+                            if diff_mask[col].any():
+                                diff_rows = diff_mask[col].sum()
+                                print(f"   列'{col}': {diff_rows}行で差分あり")
 
                 print()
 

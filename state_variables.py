@@ -16,7 +16,7 @@ class TowerStateArrays:
     mf_n2: np.ndarray  # N2モル分率
     heat_t_coef: np.ndarray  # 層伝熱係数
     heat_t_coef_wall: np.ndarray  # 壁-層伝熱係数
-    outflow_pco2: np.ndarray  # 流出CO2分圧
+    outlet_co2_partial_pressure: np.ndarray  # 流出CO2分圧
 
     # 1D arrays (section only)
     temp_wall: np.ndarray  # 壁面温度
@@ -81,7 +81,7 @@ class StateVariables:
             mf_n2=mf_n2_2d.copy(),
             heat_t_coef=heat_coef_2d.copy(),
             heat_t_coef_wall=heat_coef_wall_2d.copy(),
-            outflow_pco2=outflow_pco2_2d.copy(),
+            outlet_co2_partial_pressure=outflow_pco2_2d.copy(),
             temp_wall=temp_wall_1d.copy(),
             temp_lid_up=temp_outside,
             temp_lid_down=temp_outside,
@@ -111,10 +111,10 @@ class StateVariables:
 
         tower.temp[:, :] = as_mat(heat, "temp_reached")
         tower.temp_thermo[:, :] = as_mat(heat, "temp_thermocouple_reached")
-        tower.adsorp_amt[:, :] = as_mat(material, "accum_adsorp_amt")
+        tower.adsorp_amt[:, :] = as_mat(material, "updated_loading")
         tower.heat_t_coef[:, :] = as_mat(heat, "hw1")
         tower.heat_t_coef_wall[:, :] = as_mat(heat, "u1")
-        tower.outflow_pco2[:, :] = as_mat(material, "outflow_pco2")
+        tower.outlet_co2_partial_pressure[:, :] = as_mat(material, "outlet_co2_partial_pressure")
 
         # 壁面温度の更新
         tower.temp_wall[:] = np.array(
@@ -136,8 +136,8 @@ class StateVariables:
             "バッチ吸着_下流",
             "流通吸着_下流",
         ]:
-            tower.mf_co2[:, :] = as_mat(material, "outflow_mf_co2")
-            tower.mf_n2[:, :] = as_mat(material, "outflow_mf_n2")
+            tower.mf_co2[:, :] = as_mat(material, "outlet_co2_mole_fraction")
+            tower.mf_n2[:, :] = as_mat(material, "outlet_n2_mole_fraction")
         elif mode == "真空脱着":
             mol_frac = calc_output["mol_fraction"]
             tower.mf_co2[:, :] = as_mat(mol_frac, "mf_co2_after_vacuum")

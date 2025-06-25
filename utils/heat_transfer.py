@@ -141,14 +141,14 @@ def calc_heat_transfer_coef(
     T_K = temp_now + 273.15
 
     if mode == 0:  # 吸着
-        mf_co2 = material_output["inflow_mf_co2"]
-        mf_n2 = material_output["inflow_mf_n2"]
+        mf_co2 = material_output["inlet_co2_mole_fraction"]
+        mf_n2 = material_output["inlet_n2_mole_fraction"]
     elif mode == 2:  # 脱着
         mf_co2 = tower.mf_co2[stream - 1, section - 1]
         mf_n2 = tower.mf_n2[stream - 1, section - 1]
     else:  # その他はとりあえず吸着と同様
-        mf_co2 = material_output["inflow_mf_co2"]
-        mf_n2 = material_output["inflow_mf_n2"]
+        mf_co2 = material_output["inlet_co2_mole_fraction"]
+        mf_n2 = material_output["inlet_n2_mole_fraction"]
 
     # ---- 物性値 -----------------------------------------------------
     kf = compute_gas_k(T_K, mf_co2, mf_n2)  # 気体熱伝導率
@@ -173,12 +173,12 @@ def calc_heat_transfer_coef(
         CP.PropsSI("V", "T", T_K, "P", P_ATM, "co2") * mf_co2
         + CP.PropsSI("V", "T", T_K, "P", P_ATM, "nitrogen") * mf_n2
     )
-    Pr = mu * 1000.0 * material_output["gas_cp"] / kf
+    Pr = mu * 1000.0 * material_output["gas_specific_heat"] / kf
 
     # 流入ガス体積流量 f0
     if mode == 0:
         f0 = (
-            (material_output["inflow_fr_co2"] + material_output["inflow_fr_n2"])
+            (material_output["inlet_co2_volume"] + material_output["inlet_n2_volume"])
             / 1e6
             / (tower_conds.common.calculation_step_time * 60.0)
         )

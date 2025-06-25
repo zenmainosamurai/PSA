@@ -123,10 +123,10 @@ class OptimizedCalculations:
     ):
         """マテリアルバランス出力から状態変数を一括更新"""
         # 事前にNumPy配列を確保
-        outflow_mf_co2 = np.zeros((num_streams, num_sections))
-        outflow_mf_n2 = np.zeros((num_streams, num_sections))
-        accum_adsorp_amt = np.zeros((num_streams, num_sections))
-        outflow_pco2 = np.zeros((num_streams, num_sections))
+        outlet_co2_mole_fraction = np.zeros((num_streams, num_sections))
+        outlet_n2_mole_fraction = np.zeros((num_streams, num_sections))
+        updated_loading = np.zeros((num_streams, num_sections))
+        outlet_co2_partial_pressure = np.zeros((num_streams, num_sections))
 
         # 一括代入
         for stream in range(1, num_streams + 1):
@@ -134,16 +134,22 @@ class OptimizedCalculations:
                 idx_stream = stream - 1
                 idx_section = section - 1
 
-                outflow_mf_co2[idx_stream, idx_section] = material_output[stream][section]["outflow_mf_co2"]
-                outflow_mf_n2[idx_stream, idx_section] = material_output[stream][section]["outflow_mf_n2"]
-                accum_adsorp_amt[idx_stream, idx_section] = material_output[stream][section]["accum_adsorp_amt"]
-                outflow_pco2[idx_stream, idx_section] = material_output[stream][section]["outflow_pco2"]
+                outlet_co2_mole_fraction[idx_stream, idx_section] = material_output[stream][section][
+                    "outlet_co2_mole_fraction"
+                ]
+                outlet_n2_mole_fraction[idx_stream, idx_section] = material_output[stream][section][
+                    "outlet_n2_mole_fraction"
+                ]
+                updated_loading[idx_stream, idx_section] = material_output[stream][section]["updated_loading"]
+                outlet_co2_partial_pressure[idx_stream, idx_section] = material_output[stream][section][
+                    "outlet_co2_partial_pressure"
+                ]
 
         # NumPy配列を直接更新
-        tower.mf_co2[:] = outflow_mf_co2
-        tower.mf_n2[:] = outflow_mf_n2
-        tower.adsorp_amt[:] = accum_adsorp_amt
-        tower.outflow_pco2[:] = outflow_pco2
+        tower.mf_co2[:] = outlet_co2_mole_fraction
+        tower.mf_n2[:] = outlet_n2_mole_fraction
+        tower.adsorp_amt[:] = updated_loading
+        tower.outlet_co2_partial_pressure[:] = outlet_co2_partial_pressure
 
 
 # 既存の関数をラップして最適化版を提供
@@ -166,17 +172,17 @@ def calculate_mass_balance_for_adsorption_optimized(
     tower = state_manager.towers[tower_num]
 
     # レガシー形式の変数を作成（既存の関数との互換性のため）
-    variables = {"temp": {}, "adsorp_amt": {}, "total_pressure": tower.total_press, "outflow_pco2": {}}
+    variables = {"temp": {}, "adsorp_amt": {}, "total_pressure": tower.total_press, "outlet_co2_partial_pressure": {}}
 
     # 必要な部分のみレガシー形式に変換
     for s in range(1, state_manager.num_streams + 1):
         variables["temp"][s] = {}
         variables["adsorp_amt"][s] = {}
-        variables["outflow_pco2"][s] = {}
+        variables["outlet_co2_partial_pressure"][s] = {}
         for sec in range(1, state_manager.num_sections + 1):
             variables["temp"][s][sec] = tower.temp[s - 1, sec - 1]
             variables["adsorp_amt"][s][sec] = tower.adsorp_amt[s - 1, sec - 1]
-            variables["outflow_pco2"][s][sec] = tower.outflow_pco2[s - 1, sec - 1]
+            variables["outlet_co2_partial_pressure"][s][sec] = tower.outlet_co2_partial_pressure[s - 1, sec - 1]
 
     # 既存の関数を呼び出し
     import adsorption_base_models
