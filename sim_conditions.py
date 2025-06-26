@@ -44,6 +44,7 @@ class PackedBedConditions:
     upstream_piping_volume: float
     vessel_internal_void_volume: float
     initial_adsorption_amount: float
+    initial_temperature: float
 
     def __post_init__(self):
         for field_name in self.__dataclass_fields__:

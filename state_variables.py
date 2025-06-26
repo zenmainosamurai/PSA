@@ -46,11 +46,12 @@ class StateVariables:
     def _init_tower_state(self, tower_num: int) -> TowerStateArrays:
         """各塔の状態変数を初期化"""
         tower_cond = self.sim_conds.get_tower(tower_num)
-        # 外気温度
-        temp_outside = tower_cond.vessel.ambient_temperature
+
+        ambient_temperature = tower_cond.vessel.ambient_temperature
+        packed_bed_initial_temperature = tower_cond.packed_bed.initial_temperature
 
         # 2D配列の初期化
-        temp_2d = np.full((self.num_streams, self.num_sections), temp_outside, dtype=np.float64)
+        temp_2d = np.full((self.num_streams, self.num_sections), packed_bed_initial_temperature, dtype=np.float64)
 
         # モル分率の初期化
         mf_co2_init = tower_cond.feed_gas.co2_mole_fraction
@@ -71,7 +72,7 @@ class StateVariables:
         outflow_pco2_2d = np.full((self.num_streams, self.num_sections), total_press_init, dtype=np.float64)
 
         # 1D配列の初期化
-        temp_wall_1d = np.full(self.num_sections, temp_outside, dtype=np.float64)
+        temp_wall_1d = np.full(self.num_sections, ambient_temperature, dtype=np.float64)
 
         return TowerStateArrays(
             temp=temp_2d.copy(),
@@ -83,8 +84,8 @@ class StateVariables:
             heat_t_coef_wall=heat_coef_wall_2d.copy(),
             outlet_co2_partial_pressure=outflow_pco2_2d.copy(),
             temp_wall=temp_wall_1d.copy(),
-            temp_lid_up=temp_outside,
-            temp_lid_down=temp_outside,
+            temp_lid_up=ambient_temperature,
+            temp_lid_down=ambient_temperature,
             total_press=total_press_init,
             vacuum_amt_co2=0.0,
             vacuum_amt_n2=0.0,
