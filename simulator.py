@@ -1,6 +1,8 @@
 from copy import deepcopy
 import os
-import sys
+from dataclasses import dataclass, field
+from typing import Dict, List, Optional, Any
+
 
 import numpy as np
 import pandas as pd
@@ -10,12 +12,64 @@ from typing import Dict, List
 from utils import const, plot_csv, other_utils
 import operation_models
 from state_variables import StateVariables
-from sim_conditions import SimulationConditions, TowerConditions, StreamConditions
+from sim_conditions import SimulationConditions, TowerConditions
 
 
 import warnings
 
 warnings.simplefilter("ignore")
+
+
+@dataclass
+class SimulationResults:
+    """シミュレーション結果を保持するデータクラス"""
+
+    record_dict: Dict[int, Dict[str, List[Any]]]
+    process_completion_times: Dict[int, float]
+    final_timestamp: float
+    success: bool = True
+    error_message: Optional[str] = None
+
+    def to_dict(self) -> Dict[str, Any]:
+        """辞書形式に変換"""
+        return {
+            "record_dict": self.record_dict,
+            "process_completion_times": self.process_completion_times,
+            "final_timestamp": self.final_timestamp,
+            "success": self.success,
+            "error_message": self.error_message,
+        }
+
+
+@dataclass
+class ProcessResults:
+    """プロセス毎の結果を保持するデータクラス"""
+
+    timestamp: float
+    record_dict: Dict[int, Dict[str, List[Any]]]
+    success: bool = True
+    error_message: Optional[str] = None
+
+
+@dataclass
+class TowerResults:
+    """塔毎の計算結果を保持するデータクラス"""
+
+    material: Dict[int, Dict[int, Dict[str, Any]]]
+    heat: Dict[int, Dict[int, Dict[str, Any]]]
+    heat_wall: Dict[int, Dict[str, Any]]
+    heat_lid: Dict[str, Dict[str, Any]]
+    others: Dict[str, Any]
+
+    def to_dict(self) -> Dict[str, Any]:
+        """記録用の辞書形式に変換"""
+        return {
+            "material": self.material,
+            "heat": self.heat,
+            "heat_wall": self.heat_wall,
+            "heat_lid": self.heat_lid,
+            "others": self.others,
+        }
 
 
 class GasAdosorptionBreakthroughsimulator:
@@ -63,26 +117,24 @@ class GasAdosorptionBreakthroughsimulator:
         for tower_num in range(1, self.num_tower + 1):
             self.state_manager.towers[tower_num].total_press = self.df_obs.loc[0, f"T{tower_num}_press"]
 
-    def execute_simulation(self, filtered_states=None, output_foldapath=None):
+    def execute_simulation(self, filtered_states=None, output_folderpath=None):
         """物理計算を通しで実行"""
         ### ◆(1/4) 前準備 ------------------------------------------------
         # 記録用配列の用意
         _record_item_list = ["material", "heat", "heat_wall", "heat_lid", "others"]
         record_dict = {}
         for tower_num in range(1, 1 + self.num_tower):
-            record_dict[tower_num] = {}
-            record_dict[tower_num]["timestamp"] = []
-            for _item in _record_item_list:
-                record_dict[tower_num][_item] = []
+            record_dict[tower_num] = {"timestamp": [], **{item: [] for item in _record_item_list}}
+
         # 出力先フォルダの用意
         if filtered_states is None:
             # シミュレーションの場合
-            output_foldapath = const.OUTPUT_DIR + f"{self.cond_id}/"
-            os.makedirs(output_foldapath, exist_ok=True)
+            output_folderpath = const.OUTPUT_DIR + f"{self.cond_id}/"
+            os.makedirs(output_folderpath, exist_ok=True)
         else:
             # データ同化の場合
-            output_foldapath = output_foldapath
-            os.makedirs(output_foldapath, exist_ok=True)
+            output_folderpath = output_folderpath
+            os.makedirs(output_folderpath, exist_ok=True)
 
         ### ◆(2/4) シミュレーション実行 --------------------------------------
         self.logger.info("(1/3) simulation...")
@@ -92,54 +144,59 @@ class GasAdosorptionBreakthroughsimulator:
         self._init_variables()
         # 吸着計算
         timestamp = 0
+        simulation_success = True
+        error_message = None
         for process_index in self.df_operation.index:
-            # 各塔の稼働モード抽出
             mode_list = list(self.df_operation.loc[process_index, ["塔1", "塔2", "塔3"]])
-            # 終了条件(文字列)の抽出
             termination_cond = self.df_operation.loc[process_index, "終了条件"]
-            # プロセスpにおける各塔の吸着計算実施
-            timestamp, record_dict, success = self.calc_adsorption_process(
+
+            process_result = self._execute_process(
+                process_index=process_index,
                 mode_list=mode_list,
                 termination_cond_str=termination_cond,
                 record_dict=record_dict,
                 timestamp=timestamp,
                 filtered_x=filtered_states,
             )
-            self.logger.info(f"プロセス {process_index}: done. timestamp: {round(timestamp,2)}")
-            # プロセス終了時刻の記録
+            timestamp = process_result.timestamp
+            record_dict = process_result.record_dict
             process_completion_log[process_index] = round(timestamp, 2)
             # 処理が中断された場合、次のステップに移行
-            if not success:
+            if not process_result.success:
                 self.logger.warning(f"工程 {process_index} でエラーが発生したため、後続処理をスキップします")
                 break
+            self.logger.info(f"プロセス {process_index}: done. timestamp: {round(timestamp, 2)}")
+        if simulation_success:
+            self._output_results(output_folderpath, record_dict, process_completion_log, timestamp)
 
-        ### ◆(3/4) csv出力 -------------------------------------------------
-        self.logger.info("(2/3) csv output...")
-        # 計算結果
-        for tower_num in range(1, 1 + self.num_tower):
-            _tgt_foldapath = output_foldapath + f"/csv/tower_{tower_num}/"
-            os.makedirs(_tgt_foldapath, exist_ok=True)
-            plot_csv.outputs_to_csv(_tgt_foldapath, record_dict[tower_num], self.sim_conds.get_tower(tower_num).common)
-        # プロセス終了時刻
-        _tgt_foldapath = output_foldapath
-        self.df_operation["終了時刻(min)"] = process_completion_log.values()
-        self.df_operation.to_csv(_tgt_foldapath + "/プロセス終了時刻.csv", encoding="shift-jis")
-
-        ### ◆(4/4) 可視化 -------------------------------------------------
-        self.logger.info("(3/3) png output...")
-        # 可視化対象のセルを算出
-        plot_target_sec = [2, 10, 18]
-        # record_dictの可視化
-        for tower_num in range(1, 1 + self.num_tower):
-            tgt_foldapath = output_foldapath
-            plot_csv.plot_csv_outputs(
-                tgt_foldapath=tgt_foldapath,
-                df_obs=self.df_obs,
-                tgt_sections=plot_target_sec,
-                tower_num=tower_num,
+    def _execute_process(
+        self,
+        process_index: int,
+        mode_list: List[str],
+        termination_cond_str: str,
+        record_dict: Dict,
+        timestamp: float,
+        filtered_x=None,
+    ) -> ProcessResults:
+        try:
+            timestamp_result, record_dict_result, success = self.calc_adsorption_process(
+                mode_list=mode_list,
+                termination_cond_str=termination_cond_str,
+                record_dict=record_dict,
                 timestamp=timestamp,
-                df_p_end=self.df_operation,
+                filtered_x=filtered_x,
             )
+
+            return ProcessResults(
+                timestamp=timestamp_result,
+                record_dict=record_dict_result,
+                success=success,
+                error_message=None if success else "プロセス実行中にエラーが発生",
+            )
+
+        except Exception as e:
+            self.logger.error(f"プロセス {process_index} でエラーが発生: {str(e)}")
+            return ProcessResults(timestamp=timestamp, record_dict=record_dict, success=False, error_message=str(e))
 
     def calc_adsorption_process(
         self,
@@ -159,7 +216,6 @@ class GasAdosorptionBreakthroughsimulator:
             timestamp (float): 時刻t
             filtered_x (pd.DataFrame): データ同化で得られた状態変数の推移
         """
-        # try:
         # プロセス開始後経過時間
         timestamp_p = 0
         # 初回限定処理の実施
@@ -210,10 +266,6 @@ class GasAdosorptionBreakthroughsimulator:
                 self.logger.warning(f"{time_threshold}分以内に終了しなかったため強制終了")
                 return timestamp + timestamp_p, record_dict, False
         return timestamp + timestamp_p, record_dict, True
-
-        # except Exception as e:
-        #     self.logger.warning(f"エラーが発生しました: \n{e}")
-        #     return timestamp + timestamp_p, record_dict, False
 
     def calc_adsorption_mode_list(self, sim_conds: SimulationConditions, mode_list: List[str]):
         """モード(x_1, x_2, ... x_n)の時の各塔のガス吸着計算を行う
@@ -486,3 +538,30 @@ class GasAdosorptionBreakthroughsimulator:
         elif cond_list[0] == "時間到達":
             time = float(cond_list[1])  # 目標到達時間
             return timestamp + timestamp_p < time
+
+    def _output_results(
+        self, output_folderpath: str, record_dict: Dict, process_completion_log: Dict, timestamp: float
+    ) -> None:
+        """計算結果の出力処理"""
+        self.logger.info("(2/3) csv output...")
+
+        for tower_num in range(1, 1 + self.num_tower):
+            _tgt_foldapath = output_folderpath + f"/csv/tower_{tower_num}/"
+            os.makedirs(_tgt_foldapath, exist_ok=True)
+            plot_csv.outputs_to_csv(_tgt_foldapath, record_dict[tower_num], self.sim_conds.get_tower(tower_num).common)
+
+        self.df_operation["終了時刻(min)"] = list(process_completion_log.values())
+        self.df_operation.to_csv(output_folderpath + "/プロセス終了時刻.csv", encoding="shift-jis")
+
+        self.logger.info("(3/3) png output...")
+        plot_target_sec = [2, 10, 18]
+
+        for tower_num in range(1, 1 + self.num_tower):
+            plot_csv.plot_csv_outputs(
+                tgt_foldapath=output_folderpath,
+                df_obs=self.df_obs,
+                tgt_sections=plot_target_sec,
+                tower_num=tower_num,
+                timestamp=timestamp,
+                df_p_end=self.df_operation,
+            )
