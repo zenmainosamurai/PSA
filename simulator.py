@@ -178,25 +178,25 @@ class GasAdosorptionBreakthroughsimulator:
         timestamp: float,
         filtered_x=None,
     ) -> ProcessResults:
-        try:
-            timestamp_result, record_dict_result, success = self.calc_adsorption_process(
-                mode_list=mode_list,
-                termination_cond_str=termination_cond_str,
-                record_dict=record_dict,
-                timestamp=timestamp,
-                filtered_x=filtered_x,
-            )
+        # try:
+        timestamp_result, record_dict_result, success = self.calc_adsorption_process(
+            mode_list=mode_list,
+            termination_cond_str=termination_cond_str,
+            record_dict=record_dict,
+            timestamp=timestamp,
+            filtered_x=filtered_x,
+        )
 
-            return ProcessResults(
-                timestamp=timestamp_result,
-                record_dict=record_dict_result,
-                success=success,
-                error_message=None if success else "プロセス実行中にエラーが発生",
-            )
+        return ProcessResults(
+            timestamp=timestamp_result,
+            record_dict=record_dict_result,
+            success=success,
+            error_message=None if success else "プロセス実行中にエラーが発生",
+        )
 
-        except Exception as e:
-            self.logger.error(f"プロセス {process_index} でエラーが発生: {str(e)}")
-            return ProcessResults(timestamp=timestamp, record_dict=record_dict, success=False, error_message=str(e))
+        # except Exception as e:
+        #     self.logger.error(f"プロセス {process_index} でエラーが発生: {str(e)}")
+        #     return ProcessResults(timestamp=timestamp, record_dict=record_dict, success=False, error_message=str(e))
 
     def calc_adsorption_process(
         self,

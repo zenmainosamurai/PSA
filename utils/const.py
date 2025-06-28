@@ -50,7 +50,7 @@ TRANSLATION = {
     "Hwout": "外側境界への熱流束",
     "u1": "層伝熱係数",
     "adsorbent_mass": "セクション吸着材量",
-    "theoretical_loading_delta ": "セクション理論新規吸着量",
+    "theoretical_loading_delta": "セクション理論新規吸着量",
     "desorp_mw_co2": "気相放出CO2量",
     "case_inner_amount_after_vaccume": "排気後容器内部空間物質量",
     "total_press_after_vaccume": "排気後圧力",

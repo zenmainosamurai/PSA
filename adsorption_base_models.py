@@ -1,22 +1,29 @@
-import os
-import sys
-import datetime
-import yaml
-import math
-import copy
-import logging
-from typing import Dict, List, Optional
-
 import numpy as np
 import pandas as pd
-import matplotlib.pyplot as plt
 from scipy import optimize
 import CoolProp.CoolProp as CP
 
-from utils import const, init_functions, plot_csv, other_utils
 from utils.heat_transfer import calc_heat_transfer_coef as _heat_transfer_coef
 from state_variables import StateVariables
-from sim_conditions import TowerConditions, StreamConditions
+from sim_conditions import TowerConditions
+from adsorption_results import (
+    HeatBalanceResult,
+    MaterialBalanceResult,
+    DesorptionMoleFractionResult,
+    GasFlow,
+    GasProperties,
+    AdsorptionState,
+    PressureState,
+    VacuumPumpingResult,
+    HeatTransferCoefficients,
+    HeatFlux,
+    CellTemperatures,
+    WallHeatFlux,
+    WallHeatBalanceResult,
+    LidHeatBalanceResult,
+    DepressurizationResult,
+    DownstreamFlowResult,
+)
 
 
 import warnings
@@ -33,7 +40,7 @@ def calculate_mass_balance_for_adsorption(
     inflow_gas=None,
     flow_amt_depress=None,
     residual_gas_composition=None,
-):
+) -> MaterialBalanceResult:
     """任意セルのマテリアルバランスを計算する
         吸着モード
 
@@ -45,7 +52,7 @@ def calculate_mass_balance_for_adsorption(
         flow_amt_depress (float): 上流均圧菅からの全流量
 
     Returns:
-        dict: 対象セルの計算結果
+        MaterialBalanceResult: 対象セルのマテリアルバランスに関する計算結果
     """
     ### マテバラ計算開始 ------------------------------------------------
     tower = state_manager.towers[tower_num]
@@ -209,24 +216,40 @@ def calculate_mass_balance_for_adsorption(
             # 流出N2分率
             outlet_n2_mole_fraction = outlet_n2_volume / (outlet_co2_volume + outlet_n2_volume)
 
-    output = {
-        "inlet_co2_volume": inlet_co2_volume,
-        "inlet_n2_volume": inlet_n2_volume,
-        "inlet_co2_mole_fraction": inlet_co2_mole_fraction,
-        "inlet_n2_mole_fraction": inlet_n2_mole_fraction,
-        "gas_density": gas_density,
-        "gas_specific_heat": gas_specific_heat,
-        "equilibrium_loading": equilibrium_loading,  # 平衡吸着量
-        "actual_uptake_volume": actual_uptake_volume,
-        "updated_loading": updated_loading,
-        "outlet_co2_volume": outlet_co2_volume,
-        "outlet_n2_volume": outlet_n2_volume,
-        "outlet_co2_mole_fraction": outlet_co2_mole_fraction,
-        "outlet_n2_mole_fraction": outlet_n2_mole_fraction,
-        "theoretical_loading_delta ": theoretical_loading_delta,
-        "co2_partial_pressure": co2_partial_pressure,
-        "outlet_co2_partial_pressure": outlet_co2_partial_pressure,
-    }
+    inlet_gas = GasFlow(
+        co2_volume=inlet_co2_volume,
+        n2_volume=inlet_n2_volume,
+        co2_mole_fraction=inlet_co2_mole_fraction,
+        n2_mole_fraction=inlet_n2_mole_fraction,
+    )
+    outlet_gas = GasFlow(
+        co2_volume=outlet_co2_volume,
+        n2_volume=outlet_n2_volume,
+        co2_mole_fraction=outlet_co2_mole_fraction,
+        n2_mole_fraction=outlet_n2_mole_fraction,
+    )
+    gas_properties = GasProperties(
+        density=gas_density,
+        specific_heat=gas_specific_heat,
+    )
+    adsorption_state = AdsorptionState(
+        equilibrium_loading=equilibrium_loading,
+        actual_uptake_volume=actual_uptake_volume,
+        updated_loading=updated_loading,
+        theoretical_loading_delta=theoretical_loading_delta,
+    )
+    pressure_state = PressureState(
+        co2_partial_pressure=co2_partial_pressure,
+        outlet_co2_partial_pressure=outlet_co2_partial_pressure,
+    )
+    material_balance_result = MaterialBalanceResult(
+        inlet_gas=inlet_gas,
+        outlet_gas=outlet_gas,
+        gas_properties=gas_properties,
+        adsorption_state=adsorption_state,
+        pressure_state=pressure_state,
+    )
+    output = material_balance_result.to_dict()
 
     return output
 
@@ -238,7 +261,7 @@ def calculate_mass_balance_for_desorption(
     state_manager: StateVariables,
     tower_num: int,
     vacuum_pumping_results,
-):
+) -> tuple[MaterialBalanceResult, DesorptionMoleFractionResult]:
     """任意セルのマテリアルバランスを計算する
         脱着モード
 
@@ -249,7 +272,8 @@ def calculate_mass_balance_for_desorption(
         vacuum_pumping_results (dict): 排気後圧力計算の出力
 
     Returns:
-        dict: 対象セルの計算結果
+        MaterialBalanceResult: 対象セルのマテリアルバランスに関する計算結果
+        DesorptionMoleFractionResult: 脱着後のモル分率計算結果
     """
     ### 現在気相モル量 = 流入モル量の計算 -------------------
     tower = state_manager.towers[tower_num]
@@ -351,32 +375,47 @@ def calculate_mass_balance_for_desorption(
         + CP.PropsSI("CPMASS", "T", T_K, "P", P_ATM, "nitrogen") * mf_n2
     ) * 1e-3
 
-    # 出力
-    output = {
-        "inlet_co2_volume": 0,
-        "inlet_n2_volume": 0,
-        "inlet_co2_mole_fraction": 0,
-        "inlet_n2_mole_fraction": 0,
-        "gas_density": gas_density,
-        "gas_specific_heat": gas_specific_heat,
-        "equilibrium_loading": equilibrium_loading,  # 平衡吸着量
-        "actual_uptake_volume": actual_uptake_volume,
-        "updated_loading": updated_loading,
-        "outlet_co2_volume": 0,
-        "outlet_n2_volume": 0,
-        "outlet_co2_mole_fraction": 0,
-        "outlet_n2_mole_fraction": 0,
-        "theoretical_loading_delta ": theoretical_loading_delta,
-        "co2_partial_pressure": co2_partial_pressure,
-        "outlet_co2_partial_pressure": tower.outlet_co2_partial_pressure[stream - 1, section - 1],
-    }
+    inlet_gas = GasFlow(
+        co2_volume=0,
+        n2_volume=0,
+        co2_mole_fraction=0,
+        n2_mole_fraction=0,
+    )
+    outlet_gas = GasFlow(
+        co2_volume=0,
+        n2_volume=0,
+        co2_mole_fraction=0,
+        n2_mole_fraction=0,
+    )
+    gas_properties = GasProperties(
+        density=gas_density,
+        specific_heat=gas_specific_heat,
+    )
+    adsorption_state = AdsorptionState(
+        equilibrium_loading=equilibrium_loading,
+        actual_uptake_volume=actual_uptake_volume,
+        updated_loading=updated_loading,
+        theoretical_loading_delta=theoretical_loading_delta,
+    )
+    pressure_state = PressureState(
+        co2_partial_pressure=co2_partial_pressure,
+        outlet_co2_partial_pressure=tower.outlet_co2_partial_pressure[stream - 1, section - 1],
+    )
+    material_balance_result = MaterialBalanceResult(
+        inlet_gas=inlet_gas,
+        outlet_gas=outlet_gas,
+        gas_properties=gas_properties,
+        adsorption_state=adsorption_state,
+        pressure_state=pressure_state,
+    )
+    output = material_balance_result.to_dict()
 
-    # 出力２（モル分率）
-    output2 = {
-        "mf_co2_after_vacuum": desorp_mf_co2_after_vacuum,  # 気相放出後CO2モル分率
-        "mf_n2_after_vacuum": desorp_mf_n2_after_vacuum,  # 気相放出後N2モル分率
-        "desorp_mw_all_after_vacuum": desorp_mw_all_after_vacuum,  # 気相放出後物質量 [mol]
-    }
+    desorption_mole_fraction_result = DesorptionMoleFractionResult(
+        co2_mole_fraction_after_desorption=desorp_mf_co2_after_vacuum,
+        n2_mole_fraction_after_desorption=desorp_mf_n2_after_vacuum,
+        total_moles_after_desorption=desorp_mw_all_after_vacuum,
+    )
+    output2 = desorption_mole_fraction_result.to_dict()
 
     return output, output2
 
@@ -395,25 +434,40 @@ def calculate_mass_balance_for_valve_closed(stream: int, section: int, state_man
         dict: 対象セルの計算結果
     """
     tower = state_manager.towers[tower_num]
-    # 何の反応もしない
-    output = {
-        "inlet_co2_volume": 0,
-        "inlet_n2_volume": 0,
-        "inlet_co2_mole_fraction": 0,
-        "inlet_n2_mole_fraction": 0,
-        "gas_density": 0,
-        "gas_specific_heat": 0,
-        "equilibrium_loading": 0,
-        "actual_uptake_volume": 0,
-        "updated_loading": tower.adsorp_amt[stream - 1, section - 1],
-        "outlet_co2_volume": 0,
-        "outlet_n2_volume": 0,
-        "outlet_co2_mole_fraction": 0,
-        "outlet_n2_mole_fraction": 0,
-        "theoretical_loading_delta ": 0,
-        "co2_partial_pressure": 0,
-        "outlet_co2_partial_pressure": tower.outlet_co2_partial_pressure[stream - 1, section - 1],
-    }
+    inlet_gas = GasFlow(
+        co2_volume=0,
+        n2_volume=0,
+        co2_mole_fraction=0,
+        n2_mole_fraction=0,
+    )
+    output_gas = GasFlow(
+        co2_volume=0,
+        n2_volume=0,
+        co2_mole_fraction=0,
+        n2_mole_fraction=0,
+    )
+    gas_properties = GasProperties(
+        density=0,
+        specific_heat=0,
+    )
+    adsorption_state = AdsorptionState(
+        equilibrium_loading=0,
+        actual_uptake_volume=0,
+        updated_loading=tower.adsorp_amt[stream - 1, section - 1],
+        theoretical_loading_delta=0,
+    )
+    pressure_state = PressureState(
+        co2_partial_pressure=0,
+        outlet_co2_partial_pressure=tower.outlet_co2_partial_pressure[stream - 1, section - 1],
+    )
+    material_balance_result = MaterialBalanceResult(
+        inlet_gas=inlet_gas,
+        outlet_gas=output_gas,
+        gas_properties=gas_properties,
+        adsorption_state=adsorption_state,
+        pressure_state=pressure_state,
+    )
+    output = material_balance_result.to_dict()
 
     return output
 
@@ -604,18 +658,21 @@ def calculate_heat_balance_for_bed(
     # 次時刻熱電対温度 [℃]
     temp_thermocouple_reached = tower.temp_thermo[stream - 1, section - 1] + temp_increase
 
-    output = {
-        "temp_reached": temp_reached,
-        "temp_thermocouple_reached": temp_thermocouple_reached,
-        "hw1": hw1,  # 壁-層伝熱係数
-        "Hroof": Hroof,
-        "Hbb": Hbb,  # 下流セルへの熱流束 [J]
-        ### 以下確認用
-        "Habs": Habs,  # 発生する吸着熱 [J]
-        "Hwin": Hwin,  # 内側境界からの熱流束 [J]
-        "Hwout": Hwout,  # 外側境界への熱流束 [J]
-        "u1": u1,  # 層伝熱係数 [W/m2/K]
-    }
+    cell_temperatures = CellTemperatures(
+        bed_temperature=temp_reached,
+        thermocouple_temperature=temp_thermocouple_reached,
+    )
+    heat_transfer_coefficients = HeatTransferCoefficients(wall_to_bed=hw1, bed_to_bed=u1)
+    heat_flux = HeatFlux(
+        adsorption=Habs, from_inner_boundary=Hwin, to_outer_boundary=Hwout, to_downstream=Hbb, from_upstream=Hroof
+    )
+    heat_balance_result = HeatBalanceResult(
+        cell_temperatures=cell_temperatures,
+        heat_transfer_coefficients=heat_transfer_coefficients,
+        heat_flux=heat_flux,
+    )
+
+    output = heat_balance_result.to_dict()
 
     return output
 
@@ -704,22 +761,20 @@ def calculate_heat_balance_for_wall(
         "Hroof": Hroof,
     }
     temp_reached = optimize.newton(_optimize_wall_temperature, temp_now, args=args.values())
-
-    output = {
-        "Hbb": Hbb,
-        "temp_reached": temp_reached,
-        "Hroof": Hroof,  # 上流壁への熱流束 [J]
-        ### 以下記録用
-        "Hwin": Hwin,  # 内側境界からの熱流束 [J]
-        "Hwout": Hwout,  # 外側境界への熱流束 [J]
-        "Hbb": Hbb,  # 下流壁への熱流束 [J]
-    }
+    heat_flux = WallHeatFlux(from_inner_boundary=Hwin, to_outer_boundary=Hwout, to_downstream=Hbb, from_upstream=Hroof)
+    wall_heat_balance_result = WallHeatBalanceResult(temperature=temp_reached, heat_flux=heat_flux)
+    output = wall_heat_balance_result.to_dict()
 
     return output
 
 
 def calculate_heat_balance_for_lid(
-    tower_conds: TowerConditions, position, state_manager: StateVariables, tower_num: int, heat_output, heat_wall_output
+    tower_conds: TowerConditions,
+    position: str,
+    state_manager: StateVariables,
+    tower_num: int,
+    heat_output,
+    heat_wall_output,
 ):
     """上下蓋の熱バランス計算
 
@@ -763,12 +818,8 @@ def calculate_heat_balance_for_lid(
         "position": position,
     }
     temp_reached = optimize.newton(_optimize_lid_temperature, temp_now, args=args.values())
-
-    output = {
-        "temp_reached": temp_reached,
-        # "Hlidall_heat": Hlidall_heat,
-        # "Hlid_time": Hlid_time,
-    }
+    lid_heat_balance_result = LidHeatBalanceResult(temperature=temp_reached)
+    output = lid_heat_balance_result.to_dict()
 
     return output
 
@@ -895,17 +946,16 @@ def calculate_pressure_after_vacuum_pumping(
     total_press_after_vacuum = (
         case_inner_mol_amt_after_vacuum * 8.314 * T_K / tower_conds.vacuum_piping.space_volume * 1e-6
     )
-
-    # 出力
-    output = {
-        "P_resist": P_resist,  # 圧損 [MPaA]
-        "accum_vacuum_amt_co2": accum_vacuum_amt_co2,  # 積算排気CO2量 [mol]
-        "accum_vacuum_amt_n2": accum_vacuum_amt_n2,  # 積算排気N2量 [mol]
-        "vacuum_co2_mf": vacuum_co2_mf,  # CO2回収濃度 [%]
-        "vacuum_rate_N": vacuum_rate_N,  # 真空ポンプ排気速度 [m3/min]
-        "case_inner_mol_amt_after_vacuum": case_inner_mol_amt_after_vacuum,  # 排気内部物質量 [mol]
-        "total_press_after_vacuum": total_press_after_vacuum,  # 排気後圧力 [MPaA]
-    }
+    vacuum_pumping_result = VacuumPumpingResult(
+        pressure_loss=P_resist,
+        total_co2_recovered=accum_vacuum_amt_co2,
+        total_n2_recovered=accum_vacuum_amt_n2,
+        co2_recovery_concentration=vacuum_co2_mf,
+        volumetric_flow_rate=vacuum_rate_N,
+        remaining_moles=case_inner_mol_amt_after_vacuum,
+        final_pressure=total_press_after_vacuum,
+    )
+    output = vacuum_pumping_result.to_dict()
 
     return output
 
@@ -1019,13 +1069,10 @@ def calculate_pressure_after_depressurization(
     dP_upper = 8.314 * T_K / V_upper_tower * mw_upper_space * 1e-6
     # 次時刻の容器圧力 [MPaA]
     total_press_after_depressure = tower.total_press - dP_upper
-
-    # 出力
-    output = {
-        "total_press_after_depressure": total_press_after_depressure,  # 減圧後の全圧 [MPaA]
-        "flow_amount_l": flow_amount_l,  # 均圧配管流量 [L/min]
-        "diff_press": dP,  # 均圧塔の圧力差 [MPaA]
-    }
+    depressurization_result = DepressurizationResult(
+        final_pressure=total_press_after_depressure, flow_rate=flow_amount_l, pressure_differential=dP
+    )
+    output = depressurization_result.to_dict()
 
     return output
 
@@ -1109,15 +1156,16 @@ def calculate_downstream_flow_after_depressurization(
     # 下流塔への流出CO2, N2流量 [cm3]
     outflow_fr = {}
     for stream in range(1, 1 + tower_conds.common.num_streams):
-        outflow_fr[stream] = {}
-        outflow_fr[stream]["outlet_co2_volume"] = sum_outflow_fr_co2 * stream_conds[stream].area_fraction
-        outflow_fr[stream]["outlet_n2_volume"] = sum_outflow_fr_n2 * stream_conds[stream].area_fraction
-
-    # 出力
-    output = {
-        "total_press_after_depressure_downflow": total_press_after_depressure_downflow,  # 減圧後の下流塔の全圧 [MPaA]
-        "outflow_fr": outflow_fr,  # 下流塔への流出CO2, N2流量 [cm3]
-    }
+        outflow_fr[stream] = GasFlow(
+            co2_volume=sum_outflow_fr_co2 * stream_conds[stream].area_fraction,
+            n2_volume=sum_outflow_fr_n2 * stream_conds[stream].area_fraction,
+            co2_mole_fraction=0,
+            n2_mole_fraction=0,
+        )
+    downstream_flow_result = DownstreamFlowResult(
+        final_pressure=total_press_after_depressure_downflow, outlet_flows=outflow_fr
+    )
+    output = downstream_flow_result.to_dict()
 
     return output
 
