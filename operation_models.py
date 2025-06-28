@@ -21,7 +21,6 @@ class CellCalculator:
         tower_num: int,
         mode: int,
         mass_strategy: MassBalanceStrategy,
-        heat_balance_func: Callable,
         vacuum_pumping_results=None,
     ):
         """マスバランスと熱バランスの計算を統一的に処理"""
@@ -43,7 +42,7 @@ class CellCalculator:
                 mass_balance_results[stream][section] = unified_result.base_result
                 if unified_result.mole_fraction_result and mole_fraction_results is not None:
                     mole_fraction_results[stream][section] = unified_result.mole_fraction_result
-                heat_balance_results[stream][section] = heat_balance_func(
+                heat_balance_results[stream][section] = adsorption_base_models.calculate_heat_balance_for_bed(
                     tower_conds=tower_conds,
                     stream=stream,
                     section=section,
@@ -140,7 +139,6 @@ def initial_adsorption(tower_conds: TowerConditions, state_manager, tower_num, i
         tower_num,
         mode,
         mass_strategy=mass_strategy,
-        heat_balance_func=adsorption_base_models.calculate_heat_balance_for_bed,
     )
 
     # 壁面熱バランス計算
@@ -183,7 +181,6 @@ def stop_mode(tower_conds: TowerConditions, state_manager, tower_num):
         tower_num,
         mode,
         mass_strategy=mass_strategy,
-        heat_balance_func=adsorption_base_models.calculate_heat_balance_for_bed,
     )
 
     # 壁面熱バランス計算
@@ -217,7 +214,6 @@ def flow_adsorption_single_or_upstream(tower_conds: TowerConditions, state_manag
         tower_num,
         mode,
         mass_strategy=mass_strategy,
-        heat_balance_func=adsorption_base_models.calculate_heat_balance_for_bed,
     )
 
     # 壁面熱バランス計算
@@ -273,7 +269,6 @@ def equalization_pressure_depressurization(
         tower_num,
         mode,
         mass_strategy=mass_strategy,
-        heat_balance_func=adsorption_base_models.calculate_heat_balance_for_bed,
     )
 
     # 壁面熱バランス計算
@@ -324,7 +319,6 @@ def desorption_by_vacuuming(tower_conds: TowerConditions, state_manager, tower_n
         tower_num,
         mode,
         mass_strategy=mass_strategy,
-        heat_balance_func=adsorption_base_models.calculate_heat_balance_for_bed,
         vacuum_pumping_results=vacuum_pumping_results,
     )
 
@@ -376,7 +370,6 @@ def equalization_pressure_pressurization(tower_conds: TowerConditions, state_man
         tower_num,
         mode,
         mass_strategy=mass_strategy,
-        heat_balance_func=adsorption_base_models.calculate_heat_balance_for_bed,
     )
     wall_heat_balance_results = calculator.calculate_wall_heat_balance(
         tower_conds, state_manager, tower_num, heat_balance_results
@@ -418,7 +411,6 @@ def batch_adsorption_downstream(
         tower_num,
         mode,
         mass_strategy=mass_strategy,
-        heat_balance_func=adsorption_base_models.calculate_heat_balance_for_bed,
     )
 
     # 壁面熱バランス計算
@@ -468,7 +460,6 @@ def flow_adsorption_downstream(tower_conds: TowerConditions, state_manager, towe
         tower_num,
         mode,
         mass_strategy=mass_strategy,
-        heat_balance_func=adsorption_base_models.calculate_heat_balance_for_bed,
     )
 
     # 壁面熱バランス計算
