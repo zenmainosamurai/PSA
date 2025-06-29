@@ -4,17 +4,31 @@ from typing import Optional, Dict, Any, Callable, Type
 import adsorption_base_models
 from sim_conditions import TowerConditions
 from state_variables import StateVariables
+from adsorption_results import MaterialBalanceResult, GasFlow, GasProperties, AdsorptionState, PressureState
 
 
 @dataclass
-class UnifiedMassBalanceResult:
-    base_result: Dict[str, float]
-    mole_fraction_result: Optional[Dict[str, float]] = None
+class MassBalanceCalculationResult:
+    """マスバランス計算の統一的な結果"""
+
+    material_balance: MaterialBalanceResult
+    mole_fraction_data: Optional[Dict[str, float]] = None
+
+    def has_mole_fraction_data(self) -> bool:
+        return self.mole_fraction_data is not None
 
 
 class MassBalanceStrategy(ABC):
     @abstractmethod
-    def calculate(self, stream: int, section: int, previous_result: Optional[Dict] = None) -> UnifiedMassBalanceResult:
+    def calculate(
+        self, stream: int, section: int, previous_result: Optional[MaterialBalanceResult] = None
+    ) -> MassBalanceCalculationResult:
+        """統一された戻り値型を返す"""
+        pass
+
+    @abstractmethod
+    def supports_mole_fraction(self) -> bool:
+        """この戦略がモル分率計算をサポートするかどうか"""
         pass
 
 
@@ -35,7 +49,9 @@ class AdsorptionStrategy(MassBalanceStrategy):
         self.equalization_flow_rate = equalization_flow_rate
         self.residual_gas_composition = residual_gas_composition
 
-    def calculate(self, stream: int, section: int, previous_result: Optional[Dict] = None) -> UnifiedMassBalanceResult:
+    def calculate(
+        self, stream: int, section: int, previous_result: Optional[MaterialBalanceResult] = None
+    ) -> MassBalanceCalculationResult:
         kwargs = {
             "tower_conds": self.tower_conds,
             "stream": stream,
@@ -51,9 +67,17 @@ class AdsorptionStrategy(MassBalanceStrategy):
             if self.residual_gas_composition is not None:
                 kwargs["residual_gas_composition"] = self.residual_gas_composition
         else:
-            kwargs["inflow_gas"] = previous_result
+            kwargs["inflow_gas"] = {
+                "outlet_co2_volume": previous_result.outlet_gas.co2_volume,
+                "outlet_n2_volume": previous_result.outlet_gas.n2_volume,
+            }
         result = adsorption_base_models.calculate_mass_balance_for_adsorption(**kwargs)
-        return UnifiedMassBalanceResult(base_result=result)
+        # Convert dict result to MaterialBalanceResult object
+        material_balance = MaterialBalanceResult.from_dict(result)
+        return MassBalanceCalculationResult(material_balance=material_balance)
+
+    def supports_mole_fraction(self) -> bool:
+        return False
 
 
 class DesorptionStrategy(MassBalanceStrategy):
@@ -63,7 +87,9 @@ class DesorptionStrategy(MassBalanceStrategy):
         self.tower_num = tower_num
         self.vacuum_pumping_results = vacuum_pumping_results
 
-    def calculate(self, stream: int, section: int, previous_result: Optional[Dict] = None) -> UnifiedMassBalanceResult:
+    def calculate(
+        self, stream: int, section: int, previous_result: Optional[MaterialBalanceResult] = None
+    ) -> MassBalanceCalculationResult:
         base_result, mole_fraction_result = adsorption_base_models.calculate_mass_balance_for_desorption(
             tower_conds=self.tower_conds,
             stream=stream,
@@ -72,7 +98,12 @@ class DesorptionStrategy(MassBalanceStrategy):
             tower_num=self.tower_num,
             vacuum_pumping_results=self.vacuum_pumping_results,
         )
-        return UnifiedMassBalanceResult(base_result=base_result, mole_fraction_result=mole_fraction_result)
+        # Convert dict result to MaterialBalanceResult object
+        material_balance = MaterialBalanceResult.from_dict(base_result)
+        return MassBalanceCalculationResult(material_balance=material_balance, mole_fraction_data=mole_fraction_result)
+
+    def supports_mole_fraction(self) -> bool:
+        return True
 
 
 class ValveClosedStrategy(MassBalanceStrategy):
@@ -80,11 +111,18 @@ class ValveClosedStrategy(MassBalanceStrategy):
         self.state_manager = state_manager
         self.tower_num = tower_num
 
-    def calculate(self, stream: int, section: int, previous_result: Optional[Dict] = None) -> UnifiedMassBalanceResult:
+    def calculate(
+        self, stream: int, section: int, previous_result: Optional[MaterialBalanceResult] = None
+    ) -> MassBalanceCalculationResult:
         result = adsorption_base_models.calculate_mass_balance_for_valve_closed(
             stream=stream,
             section=section,
             state_manager=self.state_manager,
             tower_num=self.tower_num,
         )
-        return UnifiedMassBalanceResult(base_result=result)
+        # Convert dict result to MaterialBalanceResult object
+        material_balance = MaterialBalanceResult.from_dict(result)
+        return MassBalanceCalculationResult(material_balance=material_balance)
+
+    def supports_mole_fraction(self) -> bool:
+        return False

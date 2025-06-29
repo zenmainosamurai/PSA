@@ -1,6 +1,7 @@
 # calculation_results.py (新規ファイル)
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from typing import Dict, Optional, Any
+import numpy as np
 
 
 @dataclass
@@ -61,6 +62,43 @@ class MaterialBalanceResult:
             "outlet_co2_partial_pressure": self.pressure_state.outlet_co2_partial_pressure,
         }
 
+    @classmethod
+    def from_dict(cls, data: dict) -> "MaterialBalanceResult":
+        """Convert dict to MaterialBalanceResult object"""
+        inlet_gas = GasFlow(
+            co2_volume=data["inlet_co2_volume"],
+            n2_volume=data["inlet_n2_volume"],
+            co2_mole_fraction=data["inlet_co2_mole_fraction"],
+            n2_mole_fraction=data["inlet_n2_mole_fraction"],
+        )
+        outlet_gas = GasFlow(
+            co2_volume=data["outlet_co2_volume"],
+            n2_volume=data["outlet_n2_volume"],
+            co2_mole_fraction=data["outlet_co2_mole_fraction"],
+            n2_mole_fraction=data["outlet_n2_mole_fraction"],
+        )
+        gas_properties = GasProperties(
+            density=data["gas_density"],
+            specific_heat=data["gas_specific_heat"],
+        )
+        adsorption_state = AdsorptionState(
+            equilibrium_loading=data["equilibrium_loading"],
+            actual_uptake_volume=data["actual_uptake_volume"],
+            updated_loading=data["updated_loading"],
+            theoretical_loading_delta=data["theoretical_loading_delta"],
+        )
+        pressure_state = PressureState(
+            co2_partial_pressure=data["co2_partial_pressure"],
+            outlet_co2_partial_pressure=data["outlet_co2_partial_pressure"],
+        )
+        return cls(
+            inlet_gas=inlet_gas,
+            outlet_gas=outlet_gas,
+            gas_properties=gas_properties,
+            adsorption_state=adsorption_state,
+            pressure_state=pressure_state,
+        )
+
 
 @dataclass
 class HeatFlux:
@@ -103,6 +141,122 @@ class HeatBalanceResult:
             "Hwout": self.heat_flux.to_outer_boundary,
             "u1": self.heat_transfer_coefficients.bed_to_bed,
         }
+
+
+@dataclass
+class SectionResults:
+    """セクション毎の計算結果を管理するクラス"""
+
+    def __init__(self, section_data: Dict[int, Any]):
+        self.section_data = section_data
+
+    def get_section_result(self, section_id: int) -> Any:
+        """指定されたセクションの結果を取得"""
+        return self.section_data.get(section_id)
+
+    def set_section_result(self, section_id: int, result: Any) -> None:
+        """指定されたセクションの結果を設定"""
+        self.section_data[section_id] = result
+
+    def get_all_sections(self) -> Dict[int, Any]:
+        """全セクションの結果を取得"""
+        return self.section_data
+
+    def to_dict(self) -> Dict[int, dict]:
+        """辞書形式に変換"""
+        result = {}
+        for section_id, section_result in self.section_data.items():
+            if hasattr(section_result, "to_dict"):
+                result[section_id] = section_result.to_dict()
+            else:
+                result[section_id] = section_result
+        return result
+
+
+@dataclass
+class StreamSectionResults:
+    """ストリーム毎にセクション結果を管理するクラス"""
+
+    def __init__(self, results_by_stream_section: Dict[int, Dict[int, Any]] = None):
+        if results_by_stream_section is None:
+            results_by_stream_section = {}
+        self.stream_data = {
+            stream_id: SectionResults(sections) for stream_id, sections in results_by_stream_section.items()
+        }
+
+    def get_stream_sections(self, stream_id: int) -> SectionResults:
+        """指定されたストリームのセクション結果を取得"""
+        if stream_id not in self.stream_data:
+            self.stream_data[stream_id] = SectionResults({})
+        return self.stream_data[stream_id]
+
+    def set_stream_section_result(self, stream_id: int, section_id: int, result: Any) -> None:
+        """指定されたストリーム・セクションの結果を設定"""
+        if stream_id not in self.stream_data:
+            self.stream_data[stream_id] = SectionResults({})
+        self.stream_data[stream_id].set_section_result(section_id, result)
+
+    def get_all_streams(self) -> Dict[int, SectionResults]:
+        """全ストリームの結果を取得"""
+        return self.stream_data
+
+    def to_dict(self) -> Dict[int, Dict[int, dict]]:
+        """辞書形式に変換"""
+        result = {}
+        for stream_id, section_results in self.stream_data.items():
+            result[stream_id] = section_results.to_dict()
+        return result
+
+
+@dataclass
+class MassBalanceResults:
+    """マスバランス計算結果の集合"""
+
+    material_balance_by_stream: StreamSectionResults
+
+    def __init__(self, results_by_stream_section: Dict[int, Dict[int, MaterialBalanceResult]] = None):
+        self.material_balance_by_stream = StreamSectionResults(results_by_stream_section)
+
+    def to_dict(self) -> Dict[int, Dict[int, dict]]:
+        """辞書形式に変換"""
+        return self.material_balance_by_stream.to_dict()
+
+
+@dataclass
+class HeatBalanceResults:
+    """熱バランス計算結果の集合"""
+
+    heat_balance_by_stream: StreamSectionResults
+
+    def __init__(self, results_by_stream_section: Dict[int, Dict[int, HeatBalanceResult]] = None):
+        self.heat_balance_by_stream = StreamSectionResults(results_by_stream_section)
+
+    def to_dict(self) -> Dict[int, Dict[int, dict]]:
+        """辞書形式に変換"""
+        return self.heat_balance_by_stream.to_dict()
+
+
+@dataclass
+class MoleFractionResults:
+    """モル分率計算結果の集合（脱着時のみ）"""
+
+    mole_fraction_by_stream: StreamSectionResults
+
+    def __init__(self, results_by_stream_section: Dict[int, Dict[int, dict]] = None):
+        self.mole_fraction_by_stream = StreamSectionResults(results_by_stream_section)
+
+    def to_dict(self) -> Dict[int, Dict[int, dict]]:
+        """辞書形式に変換"""
+        return self.mole_fraction_by_stream.to_dict()
+
+
+@dataclass
+class MassAndHeatBalanceResults:
+    """マスバランス・熱バランス計算の統合結果"""
+
+    mass_balance_results: MassBalanceResults
+    heat_balance_results: HeatBalanceResults
+    mole_fraction_results: Optional[MoleFractionResults] = None  # 脱着モードの場合のみ
 
 
 @dataclass
