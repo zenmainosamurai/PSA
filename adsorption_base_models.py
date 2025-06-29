@@ -1,4 +1,4 @@
-from typing import Optional, Dict
+from typing import Optional, Dict, Tuple
 import numpy as np
 import pandas as pd
 from scipy import optimize
@@ -33,6 +33,65 @@ from adsorption_results import (
 import warnings
 
 warnings.simplefilter("error")
+
+
+def _calculate_theoretical_uptake(
+    tower_conds: TowerConditions,
+    equilibrium_loading: float,
+    current_loading: float,
+    section_adsorbent_mass: float,
+    inlet_co2_volume: float,
+) -> Tuple[float, float]:
+    """理論新規吸着量を計算する共通関数
+
+    Args:
+        tower_conds: 塔条件
+        equilibrium_loading: 平衡吸着量 [cm3/g-abs]
+        current_loading: 現在の既存吸着量 [cm3/g-abs]
+        section_adsorbent_mass: セクション吸着材量 [g]
+        inlet_co2_volume: 流入CO2流量 [cm3]
+
+    Returns:
+        Tuple[theoretical_loading_delta, actual_uptake_volume]
+    """
+    if equilibrium_loading >= current_loading:
+        # 吸着モード
+        theoretical_loading_delta = (
+            tower_conds.packed_bed.adsorption_mass_transfer_coef ** (current_loading / equilibrium_loading)
+            / tower_conds.packed_bed.adsorbent_bulk_density
+            * 6
+            * (1 - tower_conds.packed_bed.average_porosity)
+            * tower_conds.packed_bed.particle_shape_factor
+            / tower_conds.packed_bed.average_particle_diameter
+            * (equilibrium_loading - current_loading)
+            * tower_conds.common.calculation_step_time
+            / 1e6
+            * 60
+        )
+        # セクション理論新規吸着量 [cm3]
+        theoretical_uptake_volume = theoretical_loading_delta * section_adsorbent_mass
+        # 実際のセクション新規吸着量 [cm3]
+        actual_uptake_volume = min(theoretical_uptake_volume, inlet_co2_volume)
+    else:
+        # 脱着モード
+        theoretical_loading_delta = (
+            tower_conds.packed_bed.desorption_mass_transfer_coef ** (current_loading / equilibrium_loading)
+            / tower_conds.packed_bed.adsorbent_bulk_density
+            * 6
+            * (1 - tower_conds.packed_bed.average_porosity)
+            * tower_conds.packed_bed.particle_shape_factor
+            / tower_conds.packed_bed.average_particle_diameter
+            * (equilibrium_loading - current_loading)
+            * tower_conds.common.calculation_step_time
+            / 1e6
+            * 60
+        )
+        # セクション理論新規吸着量 [cm3]
+        theoretical_uptake_volume = theoretical_loading_delta * section_adsorbent_mass
+        # 実際のセクション新規吸着量 [cm3]
+        actual_uptake_volume = max(theoretical_uptake_volume, -current_loading)
+
+    return theoretical_loading_delta, actual_uptake_volume
 
 
 def calculate_mass_balance_for_adsorption(
@@ -125,41 +184,11 @@ def calculate_mass_balance_for_adsorption(
     equilibrium_loading = max(0.1, _calculate_equilibrium_adsorption_amount(P_KPA, T_K))
     # 現在の既存吸着量 [cm3/g-abs]
     current_loading = tower.adsorp_amt[stream - 1, section - 1]
-    # 理論新規吸着量 [cm3/g-abs]
-    if equilibrium_loading >= current_loading:
-        theoretical_loading_delta = (
-            tower_conds.packed_bed.adsorption_mass_transfer_coef ** (current_loading / equilibrium_loading)
-            / tower_conds.packed_bed.adsorbent_bulk_density
-            * 6
-            * (1 - tower_conds.packed_bed.average_porosity)
-            * tower_conds.packed_bed.particle_shape_factor
-            / tower_conds.packed_bed.average_particle_diameter
-            * (equilibrium_loading - current_loading)
-            * tower_conds.common.calculation_step_time
-            / 1e6
-            * 60
-        )
-        # セクション理論新規吸着量 [cm3]
-        theoretical_uptake_volume = theoretical_loading_delta * section_adsorbent_mass
-        # 実際のセクション新規吸着量 [cm3]
-        actual_uptake_volume = min(theoretical_uptake_volume, inlet_co2_volume)
-    else:
-        theoretical_loading_delta = (
-            tower_conds.packed_bed.desorption_mass_transfer_coef ** (current_loading / equilibrium_loading)
-            / tower_conds.packed_bed.adsorbent_bulk_density
-            * 6
-            * (1 - tower_conds.packed_bed.average_porosity)
-            * tower_conds.packed_bed.particle_shape_factor
-            / tower_conds.packed_bed.average_particle_diameter
-            * (equilibrium_loading - current_loading)
-            * tower_conds.common.calculation_step_time
-            / 1e6
-            * 60
-        )
-        # セクション理論新規吸着量 [cm3]
-        theoretical_uptake_volume = theoretical_loading_delta * section_adsorbent_mass
-        # 実際のセクション新規吸着量 [cm3]
-        actual_uptake_volume = max(theoretical_uptake_volume, -current_loading)
+
+    # 理論新規吸着量計算（共通関数使用）
+    theoretical_loading_delta, actual_uptake_volume = _calculate_theoretical_uptake(
+        tower_conds, equilibrium_loading, current_loading, section_adsorbent_mass, inlet_co2_volume
+    )
     # 実際の新規吸着量 [cm3/g-abs]
     actual_loading_delta = actual_uptake_volume / section_adsorbent_mass
     # 時間経過後吸着量 [cm3/g-abs]
@@ -312,41 +341,11 @@ def calculate_mass_balance_for_desorption(
     equilibrium_loading = max(0.1, _calculate_equilibrium_adsorption_amount(P_KPA, T_K))
     # 現在の既存吸着量 [cm3/g-abs]
     current_loading = tower.adsorp_amt[stream - 1, section - 1]
-    # 理論新規吸着量 [cm3/g-abs]
-    if equilibrium_loading >= current_loading:
-        theoretical_loading_delta = (
-            tower_conds.packed_bed.adsorption_mass_transfer_coef ** (current_loading / equilibrium_loading)
-            / tower_conds.packed_bed.adsorbent_bulk_density
-            * 6
-            * (1 - tower_conds.packed_bed.average_porosity)
-            * tower_conds.packed_bed.particle_shape_factor
-            / tower_conds.packed_bed.average_particle_diameter
-            * (equilibrium_loading - current_loading)
-            * tower_conds.common.calculation_step_time
-            / 1e6
-            * 60
-        )
-        # セクション理論新規吸着量 [cm3]
-        theoretical_uptake_volume = theoretical_loading_delta * section_adsorbent_mass
-        # 実際のセクション新規吸着量 [cm3]
-        actual_uptake_volume = min(theoretical_uptake_volume, inlet_co2_volume)
-    else:
-        theoretical_loading_delta = (
-            tower_conds.packed_bed.desorption_mass_transfer_coef ** (current_loading / equilibrium_loading)
-            / tower_conds.packed_bed.adsorbent_bulk_density
-            * 6
-            * (1 - tower_conds.packed_bed.average_porosity)
-            * tower_conds.packed_bed.particle_shape_factor
-            / tower_conds.packed_bed.average_particle_diameter
-            * (equilibrium_loading - current_loading)
-            * tower_conds.common.calculation_step_time
-            / 1e6
-            * 60
-        )
-        # セクション理論新規吸着量 [cm3]
-        theoretical_uptake_volume = theoretical_loading_delta * section_adsorbent_mass
-        # 実際のセクション新規吸着量 [cm3]
-        actual_uptake_volume = max(theoretical_uptake_volume, -current_loading)
+
+    # 理論新規吸着量計算（共通関数使用）
+    theoretical_loading_delta, actual_uptake_volume = _calculate_theoretical_uptake(
+        tower_conds, equilibrium_loading, current_loading, section_adsorbent_mass, inlet_co2_volume
+    )
     # 実際の新規吸着量 [cm3/g-abs]
     theoretical_loading_delta = actual_uptake_volume / section_adsorbent_mass
     # 時間経過後吸着量 [cm3/g-abs]
