@@ -2,6 +2,14 @@ import numpy as np
 from dataclasses import dataclass
 from typing import Dict, Any
 from sim_conditions import SimulationConditions
+from adsorption_results import (
+    HeatBalanceResults,
+    MassBalanceResults,
+    WallHeatBalanceResult,
+    LidHeatBalanceResult,
+    MoleFractionResults,
+    VacuumPumpingResult,
+)
 
 
 @dataclass
@@ -99,31 +107,39 @@ class StateVariables:
         """計算結果から状態変数を効率的に更新"""
         tower = self.towers[tower_num]
 
-        heat = calc_output["heat"]
-        material = calc_output["material"]
+        heat_results: HeatBalanceResults = calc_output["heat"]  # HeatBalanceResults
+        material_results: MassBalanceResults = calc_output["material"]  # MassBalanceResults
 
-        as_mat = lambda dct, key: np.array(
-            [
-                [dct[stream][section][key] for section in range(1, self.num_sections + 1)]
-                for stream in range(1, self.num_streams + 1)
-            ],
-            dtype=np.float64,
-        )
+        # 各セル(stream, section)の結果を状態変数に反映
+        for stream in range(1, self.num_streams + 1):
+            for section in range(1, self.num_sections + 1):
+                # マテリアルバランス結果の更新
+                material_result = material_results.get_result(stream, section)
+                tower.adsorp_amt[stream - 1, section - 1] = material_result.adsorption_state.updated_loading
+                tower.outlet_co2_partial_pressure[stream - 1, section - 1] = (
+                    material_result.pressure_state.outlet_co2_partial_pressure
+                )
 
-        tower.temp[:, :] = as_mat(heat, "temp_reached")
-        tower.temp_thermo[:, :] = as_mat(heat, "temp_thermocouple_reached")
-        tower.adsorp_amt[:, :] = as_mat(material, "updated_loading")
-        tower.heat_t_coef[:, :] = as_mat(heat, "hw1")
-        tower.heat_t_coef_wall[:, :] = as_mat(heat, "u1")
-        tower.outlet_co2_partial_pressure[:, :] = as_mat(material, "outlet_co2_partial_pressure")
+                # 熱バランス結果の更新
+                heat_result = heat_results.get_result(stream, section)
+                tower.temp[stream - 1, section - 1] = heat_result.cell_temperatures.bed_temperature
+                tower.temp_thermo[stream - 1, section - 1] = heat_result.cell_temperatures.thermocouple_temperature
+                tower.heat_t_coef[stream - 1, section - 1] = heat_result.heat_transfer_coefficients.wall_to_bed
+                tower.heat_t_coef_wall[stream - 1, section - 1] = heat_result.heat_transfer_coefficients.bed_to_bed
 
         # 壁面温度の更新
+        heat_wall_results: Dict[int, WallHeatBalanceResult] = calc_output[
+            "heat_wall"
+        ]  # Dict[int, WallHeatBalanceResult]
         tower.temp_wall[:] = np.array(
-            [calc_output["heat_wall"][section]["temp_reached"] for section in range(1, self.num_sections + 1)],
+            [heat_wall_results[section].temperature for section in range(1, self.num_sections + 1)],
             dtype=np.float64,
         )
-        tower.temp_lid_up = calc_output["heat_lid"]["up"]["temp_reached"]
-        tower.temp_lid_down = calc_output["heat_lid"]["down"]["temp_reached"]
+
+        # 蓋温度の更新
+        heat_lid_results: Dict[str, LidHeatBalanceResult] = calc_output["heat_lid"]  # Dict[str, LidHeatBalanceResult]
+        tower.temp_lid_up = heat_lid_results["up"].temperature
+        tower.temp_lid_down = heat_lid_results["down"].temperature
 
         # モル分率の更新
         if mode == "停止":
@@ -137,12 +153,18 @@ class StateVariables:
             "バッチ吸着_下流",
             "流通吸着_下流",
         ]:
-            tower.mf_co2[:, :] = as_mat(material, "outlet_co2_mole_fraction")
-            tower.mf_n2[:, :] = as_mat(material, "outlet_n2_mole_fraction")
+            for stream in range(1, self.num_streams + 1):
+                for section in range(1, self.num_sections + 1):
+                    material_result = material_results.get_result(stream, section)
+                    tower.mf_co2[stream - 1, section - 1] = material_result.outlet_gas.co2_mole_fraction
+                    tower.mf_n2[stream - 1, section - 1] = material_result.outlet_gas.n2_mole_fraction
         elif mode == "真空脱着":
-            mol_frac = calc_output["mol_fraction"]
-            tower.mf_co2[:, :] = as_mat(mol_frac, "mf_co2_after_vacuum")
-            tower.mf_n2[:, :] = as_mat(mol_frac, "mf_n2_after_vacuum")
+            mol_frac_results: MoleFractionResults = calc_output["mol_fraction"]  # MoleFractionResults
+            for stream in range(1, self.num_streams + 1):
+                for section in range(1, self.num_sections + 1):
+                    mol_frac_result = mol_frac_results.get_result(stream, section)
+                    tower.mf_co2[stream - 1, section - 1] = mol_frac_result.co2_mole_fraction_after_desorption
+                    tower.mf_n2[stream - 1, section - 1] = mol_frac_result.n2_mole_fraction_after_desorption
 
         # 全圧の更新
         if mode == "停止":
@@ -156,8 +178,9 @@ class StateVariables:
 
         # 回収量の更新
         if mode == "真空脱着":
-            tower.vacuum_amt_co2 = calc_output["accum_vacuum_amt"]["accum_vacuum_amt_co2"]
-            tower.vacuum_amt_n2 = calc_output["accum_vacuum_amt"]["accum_vacuum_amt_n2"]
+            accum_vacuum_amt: VacuumPumpingResult = calc_output["accum_vacuum_amt"]
+            tower.vacuum_amt_co2 = accum_vacuum_amt.total_co2_recovered
+            tower.vacuum_amt_n2 = accum_vacuum_amt.total_n2_recovered
         else:
             tower.vacuum_amt_co2 = 0.0
             tower.vacuum_amt_n2 = 0.0

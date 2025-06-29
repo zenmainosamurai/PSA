@@ -4,12 +4,13 @@
 """
 
 import math
-from typing import Tuple, Dict
+from typing import Tuple, Optional
 
 import CoolProp.CoolProp as CP
 
 from state_variables import StateVariables
-from sim_conditions import StreamConditions, TowerConditions
+from sim_conditions import TowerConditions
+from adsorption_results import MaterialBalanceResult, VacuumPumpingResult
 
 
 # ------------------------------------------------------------------
@@ -116,8 +117,8 @@ def calc_heat_transfer_coef(
     mode: int,
     state_manager: StateVariables,
     tower_num: int,
-    material_output: dict,
-    vacuum_pumping_results: dict | None = None,
+    material_output: MaterialBalanceResult,
+    vacuum_pumping_results: Optional[VacuumPumpingResult] = None,
 ) -> tuple[float, float]:
     """層伝熱係数、壁-層伝熱係数を算出する
 
@@ -141,14 +142,14 @@ def calc_heat_transfer_coef(
     T_K = temp_now + 273.15
 
     if mode == 0:  # 吸着
-        mf_co2 = material_output["inlet_co2_mole_fraction"]
-        mf_n2 = material_output["inlet_n2_mole_fraction"]
+        mf_co2 = material_output.inlet_gas.co2_mole_fraction
+        mf_n2 = material_output.inlet_gas.n2_mole_fraction
     elif mode == 2:  # 脱着
         mf_co2 = tower.mf_co2[stream - 1, section - 1]
         mf_n2 = tower.mf_n2[stream - 1, section - 1]
     else:  # その他はとりあえず吸着と同様
-        mf_co2 = material_output["inlet_co2_mole_fraction"]
-        mf_n2 = material_output["inlet_n2_mole_fraction"]
+        mf_co2 = material_output.inlet_gas.co2_mole_fraction
+        mf_n2 = material_output.inlet_gas.n2_mole_fraction
 
     # ---- 物性値 -----------------------------------------------------
     kf = compute_gas_k(T_K, mf_co2, mf_n2)  # 気体熱伝導率
@@ -173,22 +174,22 @@ def calc_heat_transfer_coef(
         CP.PropsSI("V", "T", T_K, "P", P_ATM, "co2") * mf_co2
         + CP.PropsSI("V", "T", T_K, "P", P_ATM, "nitrogen") * mf_n2
     )
-    Pr = mu * 1000.0 * material_output["gas_specific_heat"] / kf
+    Pr = mu * 1000.0 * material_output.gas_properties.specific_heat / kf
 
     # 流入ガス体積流量 f0
     if mode == 0:
         f0 = (
-            (material_output["inlet_co2_volume"] + material_output["inlet_n2_volume"])
+            (material_output.inlet_gas.co2_volume + material_output.inlet_gas.n2_volume)
             / 1e6
             / (tower_conds.common.calculation_step_time * 60.0)
         )
     elif mode == 2:  # 脱着時は排気ガス体積流量 [m3/s]
-        f0 = vacuum_pumping_results["vacuum_rate_N"] / 60.0 * stream_conds[stream].area_fraction
+        f0 = vacuum_pumping_results.volumetric_flow_rate / 60.0 * stream_conds[stream].area_fraction
     else:
         f0 = 0.0  # NOTE: この処理で正しいか確認
 
     vcol = f0 / stream_conds[stream].cross_section  # 空塔速度[m/s]
-    nu = mu / material_output["gas_density"]  # 気体動粘度[m2/s]
+    nu = mu / material_output.gas_properties.density  # 気体動粘度[m2/s]
     Rep = 1.0 if vcol == 0 else vcol * dp / nu  # 粒子レイノルズ数
 
     # ---- ke, habs, dlat, hw1_raw -----------------------------------

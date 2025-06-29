@@ -61,20 +61,38 @@ class AdsorptionStrategy(MassBalanceStrategy):
         }
         if section == 1:
             if self.external_inflow_gas is not None:
-                kwargs["inflow_gas"] = self.external_inflow_gas[stream]
+                # 辞書からGasFlowオブジェクトに変換
+                inflow_dict = self.external_inflow_gas[stream]
+                # 辞書がGasFlowオブジェクトかチェック
+                if isinstance(inflow_dict, GasFlow):
+                    kwargs["inflow_gas"] = inflow_dict
+                else:
+                    # 辞書の場合は変換
+                    kwargs["inflow_gas"] = GasFlow(
+                        co2_volume=inflow_dict.get("outlet_co2_volume", inflow_dict.get("co2_volume", 0)),
+                        n2_volume=inflow_dict.get("outlet_n2_volume", inflow_dict.get("n2_volume", 0)),
+                        co2_mole_fraction=inflow_dict.get(
+                            "outlet_co2_mole_fraction", inflow_dict.get("co2_mole_fraction", 0)
+                        ),
+                        n2_mole_fraction=inflow_dict.get(
+                            "outlet_n2_mole_fraction", inflow_dict.get("n2_mole_fraction", 0)
+                        ),
+                    )
             if self.equalization_flow_rate is not None:
                 kwargs["flow_amt_depress"] = self.equalization_flow_rate
             if self.residual_gas_composition is not None:
                 kwargs["residual_gas_composition"] = self.residual_gas_composition
         else:
-            kwargs["inflow_gas"] = {
-                "outlet_co2_volume": previous_result.outlet_gas.co2_volume,
-                "outlet_n2_volume": previous_result.outlet_gas.n2_volume,
-            }
+            # previous_resultからGasFlowオブジェクトを作成
+            kwargs["inflow_gas"] = GasFlow(
+                co2_volume=previous_result.outlet_gas.co2_volume,
+                n2_volume=previous_result.outlet_gas.n2_volume,
+                co2_mole_fraction=previous_result.outlet_gas.co2_mole_fraction,
+                n2_mole_fraction=previous_result.outlet_gas.n2_mole_fraction,
+            )
         result = adsorption_base_models.calculate_mass_balance_for_adsorption(**kwargs)
         # Convert dict result to MaterialBalanceResult object
-        material_balance = MaterialBalanceResult.from_dict(result)
-        return MassBalanceCalculationResult(material_balance=material_balance)
+        return MassBalanceCalculationResult(material_balance=result)
 
     def supports_mole_fraction(self) -> bool:
         return False
@@ -90,7 +108,7 @@ class DesorptionStrategy(MassBalanceStrategy):
     def calculate(
         self, stream: int, section: int, previous_result: Optional[MaterialBalanceResult] = None
     ) -> MassBalanceCalculationResult:
-        base_result, mole_fraction_result = adsorption_base_models.calculate_mass_balance_for_desorption(
+        material_balance_result, mole_fraction_result = adsorption_base_models.calculate_mass_balance_for_desorption(
             tower_conds=self.tower_conds,
             stream=stream,
             section=section,
@@ -98,9 +116,9 @@ class DesorptionStrategy(MassBalanceStrategy):
             tower_num=self.tower_num,
             vacuum_pumping_results=self.vacuum_pumping_results,
         )
-        # Convert dict result to MaterialBalanceResult object
-        material_balance = MaterialBalanceResult.from_dict(base_result)
-        return MassBalanceCalculationResult(material_balance=material_balance, mole_fraction_data=mole_fraction_result)
+        return MassBalanceCalculationResult(
+            material_balance=material_balance_result, mole_fraction_data=mole_fraction_result
+        )
 
     def supports_mole_fraction(self) -> bool:
         return True
@@ -120,9 +138,7 @@ class ValveClosedStrategy(MassBalanceStrategy):
             state_manager=self.state_manager,
             tower_num=self.tower_num,
         )
-        # Convert dict result to MaterialBalanceResult object
-        material_balance = MaterialBalanceResult.from_dict(result)
-        return MassBalanceCalculationResult(material_balance=material_balance)
+        return MassBalanceCalculationResult(material_balance=result)
 
     def supports_mole_fraction(self) -> bool:
         return False

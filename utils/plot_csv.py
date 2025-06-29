@@ -290,17 +290,23 @@ def outputs_to_csv(tgt_foldapath, record_dict, common_conds: CommonConditions):
             values_tmp = []
             for stream in range(1, 1 + common_conds.num_streams):
                 for section in range(1, 1 + common_conds.num_sections):
-                    for value in record_dict[_tgt_name][i][stream][section].values():
+                    # データクラスから辞書形式に変換してから値を取得
+                    result_data = record_dict[_tgt_name][i].get_result(stream, section).to_dict()
+                    for value in result_data.values():
                         values_tmp.append(value)
             values.append(values_tmp)
         # カラム名の抽出
         columns = []
         for stream in range(1, 1 + common_conds.num_streams):
             for section in range(1, 1 + common_conds.num_sections):
-                for key in record_dict[_tgt_name][i][stream][section].keys():
+                # 最初のレコードからキーを取得
+                result_data = record_dict[_tgt_name][0].get_result(stream, section).to_dict()
+                for key in result_data.keys():
                     columns.append(key + "-" + str(stream).zfill(3) + "-" + str(section).zfill(3))
         # df化
-        for key in record_dict[_tgt_name][i][stream][section].keys():
+        # 最初のレコードからキーを取得
+        sample_result_data = record_dict[_tgt_name][0].get_result(1, 1).to_dict()
+        for key in sample_result_data.keys():
             idx = [columns.index(col) for col in columns if key in col]
             df = pd.DataFrame(
                 np.array(values)[:, idx],
@@ -317,8 +323,8 @@ def outputs_to_csv(tgt_foldapath, record_dict, common_conds: CommonConditions):
     for i in range(len(record_dict["heat_lid"])):
         values.append(
             [
-                record_dict["heat_lid"][i]["up"]["temp_reached"],
-                record_dict["heat_lid"][i]["down"]["temp_reached"],
+                record_dict["heat_lid"][i]["up"].temperature,
+                record_dict["heat_lid"][i]["down"].temperature,
             ]
         )
     columns = ["temp_reached-up", "temp_reached-down"]

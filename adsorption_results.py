@@ -62,43 +62,6 @@ class MaterialBalanceResult:
             "outlet_co2_partial_pressure": self.pressure_state.outlet_co2_partial_pressure,
         }
 
-    @classmethod
-    def from_dict(cls, data: dict) -> "MaterialBalanceResult":
-        """Convert dict to MaterialBalanceResult object"""
-        inlet_gas = GasFlow(
-            co2_volume=data["inlet_co2_volume"],
-            n2_volume=data["inlet_n2_volume"],
-            co2_mole_fraction=data["inlet_co2_mole_fraction"],
-            n2_mole_fraction=data["inlet_n2_mole_fraction"],
-        )
-        outlet_gas = GasFlow(
-            co2_volume=data["outlet_co2_volume"],
-            n2_volume=data["outlet_n2_volume"],
-            co2_mole_fraction=data["outlet_co2_mole_fraction"],
-            n2_mole_fraction=data["outlet_n2_mole_fraction"],
-        )
-        gas_properties = GasProperties(
-            density=data["gas_density"],
-            specific_heat=data["gas_specific_heat"],
-        )
-        adsorption_state = AdsorptionState(
-            equilibrium_loading=data["equilibrium_loading"],
-            actual_uptake_volume=data["actual_uptake_volume"],
-            updated_loading=data["updated_loading"],
-            theoretical_loading_delta=data["theoretical_loading_delta"],
-        )
-        pressure_state = PressureState(
-            co2_partial_pressure=data["co2_partial_pressure"],
-            outlet_co2_partial_pressure=data["outlet_co2_partial_pressure"],
-        )
-        return cls(
-            inlet_gas=inlet_gas,
-            outlet_gas=outlet_gas,
-            gas_properties=gas_properties,
-            adsorption_state=adsorption_state,
-            pressure_state=pressure_state,
-        )
-
 
 @dataclass
 class HeatFlux:
@@ -143,14 +106,13 @@ class HeatBalanceResult:
         }
 
 
-@dataclass
 class SectionResults:
     """セクション毎の計算結果を管理するクラス"""
 
     def __init__(self, section_data: Dict[int, Any]):
         self.section_data = section_data
 
-    def get_section_result(self, section_id: int) -> Any:
+    def get_cell_result(self, section_id: int) -> Any:
         """指定されたセクションの結果を取得"""
         return self.section_data.get(section_id)
 
@@ -173,7 +135,6 @@ class SectionResults:
         return result
 
 
-@dataclass
 class StreamSectionResults:
     """ストリーム毎にセクション結果を管理するクラス"""
 
@@ -184,7 +145,7 @@ class StreamSectionResults:
             stream_id: SectionResults(sections) for stream_id, sections in results_by_stream_section.items()
         }
 
-    def get_stream_sections(self, stream_id: int) -> SectionResults:
+    def get_stream_data(self, stream_id: int) -> SectionResults:
         """指定されたストリームのセクション結果を取得"""
         if stream_id not in self.stream_data:
             self.stream_data[stream_id] = SectionResults({})
@@ -208,46 +169,145 @@ class StreamSectionResults:
         return result
 
 
-@dataclass
+class MaterialBalanceSectionResults(SectionResults):
+    """マテリアルバランス結果のセクション管理"""
+
+    def get_material_balance_result(self, section_id: int) -> MaterialBalanceResult:
+        """指定されたセクションのマテリアルバランス結果を取得"""
+        return super().get_cell_result(section_id)
+
+
+class MaterialBalanceStreamSectionResults(StreamSectionResults):
+    """マテリアルバランス結果のストリーム・セクション管理"""
+
+    def __init__(self, results_by_stream_section: Dict[int, Dict[int, MaterialBalanceResult]] = None):
+        if results_by_stream_section is None:
+            results_by_stream_section = {}
+        self.stream_data = {
+            stream_id: MaterialBalanceSectionResults(sections)
+            for stream_id, sections in results_by_stream_section.items()
+        }
+
+    def get_stream_data(self, stream_id: int) -> MaterialBalanceSectionResults:
+        """指定されたストリームのセクション結果を取得"""
+        if stream_id not in self.stream_data:
+            self.stream_data[stream_id] = MaterialBalanceSectionResults({})
+        return self.stream_data[stream_id]
+
+    def get_material_balance_result(self, stream_id: int, section_id: int) -> MaterialBalanceResult:
+        """指定されたストリーム・セクションのマテリアルバランス結果を直接取得"""
+        return self.get_stream_data(stream_id).get_material_balance_result(section_id)
+
+
+class HeatBalanceSectionResults(SectionResults):
+    """熱バランス結果のセクション管理"""
+
+    def get_heat_balance_result(self, section_id: int) -> HeatBalanceResult:
+        """指定されたセクションの熱バランス結果を取得"""
+        return super().get_cell_result(section_id)
+
+
+class HeatBalanceStreamSectionResults(StreamSectionResults):
+    """熱バランス結果のストリーム・セクション管理"""
+
+    def __init__(self, heat_balance_results_dict: Dict[int, Dict[int, HeatBalanceResult]] = None):
+        if heat_balance_results_dict is None:
+            heat_balance_results_dict = {}
+        self.stream_data = {
+            stream_id: HeatBalanceSectionResults(sections) for stream_id, sections in heat_balance_results_dict.items()
+        }
+
+    def get_stream_data(self, stream_id: int) -> HeatBalanceSectionResults:
+        """指定されたストリームのセクション結果を取得"""
+        if stream_id not in self.stream_data:
+            self.stream_data[stream_id] = HeatBalanceSectionResults({})
+        return self.stream_data[stream_id]
+
+    def get_heat_balance_result(self, stream_id: int, section_id: int) -> HeatBalanceResult:
+        """指定されたストリーム・セクションの熱バランス結果を直接取得"""
+        return self.get_stream_data(stream_id).get_cell_result(section_id)
+
+
 class MassBalanceResults:
     """マスバランス計算結果の集合"""
 
-    material_balance_by_stream: StreamSectionResults
+    def __init__(self, material_balance_results_dict: Dict[int, Dict[int, MaterialBalanceResult]] = None):
+        self.material_balance_stream_section_results = MaterialBalanceStreamSectionResults(
+            material_balance_results_dict
+        )
 
-    def __init__(self, results_by_stream_section: Dict[int, Dict[int, MaterialBalanceResult]] = None):
-        self.material_balance_by_stream = StreamSectionResults(results_by_stream_section)
+    def get_stream_data(self, stream_id: int) -> MaterialBalanceSectionResults:
+        """指定されたストリームのセクション結果管理オブジェクトを取得"""
+        return self.material_balance_stream_section_results.get_stream_data(stream_id)
 
-    def to_dict(self) -> Dict[int, Dict[int, dict]]:
-        """辞書形式に変換"""
-        return self.material_balance_by_stream.to_dict()
+    def get_result(self, stream_id: int, section_id: int) -> MaterialBalanceResult:
+        """指定されたストリーム・セクションのマテリアルバランス結果を直接取得"""
+        return self.material_balance_stream_section_results.get_material_balance_result(stream_id, section_id)
 
 
-@dataclass
 class HeatBalanceResults:
     """熱バランス計算結果の集合"""
 
-    heat_balance_by_stream: StreamSectionResults
+    def __init__(self, heat_balance_results_dict: Dict[int, Dict[int, HeatBalanceResult]] = None):
+        self.heat_balance_stream_section_results = HeatBalanceStreamSectionResults(heat_balance_results_dict)
 
-    def __init__(self, results_by_stream_section: Dict[int, Dict[int, HeatBalanceResult]] = None):
-        self.heat_balance_by_stream = StreamSectionResults(results_by_stream_section)
-
-    def to_dict(self) -> Dict[int, Dict[int, dict]]:
-        """辞書形式に変換"""
-        return self.heat_balance_by_stream.to_dict()
+    def get_result(self, stream_id: int, section_id: int) -> HeatBalanceResult:
+        """指定されたストリーム・セクションの熱バランス結果を直接取得"""
+        return self.heat_balance_stream_section_results.get_heat_balance_result(stream_id, section_id)
 
 
 @dataclass
+class DesorptionMoleFractionResult:
+    """脱着時のモル分率計算結果"""
+
+    co2_mole_fraction_after_desorption: float
+    n2_mole_fraction_after_desorption: float
+    total_moles_after_desorption: float
+
+
+class MoleFractionSectionResults(SectionResults):
+    """モル分率結果のセクション管理"""
+
+    def get_mole_fraction_result(self, section_id: int) -> dict:
+        """指定されたセクションのモル分率結果を取得"""
+        return super().get_cell_result(section_id)
+
+
+class MoleFractionStreamSectionResults(StreamSectionResults):
+    """モル分率結果のストリーム・セクション管理"""
+
+    def __init__(self, mole_fraction_results_dict: Dict[int, Dict[int, dict]] = None):
+        if mole_fraction_results_dict is None:
+            mole_fraction_results_dict = {}
+        self.stream_data = {
+            stream_id: MoleFractionSectionResults(sections)
+            for stream_id, sections in mole_fraction_results_dict.items()
+        }
+
+    def get_stream_data(self, stream_id: int) -> MoleFractionSectionResults:
+        """指定されたストリームのセクション結果を取得"""
+        if stream_id not in self.stream_data:
+            self.stream_data[stream_id] = MoleFractionSectionResults({})
+        return self.stream_data[stream_id]
+
+    def get_mole_fraction_result(self, stream_id: int, section_id: int) -> dict:
+        """指定されたストリーム・セクションのモル分率結果を直接取得"""
+        return self.get_stream_data(stream_id).get_mole_fraction_result(section_id)
+
+
 class MoleFractionResults:
     """モル分率計算結果の集合（脱着時のみ）"""
 
-    mole_fraction_by_stream: StreamSectionResults
+    def __init__(self, mole_fraction_results_dict: Dict[int, Dict[int, dict]] = None):
+        self.mole_fraction_stream_section_results = MoleFractionStreamSectionResults(mole_fraction_results_dict)
 
-    def __init__(self, results_by_stream_section: Dict[int, Dict[int, dict]] = None):
-        self.mole_fraction_by_stream = StreamSectionResults(results_by_stream_section)
+    def get_stream_data(self, stream_id: int) -> MoleFractionSectionResults:
+        """指定されたストリームのセクション結果管理オブジェクトを取得"""
+        return self.mole_fraction_stream_section_results.get_stream_data(stream_id)
 
-    def to_dict(self) -> Dict[int, Dict[int, dict]]:
-        """辞書形式に変換"""
-        return self.mole_fraction_by_stream.to_dict()
+    def get_result(self, stream_id: int, section_id: int) -> DesorptionMoleFractionResult:
+        """指定されたストリーム・セクションのモル分率結果を直接取得"""
+        return self.mole_fraction_stream_section_results.get_mole_fraction_result(stream_id, section_id)
 
 
 @dataclass
@@ -290,25 +350,6 @@ class LidHeatBalanceResult:
 
     temperature: float
 
-    def to_dict(self) -> dict:
-        return {"temp_reached": self.temperature}
-
-
-@dataclass
-class DesorptionMoleFractionResult:
-    """脱着時のモル分率計算結果"""
-
-    co2_mole_fraction_after_desorption: float
-    n2_mole_fraction_after_desorption: float
-    total_moles_after_desorption: float
-
-    def to_dict(self) -> dict:
-        return {
-            "mf_co2_after_vacuum": self.co2_mole_fraction_after_desorption,
-            "mf_n2_after_vacuum": self.n2_mole_fraction_after_desorption,
-            "desorp_mw_all_after_vacuum": self.total_moles_after_desorption,
-        }
-
 
 @dataclass
 class VacuumPumpingResult:
@@ -322,17 +363,6 @@ class VacuumPumpingResult:
     remaining_moles: float
     final_pressure: float
 
-    def to_dict(self) -> dict:
-        return {
-            "P_resist": self.pressure_loss,
-            "accum_vacuum_amt_co2": self.total_co2_recovered,
-            "accum_vacuum_amt_n2": self.total_n2_recovered,
-            "vacuum_co2_mf": self.co2_recovery_concentration,
-            "vacuum_rate_N": self.volumetric_flow_rate,
-            "case_inner_mol_amt_after_vacuum": self.remaining_moles,
-            "total_press_after_vacuum": self.final_pressure,
-        }
-
 
 @dataclass
 class DepressurizationResult:
@@ -342,13 +372,6 @@ class DepressurizationResult:
     flow_rate: float
     pressure_differential: float
 
-    def to_dict(self) -> dict:
-        return {
-            "total_press_after_depressure": self.final_pressure,
-            "flow_amount_l": self.flow_rate,
-            "diff_press": self.pressure_differential,
-        }
-
 
 @dataclass
 class DownstreamFlowResult:
@@ -356,12 +379,3 @@ class DownstreamFlowResult:
 
     final_pressure: float
     outlet_flows: Dict[int, GasFlow]
-
-    def to_dict(self) -> dict:
-        outlet_flows = {}
-        for stream_id, gas_flow in self.outlet_flows.items():
-            outlet_flows[stream_id] = {
-                "outlet_co2_volume": gas_flow.co2_volume,
-                "outlet_n2_volume": gas_flow.n2_volume,
-            }
-        return {"total_press_after_depressure_downflow": self.final_pressure, "outflow_fr": outlet_flows}
