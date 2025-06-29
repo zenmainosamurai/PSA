@@ -1,4 +1,5 @@
 from typing import Optional, Dict, Tuple
+from abc import ABC, abstractmethod
 import numpy as np
 import pandas as pd
 from scipy import optimize
@@ -473,14 +474,14 @@ def calculate_mass_balance_for_valve_closed(stream: int, section: int, state_man
 
 def calculate_heat_balance_for_bed(
     tower_conds: TowerConditions,
-    stream,
-    section,
+    stream: int,
+    section: int,
     state_manager: StateVariables,
-    tower_num,
-    mode,
+    tower_num: int,
+    mode: int,
     material_output: Optional[MaterialBalanceResult] = None,
     heat_output: Optional[HeatBalanceResult] = None,
-    vacuum_pumping_results=None,
+    vacuum_pumping_results: Optional[VacuumPumpingResult] = None,
 ):
     """対象セルの熱バランスを計算する
 
@@ -494,11 +495,13 @@ def calculate_heat_balance_for_bed(
         vacuum_pumping_results (dict): 排気後圧力計算の出力（脱着時）
 
     Returns:
-        dict: 対象セルの熱バラ出力
+        dict: 対象セルの熱バランスに関する計算結果
     """
     ### 前準備 ------------------------------------------------------
     tower = state_manager.towers[tower_num]
     stream_conds = tower_conds.stream_conditions
+
+    physics_calculator = _get_physics_calculator(mode)
 
     # セクション現在温度 [℃]
     temp_now = tower.temp[stream - 1, section - 1]
@@ -515,30 +518,13 @@ def calculate_heat_balance_for_bed(
     # 下流セクション温度 [℃]
     if section != tower_conds.common.num_sections:
         temp_below_cell = tower.temp[stream - 1, section]
-    # 発生する吸着熱 [J]
-    if mode == 1:
-        Habs = 0  # 弁停止モードでは0
-    else:
-        Habs = (
-            material_output.adsorption_state.actual_uptake_volume
-            / 1000
-            / 22.4
-            * tower_conds.feed_gas.co2_molecular_weight
-            * tower_conds.feed_gas.co2_adsorption_heat
-        )
-    # 流入ガス質量 [g]
-    if mode in [1, 2]:
-        Mgas = 0  # 弁停止・脱着モードでは0
-    else:
-        Mgas = (
-            material_output.inlet_gas.co2_volume / 1000 / 22.4 * tower_conds.feed_gas.co2_molecular_weight
-            + material_output.inlet_gas.n2_volume / 1000 / 22.4 * tower_conds.feed_gas.n2_molecular_weight
-        )
-    # 流入ガス比熱 [J/g/K]
-    if mode == 1:
-        gas_specific_heat = 0  # 弁停止モードでは0
-    else:
-        gas_specific_heat = material_output.gas_properties.specific_heat
+
+    # 発生する吸着熱[J]
+    Habs = physics_calculator.calculate_adsorption_heat(material_output, tower_conds)
+    # 流入ガス質量[g]
+    Mgas = physics_calculator.calculate_inlet_gas_mass(material_output, tower_conds)
+    # 流入ガス比熱[J/g/K]
+    gas_specific_heat = physics_calculator.get_gas_specific_heat(material_output)
     # 内側境界面積 [m2]
     Ain = stream_conds[stream].inner_boundary_area / tower_conds.common.num_sections
     # 外側境界面積 [m2]
@@ -1329,10 +1315,10 @@ def _optimize_wall_temperature(
 
     Args:
         temp_reached (float): セクション到達温度
-        args (dict): 充填層が受ける熱を計算するためのパラメータ
+        args (dict): 充填層が受け取る熱を計算するためのパラメータ
 
     Returns:
-        float: 充填層が受ける熱の熱収支基準と時間基準の差分
+        float: 充填層が受け取る熱の熱収支基準と時間基準の差分
     """
     # 壁が受け取る熱(熱収支基準) [J]
     Hwall_heat_blc = Hwin - Hroof - Hwout - Hbb
@@ -1351,10 +1337,10 @@ def _optimize_lid_temperature(temp_reached, tower_conds: TowerConditions, temp_n
 
     Args:
         temp_reached (float): セクション到達温度
-        args (dict): 充填層が受ける熱を計算するためのパラメータ
+        args (dict): 充填層が受け取る熱を計算するためのパラメータ
 
     Returns:
-        float: 充填層が受ける熱の熱収支基準と時間基準の差分
+        float: 充填層が受け取る熱の熱収支基準と時間基準の差分
     """
     # 壁が受け取る熱(ΔT基準) [J]
     Hlid_time = tower_conds.vessel.wall_specific_heat_capacity * (temp_reached - temp_now)
@@ -1364,3 +1350,86 @@ def _optimize_lid_temperature(temp_reached, tower_conds: TowerConditions, temp_n
         Hlid_time *= tower_conds.bottom.flange_total_weight
 
     return Hlidall_heat - Hlid_time
+
+
+class OperationModePhysicsCalculator(ABC):
+    """運転モード別の物理特性計算ベースクラス"""
+
+    @abstractmethod
+    def calculate_adsorption_heat(self, material_output: MaterialBalanceResult, tower_conds: TowerConditions) -> float:
+        """吸着熱計算"""
+        pass
+
+    @abstractmethod
+    def calculate_inlet_gas_mass(self, material_output: MaterialBalanceResult, tower_conds: TowerConditions) -> float:
+        """流入ガス質量計算"""
+        pass
+
+    @abstractmethod
+    def get_gas_specific_heat(self, material_output: MaterialBalanceResult) -> float:
+        """ガス比熱取得"""
+        pass
+
+
+class AdsorptionPhysicsCalculator(OperationModePhysicsCalculator):
+    """吸着モード用の物理特性計算クラス"""
+
+    def calculate_adsorption_heat(self, material_output: MaterialBalanceResult, tower_conds: TowerConditions) -> float:
+        return (
+            material_output.adsorption_state.actual_uptake_volume
+            / 1000
+            / 22.4
+            * tower_conds.feed_gas.co2_molecular_weight
+            * tower_conds.feed_gas.co2_adsorption_heat
+        )
+
+    def calculate_inlet_gas_mass(self, material_output: MaterialBalanceResult, tower_conds: TowerConditions) -> float:
+        return (
+            material_output.inlet_gas.co2_volume / 1000 / 22.4 * tower_conds.feed_gas.co2_molecular_weight
+            + material_output.inlet_gas.n2_volume / 1000 / 22.4 * tower_conds.feed_gas.n2_molecular_weight
+        )
+
+    def get_gas_specific_heat(self, material_output: MaterialBalanceResult) -> float:
+        return material_output.gas_properties.specific_heat
+
+
+class ValveClosedPhysicsCalculator(OperationModePhysicsCalculator):
+    """弁停止モード用の物理特性計算クラス"""
+
+    def calculate_adsorption_heat(self, material_output: MaterialBalanceResult, tower_conds: TowerConditions) -> float:
+        return 0  # 弁停止モードでは0
+
+    def calculate_inlet_gas_mass(self, material_output: MaterialBalanceResult, tower_conds: TowerConditions) -> float:
+        return 0  # 弁停止モードでは0
+
+    def get_gas_specific_heat(self, material_output: MaterialBalanceResult) -> float:
+        return 0  # 弁停止モードでは0
+
+
+class DesorptionPhysicsCalculator(OperationModePhysicsCalculator):
+    """脱着モード用の物理特性計算クラス"""
+
+    def calculate_adsorption_heat(self, material_output: MaterialBalanceResult, tower_conds: TowerConditions) -> float:
+        return (
+            material_output.adsorption_state.actual_uptake_volume
+            / 1000
+            / 22.4
+            * tower_conds.feed_gas.co2_molecular_weight
+            * tower_conds.feed_gas.co2_adsorption_heat
+        )
+
+    def calculate_inlet_gas_mass(self, material_output: MaterialBalanceResult, tower_conds: TowerConditions) -> float:
+        return 0  # 脱着モードでは0
+
+    def get_gas_specific_heat(self, material_output: MaterialBalanceResult) -> float:
+        return material_output.gas_properties.specific_heat
+
+
+def _get_physics_calculator(mode: int) -> OperationModePhysicsCalculator:
+    """モードに応じた物理特性計算クラスを取得"""
+    calculators = {
+        0: AdsorptionPhysicsCalculator(),
+        1: ValveClosedPhysicsCalculator(),
+        2: DesorptionPhysicsCalculator(),
+    }
+    return calculators.get(mode, AdsorptionPhysicsCalculator())
