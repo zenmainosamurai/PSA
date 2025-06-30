@@ -134,8 +134,8 @@ def calc_heat_transfer_coef(
 
     Returns:
         tuple[float, float]:
-            hw1 (float): 壁-層伝熱係数 [W/m2/K]
-            u1 (float): 層伝熱係数 [W/m2/K
+            wall_to_bed_heat_transfer_coef (float): 壁-層伝熱係数 [W/m2/K]
+            bed_heat_transfer_coef (float): 層伝熱係数 [W/m2/K
     """
     tower = state_manager.towers[tower_num]
     stream_conds = tower_conds.stream_conditions
@@ -170,11 +170,11 @@ def calc_heat_transfer_coef(
 
     # NOTE: 気体粘度 μ, 比熱 cp は大気圧を仮定
     P_ATM = 0.101325e6
-    mu = (
+    viscosity = (
         CP.PropsSI("V", "T", T_K, "P", P_ATM, "co2") * mf_co2
         + CP.PropsSI("V", "T", T_K, "P", P_ATM, "nitrogen") * mf_n2
     )
-    Pr = mu * 1000.0 * material_output.gas_properties.specific_heat / kf
+    Pr = viscosity * 1000.0 * material_output.gas_properties.specific_heat / kf
 
     # 流入ガス体積流量 f0
     if mode == 0:
@@ -189,16 +189,16 @@ def calc_heat_transfer_coef(
         f0 = 0.0  # NOTE: この処理で正しいか確認
 
     vcol = f0 / stream_conds[stream].cross_section  # 空塔速度[m/s]
-    nu = mu / material_output.gas_properties.density  # 気体動粘度[m2/s]
+    nu = viscosity / material_output.gas_properties.density  # 気体動粘度[m2/s]
     Rep = 1.0 if vcol == 0 else vcol * dp / nu  # 粒子レイノルズ数
 
     # ---- ke, habs, dlat, hw1_raw -----------------------------------
     ke, habs, dlat, hw1_raw = _axial_flow_correction(ke0, kf, dp, d1, Pr, Rep, epsilon, Lbed, num_sec)
 
     # ---- 壁-層伝熱係数補正 -----------------------------------------
-    hw1 = hw1_raw * tower_conds.vessel.wall_to_bed_htc_correction_factor
+    wall_to_bed_heat_transfer_coef = hw1_raw * tower_conds.vessel.wall_to_bed_htc_correction_factor
 
-    # ---- 層伝熱係数 u1 ---------------------------------------------
-    u1 = 1.0 / (dlat / ke + 1.0 / habs)
+    # ---- 層伝熱係数 bed_heat_transfer_coef ---------------------------------------------
+    bed_heat_transfer_coef = 1.0 / (dlat / ke + 1.0 / habs)
 
-    return hw1, u1
+    return wall_to_bed_heat_transfer_coef, bed_heat_transfer_coef

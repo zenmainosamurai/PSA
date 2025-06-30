@@ -68,8 +68,8 @@ class HeatFlux:
     adsorption: float
     from_inner_boundary: float
     to_outer_boundary: float
-    to_downstream: float
-    from_upstream: float
+    downstream: float
+    upstream: float
 
 
 @dataclass
@@ -96,13 +96,13 @@ class HeatBalanceResult:
         return {
             "temp_reached": self.cell_temperatures.bed_temperature,
             "temp_thermocouple_reached": self.cell_temperatures.thermocouple_temperature,
-            "hw1": self.heat_transfer_coefficients.wall_to_bed,
-            "Hroof": self.heat_flux.from_upstream,
-            "Hbb": self.heat_flux.to_downstream,
-            "Habs": self.heat_flux.adsorption,
-            "Hwin": self.heat_flux.from_inner_boundary,
-            "Hwout": self.heat_flux.to_outer_boundary,
-            "u1": self.heat_transfer_coefficients.bed_to_bed,
+            "wall_to_bed_heat_transfer_coef": self.heat_transfer_coefficients.wall_to_bed,
+            "upstream_heat_flux": self.heat_flux.upstream,
+            "downstream_heat_flux": self.heat_flux.downstream,
+            "adsorption_heat": self.heat_flux.adsorption,
+            "heat_flux_from_inner_boundary": self.heat_flux.from_inner_boundary,
+            "heat_flux_to_outer_boundary": self.heat_flux.to_outer_boundary,
+            "bed_heat_transfer_coef": self.heat_transfer_coefficients.bed_to_bed,
         }
 
 
@@ -325,8 +325,8 @@ class WallHeatFlux:
 
     from_inner_boundary: float
     to_outer_boundary: float
-    to_downstream: float
-    from_upstream: float
+    downstream: float
+    upstream: float
 
 
 @dataclass
@@ -337,10 +337,10 @@ class WallHeatBalanceResult:
     def to_dict(self) -> dict:
         return {
             "temp_reached": self.temperature,
-            "Hbb": self.heat_flux.to_downstream,
-            "Hroof": self.heat_flux.from_upstream,
-            "Hwin": self.heat_flux.from_inner_boundary,
-            "Hwout": self.heat_flux.to_outer_boundary,
+            "downstream_heat_flux": self.heat_flux.downstream,
+            "upstream_heat_flux": self.heat_flux.upstream,
+            "heat_flux_from_inner_boundary": self.heat_flux.from_inner_boundary,
+            "heat_flux_to_outer_boundary": self.heat_flux.to_outer_boundary,
         }
 
 

@@ -520,20 +520,20 @@ def calculate_heat_balance_for_bed(
         temp_below_cell = tower.temp[stream - 1, section]
 
     # 発生する吸着熱[J]
-    Habs = physics_calculator.calculate_adsorption_heat(material_output, tower_conds)
+    adsorption_heat = physics_calculator.calculate_adsorption_heat(material_output, tower_conds)
     # 流入ガス質量[g]
-    Mgas = physics_calculator.calculate_inlet_gas_mass(material_output, tower_conds)
+    inlet_gas_mass = physics_calculator.calculate_inlet_gas_mass(material_output, tower_conds)
     # 流入ガス比熱[J/g/K]
     gas_specific_heat = physics_calculator.get_gas_specific_heat(material_output)
     # 内側境界面積 [m2]
-    Ain = stream_conds[stream].inner_boundary_area / tower_conds.common.num_sections
+    section_inner_boundary_area = stream_conds[stream].inner_boundary_area / tower_conds.common.num_sections
     # 外側境界面積 [m2]
-    Aout = stream_conds[stream].outer_boundary_area / tower_conds.common.num_sections
+    section_outer_boundary_area = stream_conds[stream].outer_boundary_area / tower_conds.common.num_sections
     # 下流セル境界面積 [m2]
     Abb = stream_conds[stream].cross_section
     # 壁-層伝熱係数、層伝熱係数
     if mode == 0:
-        hw1, u1 = _heat_transfer_coef(
+        wall_to_bed_heat_transfer_coef, bed_heat_transfer_coef = _heat_transfer_coef(
             tower_conds,
             stream,
             section,
@@ -544,12 +544,12 @@ def calculate_heat_balance_for_bed(
             material_output,
         )
     elif mode == 1:  # 弁停止モードでは直前値に置換
-        hw1 = tower.heat_t_coef[stream - 1, section - 1]
-        u1 = tower.heat_t_coef_wall[stream - 1, section - 1]
+        wall_to_bed_heat_transfer_coef = tower.heat_t_coef[stream - 1, section - 1]
+        bed_heat_transfer_coef = tower.heat_t_coef_wall[stream - 1, section - 1]
     elif mode == 2:  # 脱着モードでは入力に排気後圧力計算の出力を使用
-        # hw1 = variables["heat_t_coef"][stream][section]
-        # u1 = variables["heat_t_coef_wall"][stream][section]
-        hw1, u1 = _heat_transfer_coef(
+        # wall_to_bed_heat_transfer_coef = variables["heat_t_coef"][stream][section]
+        # bed_heat_transfer_coef = variables["heat_t_coef_wall"][stream][section]
+        wall_to_bed_heat_transfer_coef, bed_heat_transfer_coef = _heat_transfer_coef(
             tower_conds,
             stream,
             section,
@@ -565,38 +565,56 @@ def calculate_heat_balance_for_bed(
 
     # 内側境界からの熱流束 [J]
     if stream == 1:
-        Hwin = 0
+        heat_flux_from_inner_boundary = 0
     else:
-        Hwin = u1 * Ain * (temp_inside_cell - temp_now) * tower_conds.common.calculation_step_time * 60
+        heat_flux_from_inner_boundary = (
+            bed_heat_transfer_coef
+            * section_inner_boundary_area
+            * (temp_inside_cell - temp_now)
+            * tower_conds.common.calculation_step_time
+            * 60
+        )
     # 外側境界への熱流束 [J]
     if stream == tower_conds.common.num_streams:
-        Hwout = hw1 * Aout * (temp_now - temp_outside_cell) * tower_conds.common.calculation_step_time * 60
+        heat_flux_to_outer_boundary = (
+            wall_to_bed_heat_transfer_coef
+            * section_outer_boundary_area
+            * (temp_now - temp_outside_cell)
+            * tower_conds.common.calculation_step_time
+            * 60
+        )
     else:
-        Hwout = u1 * Aout * (temp_now - temp_outside_cell) * tower_conds.common.calculation_step_time * 60
+        heat_flux_to_outer_boundary = (
+            bed_heat_transfer_coef
+            * section_outer_boundary_area
+            * (temp_now - temp_outside_cell)
+            * tower_conds.common.calculation_step_time
+            * 60
+        )
     # 下流セルへの熱流束 [J]
     if section == tower_conds.common.num_sections:
-        Hbb = (  # 下蓋への熱流束
-            hw1
+        downstream_heat_flux = (  # 下蓋への熱流束
+            wall_to_bed_heat_transfer_coef
             * stream_conds[stream].cross_section
             * (temp_now - tower.temp_lid_down)
             * tower_conds.common.calculation_step_time
             * 60
         )
     else:
-        Hbb = (
-            u1 * Abb * (temp_now - temp_below_cell) * tower_conds.common.calculation_step_time * 60
+        downstream_heat_flux = (
+            bed_heat_transfer_coef * Abb * (temp_now - temp_below_cell) * tower_conds.common.calculation_step_time * 60
         )  # 下流セルへの熱流束
     # 上流セルヘの熱流束 [J]
     if section == 1:  # 上蓋からの熱流束
-        Hroof = (
-            hw1
+        upstream_heat_flux = (
+            wall_to_bed_heat_transfer_coef
             * stream_conds[stream].cross_section
             * (temp_now - tower.temp_lid_up)
             * tower_conds.common.calculation_step_time
             * 60
         )
     else:  # 上流セルヘの熱流束 = -1 * 上流セルの「下流セルへの熱流束」
-        Hroof = -heat_output.heat_flux.to_downstream
+        upstream_heat_flux = -heat_output.heat_flux.downstream
 
     ### 到達温度計算 --------------------------------------------------------------
 
@@ -604,13 +622,13 @@ def calculate_heat_balance_for_bed(
     args = {
         "tower_conds": tower_conds,
         "gas_specific_heat": gas_specific_heat,
-        "Mgas": Mgas,
+        "inlet_gas_mass": inlet_gas_mass,
         "temp_now": temp_now,
-        "Habs": Habs,
-        "Hwin": Hwin,
-        "Hwout": Hwout,
-        "Hbb": Hbb,
-        "Hroof": Hroof,
+        "adsorption_heat": adsorption_heat,
+        "heat_flux_from_inner_boundary": heat_flux_from_inner_boundary,
+        "heat_flux_to_outer_boundary": heat_flux_to_outer_boundary,
+        "downstream_heat_flux": downstream_heat_flux,
+        "upstream_heat_flux": upstream_heat_flux,
         "stream": stream,
     }
     temp_reached = optimize.newton(_optimize_bed_temperature, temp_now, args=args.values())
@@ -622,18 +640,18 @@ def calculate_heat_balance_for_bed(
     # 熱電対側面積 [m2]
     S_side = 0.004 * np.pi * 0.1
     # 熱電対伝熱係数 [W/m2/K]
-    heat_transfer = hw1
+    thermocouple_heat_transfer_coef = wall_to_bed_heat_transfer_coef
     # 熱電対熱流束 [W]
     if mode != 2:
         heat_flux = (
-            heat_transfer
+            thermocouple_heat_transfer_coef
             * tower_conds.thermocouple.heat_transfer_correction_factor
             * S_side
             * (tower.temp[stream - 1, section - 1] - tower.temp_thermo[stream - 1, section - 1])
         )
     else:
         heat_flux = (
-            heat_transfer
+            thermocouple_heat_transfer_coef
             * 100
             * S_side
             * (tower.temp[stream - 1, section - 1] - tower.temp_thermo[stream - 1, section - 1])
@@ -647,9 +665,15 @@ def calculate_heat_balance_for_bed(
         bed_temperature=temp_reached,
         thermocouple_temperature=temp_thermocouple_reached,
     )
-    heat_transfer_coefficients = HeatTransferCoefficients(wall_to_bed=hw1, bed_to_bed=u1)
+    heat_transfer_coefficients = HeatTransferCoefficients(
+        wall_to_bed=wall_to_bed_heat_transfer_coef, bed_to_bed=bed_heat_transfer_coef
+    )
     heat_flux = HeatFlux(
-        adsorption=Habs, from_inner_boundary=Hwin, to_outer_boundary=Hwout, to_downstream=Hbb, from_upstream=Hroof
+        adsorption=adsorption_heat,
+        from_inner_boundary=heat_flux_from_inner_boundary,
+        to_outer_boundary=heat_flux_to_outer_boundary,
+        downstream=downstream_heat_flux,
+        upstream=upstream_heat_flux,
     )
     heat_balance_result = HeatBalanceResult(
         cell_temperatures=cell_temperatures,
@@ -692,7 +716,7 @@ def calculate_heat_balance_for_wall(
         temp_below_cell = tower.temp_wall[section]
     # 上流壁への熱流束 [J]
     if section == 1:
-        Hroof = (
+        upstream_heat_flux = (
             tower_conds.vessel.wall_thermal_conductivity
             * stream_conds[3].cross_section
             * (temp_now - tower.temp_lid_up)
@@ -700,9 +724,9 @@ def calculate_heat_balance_for_wall(
             * 60
         )
     else:
-        Hroof = heat_wall_output.heat_flux.to_downstream
+        upstream_heat_flux = heat_wall_output.heat_flux.downstream
     # 内側境界からの熱流束 [J]
-    Hwin = (
+    heat_flux_from_inner_boundary = (
         heat_output.heat_transfer_coefficients.wall_to_bed
         * stream_conds[3].inner_boundary_area
         / tower_conds.common.num_sections
@@ -711,7 +735,7 @@ def calculate_heat_balance_for_wall(
         * 60
     )
     # 外側境界への熱流束 [J]
-    Hwout = (
+    heat_flux_to_outer_boundary = (
         tower_conds.vessel.external_heat_transfer_coef
         * stream_conds[3].outer_boundary_area
         / tower_conds.common.num_sections
@@ -721,7 +745,7 @@ def calculate_heat_balance_for_wall(
     )
     # 下流壁への熱流束 [J]
     if section == tower_conds.common.num_sections:
-        Hbb = (
+        downstream_heat_flux = (
             tower_conds.vessel.wall_thermal_conductivity
             * stream_conds[3].cross_section
             * (temp_now - tower.temp_lid_down)
@@ -729,7 +753,7 @@ def calculate_heat_balance_for_wall(
             * 60
         )
     else:
-        Hbb = (
+        downstream_heat_flux = (
             tower_conds.vessel.wall_thermal_conductivity
             * stream_conds[3].cross_section
             * (temp_now - tower.temp_wall[section])
@@ -738,13 +762,18 @@ def calculate_heat_balance_for_wall(
     args = {
         "tower_conds": tower_conds,
         "temp_now": temp_now,
-        "Hwin": Hwin,
-        "Hwout": Hwout,
-        "Hbb": Hbb,
-        "Hroof": Hroof,
+        "heat_flux_from_inner_boundary": heat_flux_from_inner_boundary,
+        "heat_flux_to_outer_boundary": heat_flux_to_outer_boundary,
+        "downstream_heat_flux": downstream_heat_flux,
+        "upstream_heat_flux": upstream_heat_flux,
     }
     temp_reached = optimize.newton(_optimize_wall_temperature, temp_now, args=args.values())
-    heat_flux = WallHeatFlux(from_inner_boundary=Hwin, to_outer_boundary=Hwout, to_downstream=Hbb, from_upstream=Hroof)
+    heat_flux = WallHeatFlux(
+        from_inner_boundary=heat_flux_from_inner_boundary,
+        to_outer_boundary=heat_flux_to_outer_boundary,
+        downstream=downstream_heat_flux,
+        upstream=upstream_heat_flux,
+    )
     wall_heat_balance_result = WallHeatBalanceResult(temperature=temp_reached, heat_flux=heat_flux)
     return wall_heat_balance_result
 
@@ -771,36 +800,45 @@ def calculate_heat_balance_for_lid(
     # セクション現在温度 [℃]
     temp_now = tower.temp_lid_up if position == "up" else tower.temp_lid_down
     # 外気への熱流束 [J]
-    Hout = (
+    heat_flux_to_ambient = (
         tower_conds.vessel.external_heat_transfer_coef
         * (temp_now - tower_conds.vessel.ambient_temperature)
         * tower_conds.common.calculation_step_time
         * 60
     )
     if position == "up":
-        Hout *= tower_conds.bottom.outer_flange_area
+        heat_flux_to_ambient *= tower_conds.bottom.outer_flange_area
     elif position == "down":
-        Hout *= tower_conds.lid.outer_flange_area
+        heat_flux_to_ambient *= tower_conds.lid.outer_flange_area
     # 底が受け取る熱(熱収支基準)
     if position == "up":
-        stream2_section1_Hroof = heat_output.get_result(2, 1).heat_flux.from_upstream
-        stream1_section1_Hroof = heat_output.get_result(1, 1).heat_flux.from_upstream
-        wall_section1_Hroof = heat_wall_output[1].heat_flux.from_upstream
-        Hlidall_heat = stream2_section1_Hroof - stream1_section1_Hroof - Hout - wall_section1_Hroof
+        stream2_section1_upstream_heat_flux = heat_output.get_result(2, 1).heat_flux.upstream
+        stream1_section1_upstream_heat_flux = heat_output.get_result(1, 1).heat_flux.upstream
+        wall_section1_upstream_heat_flux = heat_wall_output[1].heat_flux.upstream
+        net_heat_input = (
+            stream2_section1_upstream_heat_flux
+            - stream1_section1_upstream_heat_flux
+            - heat_flux_to_ambient
+            - wall_section1_upstream_heat_flux
+        )
     else:
-        stream2_lastsection_Hroof = heat_output.get_result(2, tower_conds.common.num_sections).heat_flux.from_upstream
-        stream1_lastsection_Hroof = heat_output.get_result(1, tower_conds.common.num_sections).heat_flux.from_upstream
-        Hlidall_heat = (
-            stream2_lastsection_Hroof
-            - stream1_lastsection_Hroof
-            - Hout
-            - heat_wall_output[tower_conds.common.num_sections].heat_flux.to_downstream
+        stream2_lastsection_upstream_heat_flux = heat_output.get_result(
+            2, tower_conds.common.num_sections
+        ).heat_flux.upstream
+        stream1_lastsection_upstream_heat_flux = heat_output.get_result(
+            1, tower_conds.common.num_sections
+        ).heat_flux.upstream
+        net_heat_input = (
+            stream2_lastsection_upstream_heat_flux
+            - stream1_lastsection_upstream_heat_flux
+            - heat_flux_to_ambient
+            - heat_wall_output[tower_conds.common.num_sections].heat_flux.downstream
         )
     # セクション到達温度 [℃]
     args = {
         "tower_conds": tower_conds,
         "temp_now": temp_now,
-        "Hlidall_heat": Hlidall_heat,
+        "net_heat_input": net_heat_input,
         "position": position,
     }
     temp_reached = optimize.newton(_optimize_lid_temperature, temp_now, args=args.values())
@@ -836,7 +874,7 @@ def calculate_pressure_after_vacuum_pumping(
     # 全圧 [PaA]
     P = tower.total_press * 1e6  # [MPaA]→[Pa]
     # 平均co2分率
-    _mean_mf_co2 = np.mean(
+    average_co2_mole_fraction = np.mean(
         [
             tower.mf_co2[stream - 1, section - 1]
             for stream in range(1, 1 + tower_conds.common.num_streams)
@@ -844,7 +882,7 @@ def calculate_pressure_after_vacuum_pumping(
         ]
     )
     # 平均n2分率
-    _mean_mf_n2 = np.mean(
+    average_n2_mole_fraction = np.mean(
         [
             tower.mf_n2[stream - 1, section - 1]
             for stream in range(1, 1 + tower_conds.common.num_streams)
@@ -854,24 +892,24 @@ def calculate_pressure_after_vacuum_pumping(
     # 真空ポンプ排気ガス粘度 [Pa・s]
     # NOTE: 比熱と熱伝導率と粘度は大気圧を使用
     P_ATM = 0.101325 * 1e6
-    mu = (
-        CP.PropsSI("V", "T", T_K, "P", P_ATM, "co2") * _mean_mf_co2
-        + CP.PropsSI("V", "T", T_K, "P", P_ATM, "nitrogen") * _mean_mf_n2
+    viscosity = (
+        CP.PropsSI("V", "T", T_K, "P", P_ATM, "co2") * average_co2_mole_fraction
+        + CP.PropsSI("V", "T", T_K, "P", P_ATM, "nitrogen") * average_n2_mole_fraction
     )
     # 真空ポンプ排気ガス密度 [kg/m3]
     rho = (
-        CP.PropsSI("D", "T", T_K, "P", P, "co2") * _mean_mf_co2
-        + CP.PropsSI("D", "T", T_K, "P", P, "nitrogen") * _mean_mf_n2
+        CP.PropsSI("D", "T", T_K, "P", P, "co2") * average_co2_mole_fraction
+        + CP.PropsSI("D", "T", T_K, "P", P, "nitrogen") * average_n2_mole_fraction
     )
 
     ### 圧損計算 --------------------------------------
     _max_iteration = 1000
-    P_resist = 0
+    pressure_loss = 0
     tolerance = 1e-6
     for iter in range(_max_iteration):
-        P_resist_old = P_resist
+        pressure_loss_old = pressure_loss
         # ポンプ見せかけの全圧 [PaA]
-        P_PUMP = (tower.total_press - P_resist) * 1e6
+        P_PUMP = (tower.total_press - pressure_loss) * 1e6
         P_PUMP = max(0, P_PUMP)
         # 真空ポンプ排気速度 [m3/min]
         vacuum_rate = 25 * (tower_conds.vacuum_piping.diameter**4) * P_PUMP / 2
@@ -880,11 +918,11 @@ def calculate_pressure_after_vacuum_pumping(
         # 真空ポンプ排気線流速 [m/3]
         linear_velocity = vacuum_rate / tower_conds.vacuum_piping.cross_section
         # 真空ポンプ排気レイノルズ数
-        Re = rho * linear_velocity * tower_conds.vacuum_piping.diameter / mu
+        Re = rho * linear_velocity * tower_conds.vacuum_piping.diameter / viscosity
         # 真空ポンプ排気管摩擦係数
         lambda_f = 64 / Re if Re != 0 else 0
         # 均圧配管圧力損失 [MPaA]
-        P_resist = (
+        pressure_loss = (
             lambda_f
             * tower_conds.vacuum_piping.length
             / tower_conds.vacuum_piping.diameter
@@ -892,52 +930,50 @@ def calculate_pressure_after_vacuum_pumping(
             / (2 * 9.81)
         ) * 1e-6
         # 収束判定
-        if np.abs(P_resist - P_resist_old) < tolerance:
+        if np.abs(pressure_loss - pressure_loss_old) < tolerance:
             break
-        if pd.isna(P_resist):
+        if pd.isna(pressure_loss):
             break
     if iter == _max_iteration - 1:
-        print("収束せず: 見せかけの全圧 =", np.abs(P_resist - P_resist_old))
+        print("収束せず: 見せかけの全圧 =", np.abs(pressure_loss - pressure_loss_old))
 
     ### CO2回収濃度計算 --------------------------------------
     # 排気速度 [mol/min]
     vacuum_rate_mol = 101325 * vacuum_rate_N / 8.314 / T_K
     # 排気量 [mol]
-    vacuum_amt = vacuum_rate_mol * tower_conds.common.calculation_step_time
+    moles_pumped = vacuum_rate_mol * tower_conds.common.calculation_step_time
     # 排気CO2量 [mol]
-    vacuum_amt_co2 = vacuum_amt * _mean_mf_co2
+    vacuum_amt_co2 = moles_pumped * average_co2_mole_fraction
     # 排気N2量 [mol]
-    vacuum_amt_n2 = vacuum_amt * _mean_mf_n2
+    vacuum_amt_n2 = moles_pumped * average_n2_mole_fraction
     # 積算排気CO2量 [mol]
-    accum_vacuum_amt_co2 = tower.vacuum_amt_co2 + vacuum_amt_co2
+    total_co2_recovered = tower.vacuum_amt_co2 + vacuum_amt_co2
     # 積算排気N2量 [mol]
-    accum_vacuum_amt_n2 = tower.vacuum_amt_n2 + vacuum_amt_n2
+    total_n2_recovered = tower.vacuum_amt_n2 + vacuum_amt_n2
     # CO2回収濃度 [%]
-    vacuum_co2_mf = (accum_vacuum_amt_co2 / (accum_vacuum_amt_co2 + accum_vacuum_amt_n2)) * 100
+    co2_recovery_concentration = (total_co2_recovered / (total_co2_recovered + total_n2_recovered)) * 100
 
     ### 排気後圧力計算 --------------------------------
     # 排気"前"の真空排気空間の現在物質量 [mol]
     case_inner_mol_amt = (
         # P_PUMP * tower_conds.vacuum_piping["space_volume"]
-        (P_PUMP + P_resist * 1e6)
+        (P_PUMP + pressure_loss * 1e6)
         * tower_conds.vacuum_piping.space_volume
         / 8.314
         / T_K
     )
     # 排気"後"の現在物質量 [mol]
-    case_inner_mol_amt_after_vacuum = max(0, case_inner_mol_amt - vacuum_amt)
+    remaining_moles = max(0, case_inner_mol_amt - moles_pumped)
     # 排気"後"の容器内部圧力 [MPaA]
-    total_press_after_vacuum = (
-        case_inner_mol_amt_after_vacuum * 8.314 * T_K / tower_conds.vacuum_piping.space_volume * 1e-6
-    )
+    final_pressure = remaining_moles * 8.314 * T_K / tower_conds.vacuum_piping.space_volume * 1e-6
     vacuum_pumping_result = VacuumPumpingResult(
-        pressure_loss=P_resist,
-        total_co2_recovered=accum_vacuum_amt_co2,
-        total_n2_recovered=accum_vacuum_amt_n2,
-        co2_recovery_concentration=vacuum_co2_mf,
+        pressure_loss=pressure_loss,
+        total_co2_recovered=total_co2_recovered,
+        total_n2_recovered=total_n2_recovered,
+        co2_recovery_concentration=co2_recovery_concentration,
         volumetric_flow_rate=vacuum_rate_N,
-        remaining_moles=case_inner_mol_amt_after_vacuum,
-        final_pressure=total_press_after_vacuum,
+        remaining_moles=remaining_moles,
+        final_pressure=final_pressure,
     )
 
     return vacuum_pumping_result
@@ -971,7 +1007,7 @@ def calculate_pressure_after_depressurization(
     # 全圧 [PaA]
     P = tower.total_press * 1e6  # [MPaA]→[Pa]
     # 平均co2分率
-    _mean_mf_co2 = np.mean(
+    average_co2_mole_fraction = np.mean(
         [
             tower.mf_co2[stream - 1, section - 1]
             for stream in range(1, 1 + tower_conds.common.num_streams)
@@ -979,7 +1015,7 @@ def calculate_pressure_after_depressurization(
         ]
     )
     # 平均n2分率
-    _mean_mf_n2 = np.mean(
+    average_n2_mole_fraction = np.mean(
         [
             tower.mf_n2[stream - 1, section - 1]
             for stream in range(1, 1 + tower_conds.common.num_streams)
@@ -989,34 +1025,36 @@ def calculate_pressure_after_depressurization(
     # 上流均圧管ガス粘度 [Pa・s]
     # NOTE: 比熱と熱伝導率と粘度は大気圧を使用
     P_ATM = 0.101325 * 1e6
-    mu = (
-        CP.PropsSI("V", "T", T_K, "P", P_ATM, "co2") * _mean_mf_co2
-        + CP.PropsSI("V", "T", T_K, "P", P_ATM, "nitrogen") * _mean_mf_n2
+    viscosity = (
+        CP.PropsSI("V", "T", T_K, "P", P_ATM, "co2") * average_co2_mole_fraction
+        + CP.PropsSI("V", "T", T_K, "P", P_ATM, "nitrogen") * average_n2_mole_fraction
     )
     # 上流均圧管ガス密度 [kg/m3]
     rho = (
-        CP.PropsSI("D", "T", T_K, "P", P, "co2") * _mean_mf_co2
-        + CP.PropsSI("D", "T", T_K, "P", P, "nitrogen") * _mean_mf_n2
+        CP.PropsSI("D", "T", T_K, "P", P, "co2") * average_co2_mole_fraction
+        + CP.PropsSI("D", "T", T_K, "P", P, "nitrogen") * average_n2_mole_fraction
     )
     # 上流均圧配管圧力損失 [MPaA]
     _max_iteration = 1000
-    P_resist = 0
+    pressure_loss = 0
     tolerance = 1e-6
     for iter in range(_max_iteration):
-        P_resist_old = P_resist
+        pressure_loss_old = pressure_loss
         # 塔間の圧力差 [PaA]
-        dP = (tower.total_press - downstream_tower_pressure - P_resist) * 1e6
+        dP = (tower.total_press - downstream_tower_pressure - pressure_loss) * 1e6
         if np.abs(dP) < 1:
             dP = 0
         # 配管流速 [m/s]
-        flow_rate = dP * tower_conds.equalizing_piping.diameter**2 / (32 * mu * tower_conds.equalizing_piping.length)
+        flow_rate = (
+            dP * tower_conds.equalizing_piping.diameter**2 / (32 * viscosity * tower_conds.equalizing_piping.length)
+        )
         flow_rate = max(1e-8, flow_rate)
         # 均圧管レイノルズ数
-        Re = rho * abs(flow_rate) * tower_conds.equalizing_piping.diameter / mu
+        Re = rho * abs(flow_rate) * tower_conds.equalizing_piping.diameter / viscosity
         # 管摩擦係数
         lambda_f = 64 / Re if Re != 0 else 0
         # 均圧配管圧力損失 [MPaA]
-        P_resist = (
+        pressure_loss = (
             lambda_f
             * tower_conds.equalizing_piping.length
             / tower_conds.equalizing_piping.diameter
@@ -1024,14 +1062,14 @@ def calculate_pressure_after_depressurization(
             / (2 * 9.81)
         ) * 1e-6
         # 収束判定
-        if np.abs(P_resist - P_resist_old) < tolerance:
+        if np.abs(pressure_loss - pressure_loss_old) < tolerance:
             break
-        if pd.isna(P_resist):
+        if pd.isna(pressure_loss):
             break
     if iter == _max_iteration - 1:
-        print("収束せず: 圧力差 =", np.abs(P_resist - P_resist_old))
+        print("収束せず: 圧力差 =", np.abs(pressure_loss - pressure_loss_old))
     # 均圧配管流量 [m3/min]
-    flow_amount_m3 = (
+    volumetric_flow_rate = (
         tower_conds.equalizing_piping.cross_section
         * flow_rate
         / 60
@@ -1039,21 +1077,21 @@ def calculate_pressure_after_depressurization(
         * 5
     )
     # 均圧配管ノルマル流量 [m3/min]
-    flow_amount_m3_N = flow_amount_m3 * tower.total_press / 0.1013
+    standard_flow_rate = volumetric_flow_rate * tower.total_press / 0.1013
     # 均圧配管流量 [L/min] (下流塔への入力)
-    flow_amount_l = flow_amount_m3_N * 1e3
+    flow_rate = standard_flow_rate * 1e3
 
     ### 次時刻の圧力計算 ----------------------------------------
     # 容器上流空間を移動する物質量 [mol]
-    mw_upper_space = flow_amount_m3_N * 1000 * tower_conds.common.calculation_step_time / 22.4
+    mw_upper_space = standard_flow_rate * 1000 * tower_conds.common.calculation_step_time / 22.4
     # 上流側の合計体積 [m3]
     V_upper_tower = tower_conds.packed_bed.vessel_internal_void_volume + tower_conds.packed_bed.void_volume
     # 上流容器圧力変化 [MPaA]
     dP_upper = 8.314 * T_K / V_upper_tower * mw_upper_space * 1e-6
     # 次時刻の容器圧力 [MPaA]
-    total_press_after_depressure = tower.total_press - dP_upper
+    final_pressure = tower.total_press - dP_upper
     depressurization_result = DepressurizationResult(
-        final_pressure=total_press_after_depressure, flow_rate=flow_amount_l, pressure_differential=dP
+        final_pressure=final_pressure, flow_rate=flow_rate, pressure_differential=dP
     )
 
     return depressurization_result
@@ -1267,13 +1305,13 @@ def _optimize_bed_temperature(
     temp_reached,
     tower_conds: TowerConditions,
     gas_specific_heat,
-    Mgas,
+    inlet_gas_mass,
     temp_now,
-    Habs,
-    Hwin,
-    Hwout,
-    Hbb,
-    Hroof,
+    adsorption_heat,
+    heat_flux_from_inner_boundary,
+    heat_flux_to_outer_boundary,
+    downstream_heat_flux,
+    upstream_heat_flux,
     stream,
 ):
     """セクション到達温度算出におけるソルバー用関数
@@ -1288,7 +1326,7 @@ def _optimize_bed_temperature(
     stream_conds = tower_conds.stream_conditions
 
     # 流入ガスが受け取る熱 [J]
-    Hgas = gas_specific_heat * Mgas * (temp_reached - temp_now)
+    Hgas = gas_specific_heat * inlet_gas_mass * (temp_reached - temp_now)
     # 充填層が受け取る熱(ΔT基準) [J]
     Hbed_time = (
         tower_conds.packed_bed.heat_capacity
@@ -1297,7 +1335,14 @@ def _optimize_bed_temperature(
         * (temp_reached - temp_now)
     )
     # 充填層が受け取る熱(熱収支基準) [J]
-    Hbed_heat_blc = Habs - Hgas + Hwin - Hwout - Hbb - Hroof
+    Hbed_heat_blc = (
+        adsorption_heat
+        - Hgas
+        + heat_flux_from_inner_boundary
+        - heat_flux_to_outer_boundary
+        - downstream_heat_flux
+        - upstream_heat_flux
+    )
     return Hbed_heat_blc - Hbed_time
 
 
@@ -1305,10 +1350,10 @@ def _optimize_wall_temperature(
     temp_reached,
     tower_conds: TowerConditions,
     temp_now,
-    Hwin,
-    Hwout,
-    Hbb,
-    Hroof,
+    heat_flux_from_inner_boundary,
+    heat_flux_to_outer_boundary,
+    downstream_heat_flux,
+    upstream_heat_flux,
 ):
     stream_conds = tower_conds.stream_conditions
     """壁面の到達温度算出におけるソルバー用関数
@@ -1321,7 +1366,9 @@ def _optimize_wall_temperature(
         float: 充填層が受け取る熱の熱収支基準と時間基準の差分
     """
     # 壁が受け取る熱(熱収支基準) [J]
-    Hwall_heat_blc = Hwin - Hroof - Hwout - Hbb
+    Hwall_heat_blc = (
+        heat_flux_from_inner_boundary - upstream_heat_flux - heat_flux_to_outer_boundary - downstream_heat_flux
+    )
     # 壁が受け取る熱(ΔT基準) [J]
     Hwall_time = (
         tower_conds.vessel.wall_specific_heat_capacity
@@ -1332,7 +1379,7 @@ def _optimize_wall_temperature(
     return Hwall_heat_blc - Hwall_time
 
 
-def _optimize_lid_temperature(temp_reached, tower_conds: TowerConditions, temp_now, Hlidall_heat, position):
+def _optimize_lid_temperature(temp_reached, tower_conds: TowerConditions, temp_now, net_heat_input, position):
     """上下蓋の到達温度算出におけるソルバー用関数
 
     Args:
@@ -1349,7 +1396,7 @@ def _optimize_lid_temperature(temp_reached, tower_conds: TowerConditions, temp_n
     else:
         Hlid_time *= tower_conds.bottom.flange_total_weight
 
-    return Hlidall_heat - Hlid_time
+    return net_heat_input - Hlid_time
 
 
 class OperationModePhysicsCalculator(ABC):
