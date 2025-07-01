@@ -33,8 +33,8 @@ class TowerStateArrays:
     temp_lid_up: float  # 上蓋温度
     temp_lid_down: float  # 下蓋温度
     total_press: float  # 全圧
-    vacuum_amt_co2: float  # CO2回収量
-    vacuum_amt_n2: float  # N2回収量
+    cumulative_co2_recovered: float  # 積算CO2回収量[Nm3]
+    cumulative_n2_recovered: float  # 積算N2回収量[Nm3]
 
 
 class StateVariables:
@@ -95,8 +95,8 @@ class StateVariables:
             temp_lid_up=ambient_temperature,
             temp_lid_down=ambient_temperature,
             total_press=total_press_init,
-            vacuum_amt_co2=0.0,
-            vacuum_amt_n2=0.0,
+            cumulative_co2_recovered=0.0,
+            cumulative_n2_recovered=0.0,
         )
 
     def get_tower(self, tower_num: int) -> TowerStateArrays:
@@ -179,11 +179,11 @@ class StateVariables:
         # 回収量の更新
         if mode == "真空脱着":
             accum_vacuum_amt: VacuumPumpingResult = calc_output["accum_vacuum_amt"]
-            tower.vacuum_amt_co2 = accum_vacuum_amt.total_co2_recovered
-            tower.vacuum_amt_n2 = accum_vacuum_amt.total_n2_recovered
+            tower.cumulative_co2_recovered = accum_vacuum_amt.cumulative_co2_recovered
+            tower.cumulative_n2_recovered = accum_vacuum_amt.cumulative_n2_recovered
         else:
-            tower.vacuum_amt_co2 = 0.0
-            tower.vacuum_amt_n2 = 0.0
+            tower.cumulative_co2_recovered = 0.0
+            tower.cumulative_n2_recovered = 0.0
 
     def get_mean_temp(self, tower_num: int) -> float:
         """塔の平均温度を効率的に計算"""

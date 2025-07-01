@@ -942,16 +942,17 @@ def calculate_pressure_after_vacuum_pumping(
     vacuum_rate_mol = 101325 * vacuum_rate_N / 8.314 / T_K
     # 排気量 [mol]
     moles_pumped = vacuum_rate_mol * tower_conds.common.calculation_step_time
-    # 排気CO2量 [mol]
-    vacuum_amt_co2 = moles_pumped * average_co2_mole_fraction
-    # 排気N2量 [mol]
-    vacuum_amt_n2 = moles_pumped * average_n2_mole_fraction
-    # 積算排気CO2量 [mol]
-    total_co2_recovered = tower.vacuum_amt_co2 + vacuum_amt_co2
-    # 積算排気N2量 [mol]
-    total_n2_recovered = tower.vacuum_amt_n2 + vacuum_amt_n2
-    # CO2回収濃度 [%]
-    co2_recovery_concentration = (total_co2_recovered / (total_co2_recovered + total_n2_recovered)) * 100
+    # 回収量 [mol]
+    cumulative_co2_recovered_mol = moles_pumped * average_co2_mole_fraction
+    cumulative_n2_recovered_mol = moles_pumped * average_n2_mole_fraction
+    # 回収量[Nm3]
+    cumulative_co2_recovered = cumulative_co2_recovered_mol * 0.0224
+    cumulative_n2_recovered = cumulative_n2_recovered_mol * 0.0224
+    # 累積回収量[Nm3]
+    cumulative_co2_recovered = tower.cumulative_co2_recovered + cumulative_co2_recovered
+    cumulative_n2_recovered = tower.cumulative_n2_recovered + cumulative_n2_recovered
+    # 積算排気CO2量 [Nm3]
+    co2_recovery_concentration = (cumulative_co2_recovered / (cumulative_co2_recovered + cumulative_n2_recovered)) * 100
 
     ### 排気後圧力計算 --------------------------------
     # 排気"前"の真空排気空間の現在物質量 [mol]
@@ -968,8 +969,8 @@ def calculate_pressure_after_vacuum_pumping(
     final_pressure = remaining_moles * 8.314 * T_K / tower_conds.vacuum_piping.space_volume * 1e-6
     vacuum_pumping_result = VacuumPumpingResult(
         pressure_loss=pressure_loss,
-        total_co2_recovered=total_co2_recovered,
-        total_n2_recovered=total_n2_recovered,
+        cumulative_co2_recovered=cumulative_co2_recovered,
+        cumulative_n2_recovered=cumulative_n2_recovered,
         co2_recovery_concentration=co2_recovery_concentration,
         volumetric_flow_rate=vacuum_rate_N,
         remaining_moles=remaining_moles,

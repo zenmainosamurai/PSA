@@ -227,7 +227,7 @@ def plot_csv_outputs(tgt_foldapath, df_obs, tgt_sections, tower_num, timestamp, 
                 linestyle=linestyle_dict[section],
                 c=color_dict[stream],
             )
-        plt.title(_tgt_name.split("_")[-1] + "モル分率")
+        plt.title(_tgt_name.split("_")[0] + "モル分率")
         plt.legend()
         plt.grid()
         plt.xlabel("timestamp")
@@ -245,8 +245,8 @@ def plot_csv_outputs(tgt_foldapath, df_obs, tgt_sections, tower_num, timestamp, 
         plt_cell += 1
 
     # 3. CO2,N2回収量
-    title_list = ["CO2回収量 [mol]", "N2回収量 [mol]", "CO2回収率 [%]"]
-    for i, _tgt_name in enumerate(["vacuum_amt_co2", "vacuum_amt_n2", "vacuum_rate_co2"]):
+    title_list = ["CO2回収量 [Nm3]", "N2回収量 [Nm3]", "CO2回収率 [%]"]
+    for i, _tgt_name in enumerate(["cumulative_co2_recovered", "cumulative_n2_recovered", "vacuum_rate_co2"]):
         filename = tgt_foldapath + f"/csv/tower_{tower_num}/others/vacuum_amount.csv"
         df = pd.read_csv(filename, index_col="timestamp")
         plt.subplot(3, 2, plt_cell)
@@ -350,21 +350,24 @@ def outputs_to_csv(tgt_foldapath, record_dict, common_conds: CommonConditions):
     for i in range(len(record_dict[tgt_name])):
         try:
             _vacuum_rate_co2 = (
-                record_dict[tgt_name][i]["vacuum_amt_co2"]
-                / (record_dict[tgt_name][i]["vacuum_amt_co2"] + record_dict[tgt_name][i]["vacuum_amt_n2"])
+                record_dict[tgt_name][i]["cumulative_co2_recovered"]
+                / (
+                    record_dict[tgt_name][i]["cumulative_co2_recovered"]
+                    + record_dict[tgt_name][i]["cumulative_n2_recovered"]
+                )
             ) * 100
         except ZeroDivisionError:
             _vacuum_rate_co2 = 0
         values.append(
             [
                 _vacuum_rate_co2,
-                record_dict[tgt_name][i]["vacuum_amt_co2"],
-                record_dict[tgt_name][i]["vacuum_amt_n2"],
+                record_dict[tgt_name][i]["cumulative_co2_recovered"],
+                record_dict[tgt_name][i]["cumulative_n2_recovered"],
             ]
         )
     df = pd.DataFrame(
         values,
-        columns=["vacuum_rate_co2", "vacuum_amt_co2", "vacuum_amt_n2"],
+        columns=["vacuum_rate_co2", "cumulative_co2_recovered", "cumulative_n2_recovered"],
         index=record_dict["timestamp"],
     )
     df.index.name = "timestamp"

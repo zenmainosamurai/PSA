@@ -7,7 +7,6 @@ from typing import Dict, List, Optional, Any
 import numpy as np
 import pandas as pd
 from logging import getLogger
-from typing import Dict, List
 
 from utils import const, plot_csv, other_utils
 import operation_models
@@ -502,8 +501,8 @@ class GasAdosorptionBreakthroughsimulator:
             "total_pressure": tower.total_press,
             "co2_mole_fraction": tower.mf_co2.copy(),
             "n2_mole_fraction": tower.mf_n2.copy(),
-            "vacuum_amt_co2": tower.vacuum_amt_co2,
-            "vacuum_amt_n2": tower.vacuum_amt_n2,
+            "cumulative_co2_recovered": tower.cumulative_co2_recovered,
+            "cumulative_n2_recovered": tower.cumulative_n2_recovered,
         }
 
         return other_outputs, calc_output
@@ -545,6 +544,11 @@ class GasAdosorptionBreakthroughsimulator:
         """計算結果の出力処理"""
         self.logger.info("(2/3) csv output...")
 
+        # cm³からNm³への単位変換を適用
+        self.logger.info("Converting cm³ to Nm³ for gas flow rates (inlet/outlet CO2 and N2 volumes)...")
+        self._apply_unit_conversion_to_record_dict(record_dict)
+        self.logger.info("Unit conversion completed.")
+
         for tower_num in range(1, 1 + self.num_tower):
             _tgt_foldapath = output_folderpath + f"/csv/tower_{tower_num}/"
             os.makedirs(_tgt_foldapath, exist_ok=True)
@@ -565,3 +569,103 @@ class GasAdosorptionBreakthroughsimulator:
                 timestamp=timestamp,
                 df_p_end=self.df_operation,
             )
+
+    def _convert_cm3_to_nm3(self, volume_cm3: float, pressure_mpa: float, temperature_k: float) -> float:
+        """
+        cm³からNm³（標準状態での体積）に変換する
+
+        Args:
+            volume_cm3 (float): 体積 [cm³]
+            pressure_mpa (float): 圧力 [MPa]
+            temperature_k (float): 温度 [K]
+
+        Returns:
+            float: 標準状態での体積 [Nm³]
+        """
+        STANDARD_PRESSURE_PA = 101325  # Pa (1 atm)
+        STANDARD_TEMPERATURE_K = 273.15  # K (0℃)
+
+        pressure_pa = pressure_mpa * 1e6
+        volume_nm3 = volume_cm3 * (pressure_pa / STANDARD_PRESSURE_PA) * (STANDARD_TEMPERATURE_K / temperature_k)
+
+        return volume_nm3 * 1e-6
+
+    def _apply_unit_conversion_to_record_dict(self, record_dict: dict) -> None:
+        """
+        記録されたデータに対して単位変換を適用する
+        - cm³ → Nm³ の変換を対象フィールドに適用
+        - 各stream/sectionの実際の温度・圧力条件を使用
+
+        Args:
+            record_dict: シミュレーション結果の記録辞書
+        """
+        self.logger.info("Starting unit conversion (cm³ → Nm³) for gas flow rates...")
+
+        for tower_num in range(1, self.num_tower + 1):
+            if tower_num not in record_dict:
+                continue
+
+            for i, timestamp in enumerate(record_dict[tower_num]["timestamp"]):
+                try:
+                    tower_pressure_mpa = record_dict[tower_num]["others"][i]["total_pressure"]
+                except (KeyError, IndexError, TypeError) as e:
+                    self.logger.warning(
+                        f"Unable to get pressure data for unit conversion at tower {tower_num}, time {i}: {e}"
+                    )
+                    continue
+
+                if (
+                    "material" in record_dict[tower_num]
+                    and "heat" in record_dict[tower_num]
+                    and i < len(record_dict[tower_num]["material"])
+                    and i < len(record_dict[tower_num]["heat"])
+                ):
+
+                    material_data = record_dict[tower_num]["material"][i]
+                    heat_data = record_dict[tower_num]["heat"][i]
+
+                    for stream in range(1, self.num_str + 1):
+                        for section in range(1, self.num_sec + 1):
+                            try:
+                                material_result = material_data.get_result(stream, section)
+                                heat_result = heat_data.get_result(stream, section)
+
+                                # 温度: 各セルの到達温度 [℃] → [K]
+                                temperature_k = heat_result.cell_temperatures.bed_temperature + 273.15
+                                # 圧力: 塔の全圧 [MPa]
+                                pressure_mpa = tower_pressure_mpa
+
+                                # 流入CO2流量の変換 [cm³] → [Nm³]
+                                if hasattr(material_result.inlet_gas, "co2_volume"):
+                                    original_value = material_result.inlet_gas.co2_volume
+                                    material_result.inlet_gas.co2_volume = self._convert_cm3_to_nm3(
+                                        original_value, pressure_mpa, temperature_k
+                                    )
+
+                                # 流入N2流量の変換 [cm³] → [Nm³]
+                                if hasattr(material_result.inlet_gas, "n2_volume"):
+                                    original_value = material_result.inlet_gas.n2_volume
+                                    material_result.inlet_gas.n2_volume = self._convert_cm3_to_nm3(
+                                        original_value, pressure_mpa, temperature_k
+                                    )
+
+                                # 下流流出CO2流量の変換 [cm³] → [Nm³]
+                                if hasattr(material_result.outlet_gas, "co2_volume"):
+                                    original_value = material_result.outlet_gas.co2_volume
+                                    material_result.outlet_gas.co2_volume = self._convert_cm3_to_nm3(
+                                        original_value, pressure_mpa, temperature_k
+                                    )
+
+                                # 下流流出N2流量の変換 [cm³] → [Nm³]
+                                if hasattr(material_result.outlet_gas, "n2_volume"):
+                                    original_value = material_result.outlet_gas.n2_volume
+                                    material_result.outlet_gas.n2_volume = self._convert_cm3_to_nm3(
+                                        original_value, pressure_mpa, temperature_k
+                                    )
+
+                            except (AttributeError, IndexError, KeyError) as e:
+                                self.logger.debug(
+                                    f"Skipping unit conversion for tower {tower_num}, stream {stream}, "
+                                    f"section {section}, time {i}: {e}"
+                                )
+                                continue

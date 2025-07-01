@@ -427,8 +427,8 @@ class Assimilator:
             i += 1
         # 10. CO2,N2回収量
         for _tower_num in range(1, 1 + self.num_tower):
-            middle_vars[_tower_num]["vacuum_amt_co2"] = s_bfr[i]
-            middle_vars[_tower_num]["vacuum_amt_n2"] = s_bfr[i]
+            middle_vars[_tower_num]["cumulative_co2_recovered"] = s_bfr[i]
+            middle_vars[_tower_num]["cumulative_n2_recovered"] = s_bfr[i]
             i += 1
 
         return middle_vars
@@ -492,8 +492,8 @@ class Assimilator:
             s.append(middle_vars[_tower_num]["total_pressure"])
         # 10. CO2,N2回収量
         for _tower_num in range(1, 1 + self.num_tower):
-            s.append(middle_vars[_tower_num]["vacuum_amt_co2"])
-            s.append(middle_vars[_tower_num]["vacuum_amt_n2"])
+            s.append(middle_vars[_tower_num]["cumulative_co2_recovered"])
+            s.append(middle_vars[_tower_num]["cumulative_n2_recovered"])
 
         s = np.array(s)
 

@@ -1,5 +1,6 @@
 import os
 import pandas as pd
+import numpy as np
 from pathlib import Path
 
 
@@ -69,20 +70,114 @@ def compare_csv_files(dir1, dir2):
                 # 形状が同じ場合は詳細な差分をチェック
                 if df1.shape == df2.shape:
                     # 列名の比較
-                    if not df1.columns.equals(df2.columns):
-                        print(f"   列名が異なります")
+                    column_names_match = df1.columns.equals(df2.columns)
+                    if not column_names_match:
+                        print(f"   列名が異なりますが、位置で比較します")
                         # print(f"   ディレクトリ1の列: {list(df1.columns)}")
                         # print(f"   ディレクトリ2の列: {list(df2.columns)}")
-                    # else:
-                    # 値の違いを確認
-                    diff_mask = df1 != df2
-                    if diff_mask.any().any():
-                        print(f"   値が異なる箇所があります")
-                        # 最初の数行の差分を表示
-                        for col in df1.columns:
-                            if diff_mask[col].any():
-                                diff_rows = diff_mask[col].sum()
-                                print(f"   列'{col}': {diff_rows}行で差分あり")
+
+                    # 数値データの比較（位置ベース）
+                    print(f"   数値的な比較結果:")
+
+                    # df1の数値列のインデックスを取得
+                    numeric_cols1 = df1.select_dtypes(include=[np.number]).columns
+                    numeric_cols2 = df2.select_dtypes(include=[np.number]).columns
+
+                    # 数値列の位置を取得
+                    numeric_positions1 = [df1.columns.get_loc(col) for col in numeric_cols1]
+                    numeric_positions2 = [df2.columns.get_loc(col) for col in numeric_cols2]
+
+                    # 共通する位置の数値列を比較
+                    common_numeric_positions = set(numeric_positions1) & set(numeric_positions2)
+
+                    if len(common_numeric_positions) > 0:
+                        # 各位置ごとに数値比較
+                        for pos in sorted(common_numeric_positions):
+                            col1_name = df1.columns[pos]
+                            col2_name = df2.columns[pos]
+
+                            try:
+                                # 位置ベースで列データを取得
+                                col1_data = df1.iloc[:, pos]
+                                col2_data = df2.iloc[:, pos]
+
+                                # NaNを含む場合の処理
+                                mask1 = pd.notna(col1_data)
+                                mask2 = pd.notna(col2_data)
+
+                                # 両方とも有効な値がある箇所
+                                valid_mask = mask1 & mask2
+
+                                if valid_mask.sum() > 0:
+                                    # 完全一致の確認
+                                    exact_match = (col1_data.loc[valid_mask] == col2_data.loc[valid_mask]).all()
+
+                                    if exact_match:
+                                        print(f"     位置{pos} ('{col1_name}' vs '{col2_name}'): 完全一致 ✅")
+                                    else:
+                                        # 数値的近似の確認（相対誤差1e-10、絶対誤差1e-15）
+                                        numeric_close = np.allclose(
+                                            col1_data.loc[valid_mask],
+                                            col2_data.loc[valid_mask],
+                                            rtol=1e-10,
+                                            atol=1e-15,
+                                        )
+
+                                        if numeric_close:
+                                            print(
+                                                f"     位置{pos} ('{col1_name}' vs '{col2_name}'): 数値的に一致（丸め誤差レベル） ≈"
+                                            )
+                                        else:
+                                            # 差分の統計情報
+                                            diff = col1_data.loc[valid_mask] - col2_data.loc[valid_mask]
+                                            max_abs_diff = np.abs(diff).max()
+                                            mean_abs_diff = np.abs(diff).mean()
+                                            diff_count = (diff != 0).sum()
+
+                                            print(f"     位置{pos} ('{col1_name}' vs '{col2_name}'): 数値差分あり ❌")
+                                            print(f"       - 差分がある行数: {diff_count}/{valid_mask.sum()}")
+                                            print(f"       - 最大絶対差分: {max_abs_diff:.2e}")
+                                            print(f"       - 平均絶対差分: {mean_abs_diff:.2e}")
+
+                                # NaNの一致確認
+                                nan_match = (mask1 == mask2).all()
+                                if not nan_match:
+                                    nan1_count = (~mask1).sum()
+                                    nan2_count = (~mask2).sum()
+                                    print(
+                                        f"     位置{pos} ('{col1_name}' vs '{col2_name}'): NaN分布が異なる (Dir1: {nan1_count}, Dir2: {nan2_count})"
+                                    )
+
+                            except Exception as e:
+                                print(f"     位置{pos} ('{col1_name}' vs '{col2_name}'): 比較エラー - {str(e)}")
+
+                    # 非数値データの比較（位置ベース）
+                    non_numeric_cols1 = df1.select_dtypes(exclude=[np.number]).columns
+                    non_numeric_cols2 = df2.select_dtypes(exclude=[np.number]).columns
+
+                    if len(non_numeric_cols1) > 0 or len(non_numeric_cols2) > 0:
+                        print(f"   非数値列の比較:")
+
+                        # 非数値列の位置を取得
+                        non_numeric_positions1 = [df1.columns.get_loc(col) for col in non_numeric_cols1]
+                        non_numeric_positions2 = [df2.columns.get_loc(col) for col in non_numeric_cols2]
+
+                        # 共通する位置の非数値列を比較
+                        common_non_numeric_positions = set(non_numeric_positions1) & set(non_numeric_positions2)
+
+                        for pos in sorted(common_non_numeric_positions):
+                            col1_name = df1.columns[pos]
+                            col2_name = df2.columns[pos]
+
+                            col1_data = df1.iloc[:, pos]
+                            col2_data = df2.iloc[:, pos]
+
+                            string_match = col1_data.equals(col2_data)
+                            if string_match:
+                                print(f"     位置{pos} ('{col1_name}' vs '{col2_name}'): 完全一致 ✅")
+                            else:
+                                diff_count = (col1_data != col2_data).sum()
+                                print(f"     位置{pos} ('{col1_name}' vs '{col2_name}'): {diff_count}行で差分あり ❌")
 
                 print()
 

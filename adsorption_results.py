@@ -356,8 +356,8 @@ class VacuumPumpingResult:
     """真空排気計算結果"""
 
     pressure_loss: float
-    total_co2_recovered: float
-    total_n2_recovered: float
+    cumulative_co2_recovered: float
+    cumulative_n2_recovered: float
     co2_recovery_concentration: float
     volumetric_flow_rate: float
     remaining_moles: float
