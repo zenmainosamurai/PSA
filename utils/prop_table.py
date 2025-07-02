@@ -15,11 +15,16 @@ import CoolProp.CoolProp as _CP
 # -------------------------------------------------
 # 1. テーブル読み込み
 # -------------------------------------------------
-TABLE_FILE = Path(__file__).resolve().parent.parent
-TABLE_FILE /= "prop_table.npz"
-print(TABLE_FILE)
+BASE_DIR = Path(__file__).resolve().parent.parent
+
+DATA_TABLE_FILE = BASE_DIR / "data" / "prop_table.npz"
+if DATA_TABLE_FILE.exists():
+    TABLE_FILE = DATA_TABLE_FILE
+
+print(f"Loading prop_table from: {TABLE_FILE}")
+
 if not TABLE_FILE.exists():
-    raise FileNotFoundError("prop_table.npz が見つかりません。先に build_prop_table.py を実行してください。")
+    raise FileNotFoundError("prop_table.npz が見つかりません。\n" "先に build_prop_table.py を実行してください。")
 
 _npz = np.load(TABLE_FILE, allow_pickle=False)
 _T = _npz["T"].astype(np.float32)  # 温度軸

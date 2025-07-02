@@ -2,7 +2,7 @@ import numpy as np
 from dataclasses import dataclass
 from typing import Dict
 from config.sim_conditions import SimulationConditions
-from core.state.results import (
+from .results import (
     HeatBalanceResults,
     MassBalanceResults,
     WallHeatBalanceResult,

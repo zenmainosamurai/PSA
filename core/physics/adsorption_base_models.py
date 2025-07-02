@@ -5,10 +5,10 @@ import pandas as pd
 from scipy import optimize
 import CoolProp.CoolProp as CP
 
-from core.physics.heat_transfer import calc_heat_transfer_coef as _heat_transfer_coef
-from core.state.state_variables import StateVariables
+from .heat_transfer import calc_heat_transfer_coef as _heat_transfer_coef
+from ..state import StateVariables
 from config.sim_conditions import TowerConditions
-from core.state.results import (
+from ..state import (
     HeatBalanceResult,
     HeatBalanceResults,
     MaterialBalanceResult,

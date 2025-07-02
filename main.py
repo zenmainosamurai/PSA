@@ -1,7 +1,7 @@
 import yaml
 import time
 
-from core.simulator import GasAdosorptionBreakthroughsimulator
+from core import GasAdosorptionBreakthroughsimulator
 import utils.prop_table
 
 if __name__ == "__main__":

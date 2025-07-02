@@ -42,8 +42,8 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument(
         "--outfile",
         type=str,
-        default="prop_table.npz",
-        help="Output *.npz file",
+        default="data/prop_table.npz",
+        help="Output *.npz file (default: data/prop_table.npz)",
     )
     return parser.parse_args()
 
