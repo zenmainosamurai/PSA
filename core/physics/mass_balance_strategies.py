@@ -78,7 +78,7 @@ class AdsorptionStrategy(MassBalanceStrategy):
                         ),
                     )
             if self.equalization_flow_rate is not None:
-                kwargs["flow_amt_depress"] = self.equalization_flow_rate
+                kwargs["equalization_flow_rate"] = self.equalization_flow_rate
             if self.residual_gas_composition is not None:
                 kwargs["residual_gas_composition"] = self.residual_gas_composition
         else:

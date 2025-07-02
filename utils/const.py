@@ -106,32 +106,3 @@ UNIT = {
     "CO2分圧": "[MPaA]",
     "流出CO2分圧": "[MPaA]",
 }
-
-TRANSLATION_PARAMS = {
-    # パラメータ
-    "co2_molecular_weight": "CO2分子量 [g/mol]",
-    "co2_flow_rate": "CO2流量 [L/min]",
-    "n2_molecular_weight": "N2分子量 [g/mol]",
-    "n2_flow_rate": "N2流量 [L/min]",
-    "total_flow_rate": "全流量 [L/min]",
-    "total_pressure": "圧力 [MPaA]",
-    "temp": "温度 [degC]",
-    "co2_mole_fraction": "CO2分率 [co2]",
-    "n2_mole_fraction": "CO2分率 [nitrogen]",
-    "co2_density": "CO2密度 [kg/m3]",
-    "n2_density": "N2密度 [kg/m3]",
-    "average_density": "平均密度 [kg/m3]",
-    "co2_thermal_conductivity": "CO2熱伝導率 [W/m/K]",
-    "n2_thermal_conductivity": "N2熱伝導率 [W/m/K]",
-    "c_mean": "平均熱伝導率 [W/m/K]",
-    "vi_co2": "CO2粘度 [Pas]",
-    "vi_n2": "N2粘度 [Pas]",
-    "vi_mean": "平均粘度 [Pas]",
-    "enthalpy": "エンタルピー [kJ/kg]",
-    "co2_specific_heat_capacity": "co2比熱 [kJ/kg/K]",
-    "n2_specific_heat_capacity": "n2比熱 [kJ/kg/K]",
-    "cp_mean": "平均比熱 [kJ/kg/K]",
-    "C_per_hour": "1h熱容量 [kJ/K/h]",
-    "co2_adsorption_heat": "CO2吸着熱 [kJ/kg]",
-    "n2_adsorption_heat": "N2吸着熱 [kJ/kg]",
-}

@@ -16,7 +16,7 @@ from core.state.results import MaterialBalanceResult, VacuumPumpingResult
 # ------------------------------------------------------------------
 # 1. 物性値: 気体熱伝導率
 # ------------------------------------------------------------------
-def compute_gas_k(T_K: float, mf_co2: float, mf_n2: float) -> float:
+def compute_gas_k(T_K: float, co2_mole_fraction: float, n2_mole_fraction: float) -> float:
     """
     温度 T_K [K]・モル分率から混合気体の熱伝導率 [W/m/K] を返す。
     CoolProp の単体値を線形補間（大気圧を仮定）。
@@ -24,7 +24,7 @@ def compute_gas_k(T_K: float, mf_co2: float, mf_n2: float) -> float:
     P_ATM = 0.101325e6  # Pa
     k_co2 = CP.PropsSI("L", "T", T_K, "P", P_ATM, "co2")
     k_n2 = CP.PropsSI("L", "T", T_K, "P", P_ATM, "nitrogen")
-    return (k_co2 * mf_co2 + k_n2 * mf_n2) / 1000
+    return (k_co2 * co2_mole_fraction + k_n2 * n2_mole_fraction) / 1000
 
 
 # ------------------------------------------------------------------
@@ -142,17 +142,17 @@ def calc_heat_transfer_coef(
     T_K = temp_now + 273.15
 
     if mode == 0:  # 吸着
-        mf_co2 = material_output.inlet_gas.co2_mole_fraction
-        mf_n2 = material_output.inlet_gas.n2_mole_fraction
+        co2_mole_fraction = material_output.inlet_gas.co2_mole_fraction
+        n2_mole_fraction = material_output.inlet_gas.n2_mole_fraction
     elif mode == 2:  # 脱着
-        mf_co2 = tower.mf_co2[stream - 1, section - 1]
-        mf_n2 = tower.mf_n2[stream - 1, section - 1]
+        co2_mole_fraction = tower.co2_mole_fraction[stream - 1, section - 1]
+        n2_mole_fraction = tower.n2_mole_fraction[stream - 1, section - 1]
     else:  # その他はとりあえず吸着と同様
-        mf_co2 = material_output.inlet_gas.co2_mole_fraction
-        mf_n2 = material_output.inlet_gas.n2_mole_fraction
+        co2_mole_fraction = material_output.inlet_gas.co2_mole_fraction
+        n2_mole_fraction = material_output.inlet_gas.n2_mole_fraction
 
     # ---- 物性値 -----------------------------------------------------
-    kf = compute_gas_k(T_K, mf_co2, mf_n2)  # 気体熱伝導率
+    kf = compute_gas_k(T_K, co2_mole_fraction, n2_mole_fraction)  # 気体熱伝導率
     kp = tower_conds.packed_bed.thermal_conductivity
 
     epsilon = tower_conds.packed_bed.average_porosity
@@ -171,8 +171,8 @@ def calc_heat_transfer_coef(
     # NOTE: 気体粘度 μ, 比熱 cp は大気圧を仮定
     P_ATM = 0.101325e6
     viscosity = (
-        CP.PropsSI("V", "T", T_K, "P", P_ATM, "co2") * mf_co2
-        + CP.PropsSI("V", "T", T_K, "P", P_ATM, "nitrogen") * mf_n2
+        CP.PropsSI("V", "T", T_K, "P", P_ATM, "co2") * co2_mole_fraction
+        + CP.PropsSI("V", "T", T_K, "P", P_ATM, "nitrogen") * n2_mole_fraction
     )
     Pr = viscosity * 1000.0 * material_output.gas_properties.specific_heat / kf
 

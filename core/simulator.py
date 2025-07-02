@@ -452,8 +452,8 @@ class GasAdosorptionBreakthroughsimulator:
 
         other_outputs["others"] = {
             "total_pressure": tower.total_press,
-            "co2_mole_fraction": tower.mf_co2.copy(),
-            "n2_mole_fraction": tower.mf_n2.copy(),
+            "co2_mole_fraction": tower.co2_mole_fraction.copy(),
+            "n2_mole_fraction": tower.n2_mole_fraction.copy(),
             "cumulative_co2_recovered": tower.cumulative_co2_recovered,
             "cumulative_n2_recovered": tower.cumulative_n2_recovered,
         }
@@ -499,6 +499,7 @@ class GasAdosorptionBreakthroughsimulator:
 
         # cm³からNm³への単位変換を適用
         self.logger.info("Converting cm³ to Nm³ for gas flow rates (inlet/outlet CO2 and N2 volumes)...")
+        # NOTE: csv化した後でよい
         self._apply_unit_conversion_to_record_dict(record_dict)
         self.logger.info("Unit conversion completed.")
 

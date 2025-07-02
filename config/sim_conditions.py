@@ -8,7 +8,7 @@ import math
 class CommonConditions:
     """共通条件"""
 
-    calculation_step_time: float
+    calculation_step_time: float  # min
     num_streams: int
     num_sections: int
 
@@ -23,28 +23,28 @@ class CommonConditions:
 class PackedBedConditions:
     """充填層条件"""
 
-    diameter: float
-    radius: float
-    cross_section: float
-    height: float
-    volume: float
-    adsorbent_mass: float
-    adsorbent_bulk_density: float
-    thermal_conductivity: float
-    emissivity: float
-    specific_heat_capacity: float
-    heat_capacity: float
-    average_porosity: float
-    average_particle_diameter: float
-    particle_shape_factor: float
-    initial_internal_pressure: float
-    adsorption_mass_transfer_coef: float
-    desorption_mass_transfer_coef: float
-    void_volume: float
-    upstream_piping_volume: float
-    vessel_internal_void_volume: float
-    initial_adsorption_amount: float
-    initial_temperature: float
+    diameter: float  # m
+    radius: float  # m
+    cross_section: float  # m^2
+    height: float  # m
+    volume: float  # m^3
+    adsorbent_mass: float  # g
+    adsorbent_bulk_density: float  # g/cm^3
+    thermal_conductivity: float  # W/(m·K)
+    emissivity: float  # -
+    specific_heat_capacity: float  # J/(g·K)
+    heat_capacity: float  # J/K
+    average_porosity: float  # -
+    average_particle_diameter: float  # m
+    particle_shape_factor: float  # -
+    initial_internal_pressure: float  # kPaA
+    adsorption_mass_transfer_coef: float  # 1e-6/sec
+    desorption_mass_transfer_coef: float  # 1e-6/sec
+    void_volume: float  # m^3
+    upstream_piping_volume: float  # m^3
+    vessel_internal_void_volume: float  # m^3
+    initial_adsorption_amount: float  # cm^3/g-abs
+    initial_temperature: float  # degC
 
     def __post_init__(self):
         for field_name in self.__dataclass_fields__:
@@ -55,31 +55,31 @@ class PackedBedConditions:
 class FeedGasConditions:
     """導入ガス条件"""
 
-    co2_molecular_weight: float
-    co2_flow_rate: float
-    n2_molecular_weight: float
-    n2_flow_rate: float
-    total_flow_rate: float
-    total_pressure: float
-    temperature: float
-    co2_mole_fraction: float
-    n2_mole_fraction: float
-    co2_density: float
-    n2_density: float
-    average_density: float
-    co2_thermal_conductivity: float
-    n2_thermal_conductivity: float
-    average_thermal_conductivity: float
-    co2_viscosity: float
-    n2_viscosity: float
-    average_viscosity: float
-    enthalpy: float
-    co2_specific_heat_capacity: float
-    n2_specific_heat_capacity: float
-    average_specific_heat_capacity: float
-    heat_capacity_per_hour: float
-    co2_adsorption_heat: float
-    n2_adsorption_heat: float
+    co2_molecular_weight: float  # g/mol
+    co2_flow_rate: float  # L/min
+    n2_molecular_weight: float  # g/mol
+    n2_flow_rate: float  # L/min
+    total_flow_rate: float  # L/min
+    total_pressure: float  # MPaA
+    temperature: float  # degC
+    co2_mole_fraction: float  # -
+    n2_mole_fraction: float  # -
+    co2_density: float  # kg/m^3
+    n2_density: float  # kg/m^3
+    average_density: float  # kg/m^3
+    co2_thermal_conductivity: float  # W/(m·K)
+    n2_thermal_conductivity: float  # W/(m·K)
+    average_thermal_conductivity: float  # W/(m·K)
+    co2_viscosity: float  # Pa·s
+    n2_viscosity: float  # Pa·s
+    average_viscosity: float  # Pa·s
+    enthalpy: float  # kJ/kg
+    co2_specific_heat_capacity: float  # kJ/(kg·K)
+    n2_specific_heat_capacity: float  # kJ/(kg·K)
+    average_specific_heat_capacity: float  # kJ/(kg·K)
+    heat_capacity_per_hour: float  # kJ/K/h
+    co2_adsorption_heat: float  # kJ/kg
+    n2_adsorption_heat: float  # kJ/kg
 
     def __post_init__(self):
         for field_name in self.__dataclass_fields__:
@@ -90,20 +90,20 @@ class FeedGasConditions:
 class VesselConditions:
     """容器条件"""
 
-    diameter: float
-    radius: float
-    height: float
-    wall_thickness: float
-    wall_cross_section: float
-    wall_volume: float
-    wall_density: float
-    wall_total_weight: float
-    wall_specific_heat_capacity: float
-    wall_thermal_conductivity: float
-    lateral_surface_area: float
-    external_heat_transfer_coef: float
-    ambient_temperature: float
-    wall_to_bed_htc_correction_factor: float
+    diameter: float  # m
+    radius: float  # m
+    height: float  # m
+    wall_thickness: float  # m
+    wall_cross_section: float  # m^2
+    wall_volume: float  # m^3
+    wall_density: float  # g/cm^3
+    wall_total_weight: float  # g
+    wall_specific_heat_capacity: float  # J/(kg·K)
+    wall_thermal_conductivity: float  # W/(m·K)
+    lateral_surface_area: float  # m^2
+    external_heat_transfer_coef: float  # W/(m^2·K)
+    ambient_temperature: float  # degC
+    wall_to_bed_htc_correction_factor: float  # -
 
     def __post_init__(self):
         for field_name in self.__dataclass_fields__:
@@ -114,14 +114,14 @@ class VesselConditions:
 class EndCoverConditions:
     """終端カバー条件"""
 
-    flange_diameter: float
-    flange_thickness: float
-    outer_flange_inner_diameter: float
-    outer_flange_area: float
-    outer_flange_volume: float
-    inner_flange_inner_diameter: float
-    inner_flange_volume: float
-    flange_total_weight: float
+    flange_diameter: float  # mm
+    flange_thickness: float  # mm
+    outer_flange_inner_diameter: float  # mm
+    outer_flange_area: float  # m^2
+    outer_flange_volume: float  # cm^3
+    inner_flange_inner_diameter: float  # mm
+    inner_flange_volume: float  # cm^3
+    flange_total_weight: float  # g
 
     def __post_init__(self):
         for field_name in self.__dataclass_fields__:
@@ -132,10 +132,10 @@ class EndCoverConditions:
 class PipingConditions:
     """配管条件"""
 
-    length: float
-    diameter: float
-    cross_section: float
-    volume: float
+    length: float  # m
+    diameter: float  # m
+    cross_section: float  # m^2
+    volume: float  # m^3
 
     def __post_init__(self):
         for field_name in self.__dataclass_fields__:
@@ -146,25 +146,25 @@ class PipingConditions:
 class EqualizingPipingConditions(PipingConditions):
     """均圧配管条件"""
 
-    flow_velocity_correction_factor: float
-    main_part_volume: float
-    isolated_equalizing_volume: float
+    flow_velocity_correction_factor: float  # -
+    main_part_volume: float  # m^3
+    isolated_equalizing_volume: float  # m^3
 
 
 @dataclass
 class VacuumPipingConditions(PipingConditions):
     """真空引き配管条件"""
 
-    space_volume: float
+    space_volume: float  # m^3
 
 
 @dataclass
 class ThermocoupleConditions:
     """熱電対条件"""
 
-    specific_heat: float
-    weight: float
-    heat_transfer_correction_factor: float
+    specific_heat: float  # J/(g·K)
+    weight: float  # g
+    heat_transfer_correction_factor: float  # -
 
     def __post_init__(self):
         for field_name in self.__dataclass_fields__:
