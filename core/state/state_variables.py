@@ -1,8 +1,8 @@
 import numpy as np
 from dataclasses import dataclass
 from typing import Dict
-from sim_conditions import SimulationConditions
-from adsorption_results import (
+from config.sim_conditions import SimulationConditions
+from core.state.results import (
     HeatBalanceResults,
     MassBalanceResults,
     WallHeatBalanceResult,

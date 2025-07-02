@@ -6,7 +6,7 @@ import math
 import glob
 from utils import const
 
-from sim_conditions import CommonConditions
+from config.sim_conditions import CommonConditions
 
 
 def plot_csv_outputs(tgt_foldapath, df_obs, tgt_sections, tower_num, timestamp, df_p_end):

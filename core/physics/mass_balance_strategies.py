@@ -1,10 +1,10 @@
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
 from typing import Optional, Dict
-import adsorption_base_models
-from sim_conditions import TowerConditions
-from state_variables import StateVariables
-from adsorption_results import MaterialBalanceResult, GasFlow
+import core.physics.adsorption_base_models as adsorption_base_models
+from config.sim_conditions import TowerConditions
+from core.state.state_variables import StateVariables
+from core.state.results import MaterialBalanceResult, GasFlow
 
 
 @dataclass

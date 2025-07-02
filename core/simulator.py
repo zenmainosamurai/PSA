@@ -9,9 +9,9 @@ import pandas as pd
 from logging import getLogger
 
 from utils import const, plot_csv, other_utils
-import operation_models
-from state_variables import StateVariables
-from sim_conditions import SimulationConditions, TowerConditions
+import core.physics.operation_models as operation_models
+from core.state.state_variables import StateVariables
+from config.sim_conditions import SimulationConditions, TowerConditions
 
 
 import warnings

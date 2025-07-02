@@ -1,11 +1,16 @@
-import adsorption_base_models
+import core.physics.adsorption_base_models as adsorption_base_models
 import warnings
 from typing import Dict
 
-from sim_conditions import TowerConditions
-from state_variables import StateVariables
-from mass_balance_strategies import MassBalanceStrategy, AdsorptionStrategy, DesorptionStrategy, ValveClosedStrategy
-from adsorption_results import (
+from config.sim_conditions import TowerConditions
+from core.state.state_variables import StateVariables
+from core.physics.mass_balance_strategies import (
+    MassBalanceStrategy,
+    AdsorptionStrategy,
+    DesorptionStrategy,
+    ValveClosedStrategy,
+)
+from core.state.results import (
     MassAndHeatBalanceResults,
     MassBalanceResults,
     HeatBalanceResults,

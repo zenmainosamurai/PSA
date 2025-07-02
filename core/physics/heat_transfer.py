@@ -8,9 +8,9 @@ from typing import Tuple, Optional
 
 import CoolProp.CoolProp as CP
 
-from state_variables import StateVariables
-from sim_conditions import TowerConditions
-from adsorption_results import MaterialBalanceResult, VacuumPumpingResult
+from core.state.state_variables import StateVariables
+from config.sim_conditions import TowerConditions
+from core.state.results import MaterialBalanceResult, VacuumPumpingResult
 
 
 # ------------------------------------------------------------------
