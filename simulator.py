@@ -1,6 +1,6 @@
 from copy import deepcopy
 import os
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from typing import Dict, List, Optional, Any
 
 
@@ -20,27 +20,6 @@ warnings.simplefilter("ignore")
 
 
 @dataclass
-class SimulationResults:
-    """シミュレーション結果を保持するデータクラス"""
-
-    record_dict: Dict[int, Dict[str, List[Any]]]
-    process_completion_times: Dict[int, float]
-    final_timestamp: float
-    success: bool = True
-    error_message: Optional[str] = None
-
-    def to_dict(self) -> Dict[str, Any]:
-        """辞書形式に変換"""
-        return {
-            "record_dict": self.record_dict,
-            "process_completion_times": self.process_completion_times,
-            "final_timestamp": self.final_timestamp,
-            "success": self.success,
-            "error_message": self.error_message,
-        }
-
-
-@dataclass
 class ProcessResults:
     """プロセス毎の結果を保持するデータクラス"""
 
@@ -48,27 +27,6 @@ class ProcessResults:
     record_dict: Dict[int, Dict[str, List[Any]]]
     success: bool = True
     error_message: Optional[str] = None
-
-
-@dataclass
-class TowerResults:
-    """塔毎の計算結果を保持するデータクラス"""
-
-    material: Dict[int, Dict[int, Dict[str, Any]]]
-    heat: Dict[int, Dict[int, Dict[str, Any]]]
-    heat_wall: Dict[int, Dict[str, Any]]
-    heat_lid: Dict[str, Dict[str, Any]]
-    others: Dict[str, Any]
-
-    def to_dict(self) -> Dict[str, Any]:
-        """記録用の辞書形式に変換"""
-        return {
-            "material": self.material,
-            "heat": self.heat,
-            "heat_wall": self.heat_wall,
-            "heat_lid": self.heat_lid,
-            "others": self.others,
-        }
 
 
 class GasAdosorptionBreakthroughsimulator:
@@ -177,7 +135,6 @@ class GasAdosorptionBreakthroughsimulator:
         timestamp: float,
         filtered_x=None,
     ) -> ProcessResults:
-        # try:
         timestamp_result, record_dict_result, success = self.calc_adsorption_process(
             mode_list=mode_list,
             termination_cond_str=termination_cond_str,
@@ -192,10 +149,6 @@ class GasAdosorptionBreakthroughsimulator:
             success=success,
             error_message=None if success else "プロセス実行中にエラーが発生",
         )
-
-        # except Exception as e:
-        #     self.logger.error(f"プロセス {process_index} でエラーが発生: {str(e)}")
-        #     return ProcessResults(timestamp=timestamp, record_dict=record_dict, success=False, error_message=str(e))
 
     def calc_adsorption_process(
         self,

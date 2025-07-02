@@ -298,10 +298,6 @@ class SimulationConditions:
         """指定した塔の条件を取得"""
         return self.towers[tower_num]
 
-    def get_stream(self, tower_num: int, stream: int) -> StreamConditions:
-        """指定した塔・ストリームの条件を取得"""
-        return self.get_tower(tower_num).stream_conditions[stream]
-
     @property
     def num_towers(self) -> int:
         """塔数を取得"""

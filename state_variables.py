@@ -1,6 +1,6 @@
 import numpy as np
 from dataclasses import dataclass
-from typing import Dict, Any
+from typing import Dict
 from sim_conditions import SimulationConditions
 from adsorption_results import (
     HeatBalanceResults,
@@ -184,15 +184,3 @@ class StateVariables:
         else:
             tower.cumulative_co2_recovered = 0.0
             tower.cumulative_n2_recovered = 0.0
-
-    def get_mean_temp(self, tower_num: int) -> float:
-        """塔の平均温度を効率的に計算"""
-        return np.mean(self.towers[tower_num].temp)
-
-    def get_mean_mf_co2(self, tower_num: int) -> float:
-        """塔の平均CO2モル分率を効率的に計算"""
-        return np.mean(self.towers[tower_num].mf_co2)
-
-    def get_mean_mf_n2(self, tower_num: int) -> float:
-        """塔の平均N2モル分率を効率的に計算"""
-        return np.mean(self.towers[tower_num].mf_n2)

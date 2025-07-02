@@ -1,7 +1,6 @@
 # calculation_results.py (新規ファイル)
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from typing import Dict, Optional, Any
-import numpy as np
 
 
 @dataclass
@@ -116,24 +115,6 @@ class SectionResults:
         """指定されたセクションの結果を取得"""
         return self.section_data.get(section_id)
 
-    def set_section_result(self, section_id: int, result: Any) -> None:
-        """指定されたセクションの結果を設定"""
-        self.section_data[section_id] = result
-
-    def get_all_sections(self) -> Dict[int, Any]:
-        """全セクションの結果を取得"""
-        return self.section_data
-
-    def to_dict(self) -> Dict[int, dict]:
-        """辞書形式に変換"""
-        result = {}
-        for section_id, section_result in self.section_data.items():
-            if hasattr(section_result, "to_dict"):
-                result[section_id] = section_result.to_dict()
-            else:
-                result[section_id] = section_result
-        return result
-
 
 class StreamSectionResults:
     """ストリーム毎にセクション結果を管理するクラス"""
@@ -150,23 +131,6 @@ class StreamSectionResults:
         if stream_id not in self.stream_data:
             self.stream_data[stream_id] = SectionResults({})
         return self.stream_data[stream_id]
-
-    def set_stream_section_result(self, stream_id: int, section_id: int, result: Any) -> None:
-        """指定されたストリーム・セクションの結果を設定"""
-        if stream_id not in self.stream_data:
-            self.stream_data[stream_id] = SectionResults({})
-        self.stream_data[stream_id].set_section_result(section_id, result)
-
-    def get_all_streams(self) -> Dict[int, SectionResults]:
-        """全ストリームの結果を取得"""
-        return self.stream_data
-
-    def to_dict(self) -> Dict[int, Dict[int, dict]]:
-        """辞書形式に変換"""
-        result = {}
-        for stream_id, section_results in self.stream_data.items():
-            result[stream_id] = section_results.to_dict()
-        return result
 
 
 class MaterialBalanceSectionResults(SectionResults):

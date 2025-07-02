@@ -2,8 +2,6 @@ import yaml
 import time
 
 from simulator import GasAdosorptionBreakthroughsimulator
-from assimilator import Assimilator
-from models_opt import GasAdosorption_for_Optimize
 import utils.prop_table
 
 if __name__ == "__main__":
@@ -27,18 +25,10 @@ if __name__ == "__main__":
                 instance.execute_simulation()
         # データ同化
         if mode == "assimilation":
-            for cond_id in main_cond["cond_list"]:
-                print("データ同化 実施中 ...")
-                print("cond = ", cond_id)
-                instance = Assimilator(cond_id)
-                instance.execute_assimilation()
+            pass
         # 最適化
         elif mode == "optimize":
-            for cond_id in main_cond["cond_list"]:
-                print("パラメータ探索 実施中 ...")
-                print("cond = ", cond_id)
-                instance = GasAdosorption_for_Optimize(cond_id, main_cond["opt_params"])
-                instance.optimize_params()
+            pass
     end = time.time()  # 時間計測
     ptime = end - start
     ptime_hour = int(ptime // 3600)
