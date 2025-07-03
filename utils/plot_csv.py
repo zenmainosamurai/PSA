@@ -272,122 +272,168 @@ def plot_csv_outputs(tgt_foldapath, df_obs, tgt_sections, tower_num, timestamp, 
     plt.close()
 
 
+def _create_dataframe_and_save(values, columns, timestamp_index, file_path):
+    """データフレームを作成してCSVファイルに保存する"""
+    df = pd.DataFrame(values, columns=columns, index=timestamp_index)
+    df.index.name = "timestamp"
+    df.to_csv(file_path)
+
+
+def _generate_stream_section_columns(base_name, num_streams, num_sections):
+    """ストリーム・セクション用のカラム名を生成する"""
+    columns = []
+    for stream in range(1, 1 + num_streams):
+        for section in range(1, 1 + num_sections):
+            columns.append(f"{base_name}-{stream:03d}-{section:03d}")
+    return columns
+
+
+def _extract_heat_material_values(record_data, common_conds):
+    """heat/materialデータから値を抽出する"""
+    values = []
+    for record in record_data:
+        values_tmp = []
+        for stream in range(1, 1 + common_conds.num_streams):
+            for section in range(1, 1 + common_conds.num_sections):
+                result_data = record.get_result(stream, section).to_dict()
+                values_tmp.extend(result_data.values())
+        values.append(values_tmp)
+    return values
+
+
+def _generate_heat_material_columns(record_data, common_conds):
+    """heat/materialデータ用のカラム名を生成する"""
+    columns = []
+    for stream in range(1, 1 + common_conds.num_streams):
+        for section in range(1, 1 + common_conds.num_sections):
+            result_data = record_data[0].get_result(stream, section).to_dict()
+            for key in result_data.keys():
+                columns.append(f"{key}-{stream:03d}-{section:03d}")
+    return columns
+
+
+def _save_heat_material_data(tgt_foldapath, record_dict, common_conds, data_type):
+    """heat/materialデータをCSVに保存する"""
+    folder_path = os.path.join(tgt_foldapath, data_type)
+    os.makedirs(folder_path, exist_ok=True)
+
+    record_data = record_dict[data_type]
+    values = _extract_heat_material_values(record_data, common_conds)
+    columns = _generate_heat_material_columns(record_data, common_conds)
+
+    # キーごとにCSVファイルを作成
+    sample_result_data = record_data[0].get_result(1, 1).to_dict()
+    for key in sample_result_data.keys():
+        key_indices = [i for i, col in enumerate(columns) if key in col]
+        key_values = np.array(values)[:, key_indices]
+        key_columns = [columns[i] for i in key_indices]
+
+        file_path = os.path.join(folder_path, f"{const.TRANSLATION[key]}.csv")
+        _create_dataframe_and_save(key_values, key_columns, record_dict["timestamp"], file_path)
+
+
+def _save_heat_lid_data(tgt_foldapath, record_dict):
+    """heat_lidデータをCSVに保存する"""
+    folder_path = os.path.join(tgt_foldapath, "heat_lid")
+    os.makedirs(folder_path, exist_ok=True)
+
+    values = []
+    for record in record_dict["heat_lid"]:
+        values.append(
+            [
+                record["up"].temperature,
+                record["down"].temperature,
+            ]
+        )
+
+    columns = ["temp_reached-up", "temp_reached-down"]
+    file_path = os.path.join(folder_path, "heat_lid.csv")
+    _create_dataframe_and_save(values, columns, record_dict["timestamp"], file_path)
+
+
+def _calculate_vacuum_rate_co2(cumulative_co2, cumulative_n2):
+    """CO2回収率を計算する"""
+    try:
+        total = cumulative_co2 + cumulative_n2
+        return (cumulative_co2 / total) * 100 if total != 0 else 0
+    except (ZeroDivisionError, TypeError):
+        return 0
+
+
+def _save_total_pressure_data(folder_path, record_dict):
+    """全圧データをCSVに保存する"""
+    values = [record["total_pressure"] for record in record_dict["others"]]
+    file_path = os.path.join(folder_path, "total_pressure.csv")
+    _create_dataframe_and_save(values, ["total_pressure"], record_dict["timestamp"], file_path)
+
+
+def _save_vacuum_amount_data(folder_path, record_dict):
+    """CO2, N2回収量データをCSVに保存する"""
+    values = []
+    for record in record_dict["others"]:
+        vacuum_rate_co2 = _calculate_vacuum_rate_co2(
+            record["cumulative_co2_recovered"], record["cumulative_n2_recovered"]
+        )
+        values.append(
+            [
+                vacuum_rate_co2,
+                record["cumulative_co2_recovered"],
+                record["cumulative_n2_recovered"],
+            ]
+        )
+
+    columns = ["vacuum_rate_co2", "cumulative_co2_recovered", "cumulative_n2_recovered"]
+    file_path = os.path.join(folder_path, "vacuum_amount.csv")
+    _create_dataframe_and_save(values, columns, record_dict["timestamp"], file_path)
+
+
+def _save_mole_fraction_data(folder_path, record_dict, common_conds, fraction_type):
+    """モル分率データをCSVに保存する"""
+    values = []
+    for record in record_dict["others"]:
+        values_tmp = []
+        for stream in range(common_conds.num_streams):
+            for section in range(common_conds.num_sections):
+                values_tmp.append(record[fraction_type][stream, section])
+        values.append(values_tmp)
+
+    columns = _generate_stream_section_columns(fraction_type, common_conds.num_streams, common_conds.num_sections)
+    file_path = os.path.join(folder_path, f"{fraction_type}.csv")
+    _create_dataframe_and_save(values, columns, record_dict["timestamp"], file_path)
+
+
+def _save_others_data(tgt_foldapath, record_dict, common_conds):
+    """othersデータをCSVに保存する"""
+    folder_path = os.path.join(tgt_foldapath, "others")
+    os.makedirs(folder_path, exist_ok=True)
+
+    # 全圧
+    _save_total_pressure_data(folder_path, record_dict)
+
+    # CO2, N2回収量
+    _save_vacuum_amount_data(folder_path, record_dict)
+
+    # モル分率
+    for fraction_type in ["co2_mole_fraction", "n2_mole_fraction"]:
+        _save_mole_fraction_data(folder_path, record_dict, common_conds, fraction_type)
+
+
 def outputs_to_csv(tgt_foldapath, record_dict, common_conds: CommonConditions):
     """計算結果をcsv出力する
 
     Args:
         tgt_foldapath (str): 出力先フォルダパス
         record_dict (dict): 計算結果
-        common_conds (dict): 実験パラメータ
+        common_conds (CommonConditions): 実験パラメータ
     """
-    ### heat, material ----------------------------------------------
-    for _tgt_name in ["heat", "material"]:
-        _foldapath = tgt_foldapath + f"/{_tgt_name}/"
-        os.makedirs(_foldapath, exist_ok=True)
-        # 値の抽出
-        values = []
-        for i in range(len(record_dict[_tgt_name])):
-            values_tmp = []
-            for stream in range(1, 1 + common_conds.num_streams):
-                for section in range(1, 1 + common_conds.num_sections):
-                    # データクラスから辞書形式に変換してから値を取得
-                    result_data = record_dict[_tgt_name][i].get_result(stream, section).to_dict()
-                    for value in result_data.values():
-                        values_tmp.append(value)
-            values.append(values_tmp)
-        # カラム名の抽出
-        columns = []
-        for stream in range(1, 1 + common_conds.num_streams):
-            for section in range(1, 1 + common_conds.num_sections):
-                # 最初のレコードからキーを取得
-                result_data = record_dict[_tgt_name][0].get_result(stream, section).to_dict()
-                for key in result_data.keys():
-                    columns.append(key + "-" + str(stream).zfill(3) + "-" + str(section).zfill(3))
-        # df化
-        # 最初のレコードからキーを取得
-        sample_result_data = record_dict[_tgt_name][0].get_result(1, 1).to_dict()
-        for key in sample_result_data.keys():
-            idx = [columns.index(col) for col in columns if key in col]
-            df = pd.DataFrame(
-                np.array(values)[:, idx],
-                columns=np.array(columns)[idx],
-                index=record_dict["timestamp"],
-            )
-            df.index.name = "timestamp"
-            df.to_csv(_foldapath + const.TRANSLATION[key] + ".csv")
+    # heat, material データの保存
+    for data_type in ["heat", "material"]:
+        _save_heat_material_data(tgt_foldapath, record_dict, common_conds, data_type)
 
-    # heat_lid
-    foldapath = tgt_foldapath + f"/heat_lid/"
-    os.makedirs(foldapath, exist_ok=True)
-    values = []
-    for i in range(len(record_dict["heat_lid"])):
-        values.append(
-            [
-                record_dict["heat_lid"][i]["up"].temperature,
-                record_dict["heat_lid"][i]["down"].temperature,
-            ]
-        )
-    columns = ["temp_reached-up", "temp_reached-down"]
-    df = pd.DataFrame(values, columns=columns, index=record_dict["timestamp"])
-    df.index.name = "timestamp"
-    df.to_csv(foldapath + "heat_lid.csv")
+    # heat_lid データの保存
+    _save_heat_lid_data(tgt_foldapath, record_dict)
 
-    ### others ----------------------------------------------
-    tgt_name = "others"
-    _foldapath = tgt_foldapath + f"/{tgt_name}/"
-    os.makedirs(_foldapath, exist_ok=True)
-    # 全圧
-    values = []
-    _tgt_col = "total_pressure"
-    for i in range(len(record_dict[tgt_name])):
-        values.append(record_dict[tgt_name][i][_tgt_col])
-    df = pd.DataFrame(values, columns=[_tgt_col], index=record_dict["timestamp"])
-    df.index.name = "timestamp"
-    df.to_csv(_foldapath + f"{_tgt_col}.csv")
-    # CO2, N2回収量
-    values = []
-    _tgt_col = "vacuum_amount"
-    for i in range(len(record_dict[tgt_name])):
-        try:
-            _vacuum_rate_co2 = (
-                record_dict[tgt_name][i]["cumulative_co2_recovered"]
-                / (
-                    record_dict[tgt_name][i]["cumulative_co2_recovered"]
-                    + record_dict[tgt_name][i]["cumulative_n2_recovered"]
-                )
-            ) * 100
-        except ZeroDivisionError:
-            _vacuum_rate_co2 = 0
-        values.append(
-            [
-                _vacuum_rate_co2,
-                record_dict[tgt_name][i]["cumulative_co2_recovered"],
-                record_dict[tgt_name][i]["cumulative_n2_recovered"],
-            ]
-        )
-    df = pd.DataFrame(
-        values,
-        columns=["vacuum_rate_co2", "cumulative_co2_recovered", "cumulative_n2_recovered"],
-        index=record_dict["timestamp"],
-    )
-    df.index.name = "timestamp"
-    df.to_csv(_foldapath + f"{_tgt_col}.csv")
-    # モル分率
-    for _tgt_col in ["co2_mole_fraction", "n2_mole_fraction"]:
-        values = []
-        for i in range(len(record_dict[tgt_name])):
-            values_tmp = []
-            for stream in range(common_conds.num_streams):
-                for section in range(common_conds.num_sections):
-                    values_tmp.append(record_dict[tgt_name][i][_tgt_col][stream, section])
-            values.append(values_tmp)
-        # カラム名の抽出
-        columns = []
-        for stream in range(1, 1 + common_conds.num_streams):
-            for section in range(1, 1 + common_conds.num_sections):
-                columns.append(_tgt_col + "-" + str(stream).zfill(3) + "-" + str(section).zfill(3))
-        df = pd.DataFrame(values, columns=columns, index=record_dict["timestamp"])
-        df.index.name = "timestamp"
-        df.to_csv(_foldapath + f"{_tgt_col}.csv")
+    # others データの保存
+    _save_others_data(tgt_foldapath, record_dict, common_conds)
 
     # heat_wall
