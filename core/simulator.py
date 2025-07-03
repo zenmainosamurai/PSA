@@ -11,6 +11,7 @@ from logging import getLogger
 from utils import const, plot_csv, other_utils
 from .physics import operation_models
 from .state import StateVariables
+from .simulation_results import SimulationResults
 from config.sim_conditions import SimulationConditions, TowerConditions
 
 
@@ -24,7 +25,7 @@ class ProcessResults:
     """プロセス毎の結果を保持するデータクラス"""
 
     timestamp: float
-    record_dict: Dict[int, Dict[str, List[Any]]]
+    simulation_results: SimulationResults
     success: bool = True
     error_message: Optional[str] = None
 
@@ -78,10 +79,11 @@ class GasAdosorptionBreakthroughsimulator:
         """物理計算を通しで実行"""
         ### ◆(1/4) 前準備 ------------------------------------------------
         # 記録用配列の用意
-        _record_item_list = ["material", "heat", "heat_wall", "heat_lid", "others"]
-        record_dict = {}
+        simulation_results = SimulationResults()
+
+        # 塔の初期化
         for tower_num in range(1, 1 + self.num_tower):
-            record_dict[tower_num] = {"timestamp": [], **{item: [] for item in _record_item_list}}
+            simulation_results.initialize_tower(tower_num)
 
         # 出力先フォルダの用意
         if filtered_states is None:
@@ -111,12 +113,12 @@ class GasAdosorptionBreakthroughsimulator:
                 process_index=process_index,
                 mode_list=mode_list,
                 termination_cond_str=termination_cond,
-                record_dict=record_dict,
+                simulation_results=simulation_results,
                 timestamp=timestamp,
                 filtered_x=filtered_states,
             )
             timestamp = process_result.timestamp
-            record_dict = process_result.record_dict
+            simulation_results = process_result.simulation_results
             process_completion_log[process_index] = round(timestamp, 2)
             # 処理が中断された場合、次のステップに移行
             if not process_result.success:
@@ -124,28 +126,28 @@ class GasAdosorptionBreakthroughsimulator:
                 break
             self.logger.info(f"プロセス {process_index}: done. timestamp: {round(timestamp, 2)}")
         if simulation_success:
-            self._output_results(output_folderpath, record_dict, process_completion_log, timestamp)
+            self._output_results(output_folderpath, simulation_results, process_completion_log, timestamp)
 
     def _execute_process(
         self,
         process_index: int,
         mode_list: List[str],
         termination_cond_str: str,
-        record_dict: Dict,
+        simulation_results: SimulationResults,
         timestamp: float,
         filtered_x=None,
     ) -> ProcessResults:
-        timestamp_result, record_dict_result, success = self.calc_adsorption_process(
+        timestamp_result, simulation_results_result, success = self.calc_adsorption_process(
             mode_list=mode_list,
             termination_cond_str=termination_cond_str,
-            record_dict=record_dict,
+            simulation_results=simulation_results,
             timestamp=timestamp,
             filtered_x=filtered_x,
         )
 
         return ProcessResults(
             timestamp=timestamp_result,
-            record_dict=record_dict_result,
+            simulation_results=simulation_results_result,
             success=success,
             error_message=None if success else "プロセス実行中にエラーが発生",
         )
@@ -154,7 +156,7 @@ class GasAdosorptionBreakthroughsimulator:
         self,
         mode_list: List[str],
         termination_cond_str: str,
-        record_dict,
+        simulation_results: SimulationResults,
         timestamp,
         filtered_x=None,
     ):
@@ -164,7 +166,7 @@ class GasAdosorptionBreakthroughsimulator:
             process (inf): プロセス番号p
             mode_list (list): 各塔の稼働モード
             termination_cond (str): プロセスの終了条件
-            record_dict (dict): 計算結果の記録用
+            simulation_results (SimulationResults): 計算結果の記録用
             timestamp (float): 時刻t
             filtered_x (pd.DataFrame): データ同化で得られた状態変数の推移
         """
@@ -203,9 +205,18 @@ class GasAdosorptionBreakthroughsimulator:
             timestamp_p += self.dt
             # 記録
             for tower_num in range(1, 1 + self.num_tower):
-                record_dict[tower_num]["timestamp"].append(timestamp + timestamp_p)
-                for key, values in _record_outputs_tower[tower_num].items():
-                    record_dict[tower_num][key].append(values)
+                current_timestamp = timestamp + timestamp_p
+                tower_outputs = _record_outputs_tower[tower_num]
+
+                simulation_results.add_tower_result(
+                    tower_id=tower_num,
+                    timestamp=current_timestamp,
+                    material=tower_outputs["material"],
+                    heat=tower_outputs["heat"],
+                    heat_wall=tower_outputs["heat_wall"],
+                    heat_lid=tower_outputs["heat_lid"],
+                    others=tower_outputs["others"],
+                )
             # 終了条件の更新
             termination_cond = self._create_termination_cond(
                 termination_cond_str,
@@ -216,8 +227,8 @@ class GasAdosorptionBreakthroughsimulator:
             time_threshold = 20
             if timestamp_p >= time_threshold:
                 self.logger.warning(f"{time_threshold}分以内に終了しなかったため強制終了")
-                return timestamp + timestamp_p, record_dict, False
-        return timestamp + timestamp_p, record_dict, True
+                return timestamp + timestamp_p, simulation_results, False
+        return timestamp + timestamp_p, simulation_results, True
 
     def calc_adsorption_mode_list(self, sim_conds: SimulationConditions, mode_list: List[str]):
         """モード(x_1, x_2, ... x_n)の時の各塔のガス吸着計算を行う
@@ -492,10 +503,17 @@ class GasAdosorptionBreakthroughsimulator:
             return timestamp + timestamp_p < time
 
     def _output_results(
-        self, output_folderpath: str, record_dict: Dict, process_completion_log: Dict, timestamp: float
+        self,
+        output_folderpath: str,
+        simulation_results: SimulationResults,
+        process_completion_log: Dict,
+        timestamp: float,
     ) -> None:
         """計算結果の出力処理"""
         self.logger.info("(2/3) csv output...")
+
+        # 後方互換性のためにlegacy形式に変換
+        record_dict = simulation_results.to_legacy_format()
 
         # cm³からNm³への単位変換を適用
         self.logger.info("Converting cm³ to Nm³ for gas flow rates (inlet/outlet CO2 and N2 volumes)...")
