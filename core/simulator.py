@@ -512,19 +512,16 @@ class GasAdosorptionBreakthroughsimulator:
         """計算結果の出力処理"""
         self.logger.info("(2/3) csv output...")
 
-        # 後方互換性のためにlegacy形式に変換
-        record_dict = simulation_results.to_legacy_format()
-
         # cm³からNm³への単位変換を適用
         self.logger.info("Converting cm³ to Nm³ for gas flow rates (inlet/outlet CO2 and N2 volumes)...")
-        # NOTE: csv化した後でよい
-        self._apply_unit_conversion_to_record_dict(record_dict)
+        self._apply_unit_conversion_to_simulation_results(simulation_results)
         self.logger.info("Unit conversion completed.")
 
         for tower_num in range(1, 1 + self.num_tower):
             _tgt_foldapath = output_folderpath + f"/csv/tower_{tower_num}/"
             os.makedirs(_tgt_foldapath, exist_ok=True)
-            plot_csv.outputs_to_csv(_tgt_foldapath, record_dict[tower_num], self.sim_conds.get_tower(tower_num).common)
+            tower_results = simulation_results.tower_simulation_results[tower_num]
+            plot_csv.outputs_to_csv(_tgt_foldapath, tower_results, self.sim_conds.get_tower(tower_num).common)
 
         self.df_operation["終了時刻(min)"] = list(process_completion_log.values())
         self.df_operation.to_csv(output_folderpath + "/プロセス終了時刻.csv", encoding="shift-jis")
@@ -562,39 +559,37 @@ class GasAdosorptionBreakthroughsimulator:
 
         return volume_nm3 * 1e-6
 
-    def _apply_unit_conversion_to_record_dict(self, record_dict: dict) -> None:
+    def _apply_unit_conversion_to_simulation_results(self, simulation_results: SimulationResults) -> None:
         """
         記録されたデータに対して単位変換を適用する
         - cm³ → Nm³ の変換を対象フィールドに適用
         - 各stream/sectionの実際の温度・圧力条件を使用
 
         Args:
-            record_dict: シミュレーション結果の記録辞書
+            simulation_results: シミュレーション結果
         """
         self.logger.info("Starting unit conversion (cm³ → Nm³) for gas flow rates...")
 
         for tower_num in range(1, self.num_tower + 1):
-            if tower_num not in record_dict:
+            if tower_num not in simulation_results.tower_simulation_results:
                 continue
 
-            for i, timestamp in enumerate(record_dict[tower_num]["timestamp"]):
+            tower_results = simulation_results.tower_simulation_results[tower_num]
+            time_series = tower_results.time_series_data
+
+            for i, timestamp in enumerate(time_series.timestamps):
                 try:
-                    tower_pressure_mpa = record_dict[tower_num]["others"][i]["total_pressure"]
+                    tower_pressure_mpa = time_series.others[i]["total_pressure"]
                 except (KeyError, IndexError, TypeError) as e:
                     self.logger.warning(
                         f"Unable to get pressure data for unit conversion at tower {tower_num}, time {i}: {e}"
                     )
                     continue
 
-                if (
-                    "material" in record_dict[tower_num]
-                    and "heat" in record_dict[tower_num]
-                    and i < len(record_dict[tower_num]["material"])
-                    and i < len(record_dict[tower_num]["heat"])
-                ):
+                if i < len(time_series.material) and i < len(time_series.heat):
 
-                    material_data = record_dict[tower_num]["material"][i]
-                    heat_data = record_dict[tower_num]["heat"][i]
+                    material_data = time_series.material[i]
+                    heat_data = time_series.heat[i]
 
                     for stream in range(1, self.num_str + 1):
                         for section in range(1, self.num_sec + 1):

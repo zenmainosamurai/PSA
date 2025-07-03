@@ -312,12 +312,12 @@ def _generate_heat_material_columns(record_data, common_conds):
     return columns
 
 
-def _save_heat_material_data(tgt_foldapath, record_dict, common_conds, data_type):
+def _save_heat_material_data(tgt_foldapath, tower_results, common_conds, data_type):
     """heat/materialデータをCSVに保存する"""
     folder_path = os.path.join(tgt_foldapath, data_type)
     os.makedirs(folder_path, exist_ok=True)
 
-    record_data = record_dict[data_type]
+    record_data = getattr(tower_results.time_series_data, data_type)
     values = _extract_heat_material_values(record_data, common_conds)
     columns = _generate_heat_material_columns(record_data, common_conds)
 
@@ -329,16 +329,16 @@ def _save_heat_material_data(tgt_foldapath, record_dict, common_conds, data_type
         key_columns = [columns[i] for i in key_indices]
 
         file_path = os.path.join(folder_path, f"{const.TRANSLATION[key]}.csv")
-        _create_dataframe_and_save(key_values, key_columns, record_dict["timestamp"], file_path)
+        _create_dataframe_and_save(key_values, key_columns, tower_results.time_series_data.timestamps, file_path)
 
 
-def _save_heat_lid_data(tgt_foldapath, record_dict):
+def _save_heat_lid_data(tgt_foldapath, tower_results):
     """heat_lidデータをCSVに保存する"""
     folder_path = os.path.join(tgt_foldapath, "heat_lid")
     os.makedirs(folder_path, exist_ok=True)
 
     values = []
-    for record in record_dict["heat_lid"]:
+    for record in tower_results.time_series_data.heat_lid:
         values.append(
             [
                 record["up"].temperature,
@@ -348,7 +348,7 @@ def _save_heat_lid_data(tgt_foldapath, record_dict):
 
     columns = ["temp_reached-up", "temp_reached-down"]
     file_path = os.path.join(folder_path, "heat_lid.csv")
-    _create_dataframe_and_save(values, columns, record_dict["timestamp"], file_path)
+    _create_dataframe_and_save(values, columns, tower_results.time_series_data.timestamps, file_path)
 
 
 def _calculate_vacuum_rate_co2(cumulative_co2, cumulative_n2):
@@ -360,17 +360,17 @@ def _calculate_vacuum_rate_co2(cumulative_co2, cumulative_n2):
         return 0
 
 
-def _save_total_pressure_data(folder_path, record_dict):
+def _save_total_pressure_data(folder_path, tower_results):
     """全圧データをCSVに保存する"""
-    values = [record["total_pressure"] for record in record_dict["others"]]
+    values = [record["total_pressure"] for record in tower_results.time_series_data.others]
     file_path = os.path.join(folder_path, "total_pressure.csv")
-    _create_dataframe_and_save(values, ["total_pressure"], record_dict["timestamp"], file_path)
+    _create_dataframe_and_save(values, ["total_pressure"], tower_results.time_series_data.timestamps, file_path)
 
 
-def _save_vacuum_amount_data(folder_path, record_dict):
+def _save_vacuum_amount_data(folder_path, tower_results):
     """CO2, N2回収量データをCSVに保存する"""
     values = []
-    for record in record_dict["others"]:
+    for record in tower_results.time_series_data.others:
         vacuum_rate_co2 = _calculate_vacuum_rate_co2(
             record["cumulative_co2_recovered"], record["cumulative_n2_recovered"]
         )
@@ -384,13 +384,13 @@ def _save_vacuum_amount_data(folder_path, record_dict):
 
     columns = ["vacuum_rate_co2", "cumulative_co2_recovered", "cumulative_n2_recovered"]
     file_path = os.path.join(folder_path, "vacuum_amount.csv")
-    _create_dataframe_and_save(values, columns, record_dict["timestamp"], file_path)
+    _create_dataframe_and_save(values, columns, tower_results.time_series_data.timestamps, file_path)
 
 
-def _save_mole_fraction_data(folder_path, record_dict, common_conds, fraction_type):
+def _save_mole_fraction_data(folder_path, tower_results, common_conds, fraction_type):
     """モル分率データをCSVに保存する"""
     values = []
-    for record in record_dict["others"]:
+    for record in tower_results.time_series_data.others:
         values_tmp = []
         for stream in range(common_conds.num_streams):
             for section in range(common_conds.num_sections):
@@ -399,41 +399,41 @@ def _save_mole_fraction_data(folder_path, record_dict, common_conds, fraction_ty
 
     columns = _generate_stream_section_columns(fraction_type, common_conds.num_streams, common_conds.num_sections)
     file_path = os.path.join(folder_path, f"{fraction_type}.csv")
-    _create_dataframe_and_save(values, columns, record_dict["timestamp"], file_path)
+    _create_dataframe_and_save(values, columns, tower_results.time_series_data.timestamps, file_path)
 
 
-def _save_others_data(tgt_foldapath, record_dict, common_conds):
+def _save_others_data(tgt_foldapath, tower_results, common_conds):
     """othersデータをCSVに保存する"""
     folder_path = os.path.join(tgt_foldapath, "others")
     os.makedirs(folder_path, exist_ok=True)
 
     # 全圧
-    _save_total_pressure_data(folder_path, record_dict)
+    _save_total_pressure_data(folder_path, tower_results)
 
     # CO2, N2回収量
-    _save_vacuum_amount_data(folder_path, record_dict)
+    _save_vacuum_amount_data(folder_path, tower_results)
 
     # モル分率
     for fraction_type in ["co2_mole_fraction", "n2_mole_fraction"]:
-        _save_mole_fraction_data(folder_path, record_dict, common_conds, fraction_type)
+        _save_mole_fraction_data(folder_path, tower_results, common_conds, fraction_type)
 
 
-def outputs_to_csv(tgt_foldapath, record_dict, common_conds: CommonConditions):
+def outputs_to_csv(tgt_foldapath, tower_results, common_conds: CommonConditions):
     """計算結果をcsv出力する
 
     Args:
         tgt_foldapath (str): 出力先フォルダパス
-        record_dict (dict): 計算結果
+        tower_results (TowerSimulationResults): 計算結果
         common_conds (CommonConditions): 実験パラメータ
     """
     # heat, material データの保存
     for data_type in ["heat", "material"]:
-        _save_heat_material_data(tgt_foldapath, record_dict, common_conds, data_type)
+        _save_heat_material_data(tgt_foldapath, tower_results, common_conds, data_type)
 
     # heat_lid データの保存
-    _save_heat_lid_data(tgt_foldapath, record_dict)
+    _save_heat_lid_data(tgt_foldapath, tower_results)
 
     # others データの保存
-    _save_others_data(tgt_foldapath, record_dict, common_conds)
+    _save_others_data(tgt_foldapath, tower_results, common_conds)
 
     # heat_wall

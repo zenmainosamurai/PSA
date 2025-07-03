@@ -58,17 +58,6 @@ class TowerSimulationResults:
         """計算結果を追加"""
         self.time_series_data.append_record(timestamp, material, heat, heat_wall, heat_lid, others)
 
-    def to_legacy_format(self) -> Dict[str, Any]:
-        """既存のrecord_dict形式に変換（後方互換性のため）"""
-        return {
-            "timestamp": self.time_series_data.timestamps,
-            "material": self.time_series_data.material,
-            "heat": self.time_series_data.heat,
-            "heat_wall": self.time_series_data.heat_wall,
-            "heat_lid": self.time_series_data.heat_lid,
-            "others": self.time_series_data.others,
-        }
-
 
 @dataclass
 class SimulationResults:
@@ -98,10 +87,3 @@ class SimulationResults:
         self.tower_simulation_results[tower_id].add_calculation_result(
             timestamp, material, heat, heat_wall, heat_lid, others
         )
-
-    def to_legacy_format(self) -> Dict[int, Dict[str, Any]]:
-        """既存のrecord_dict形式に変換（後方互換性のため）"""
-        return {
-            tower_id: tower_results.to_legacy_format()
-            for tower_id, tower_results in self.tower_simulation_results.items()
-        }
