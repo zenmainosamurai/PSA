@@ -56,8 +56,10 @@ class FeedGasConditions:
     """導入ガス条件"""
 
     co2_molecular_weight: float  # g/mol
+    co2_flow_rate_normal: float  # Nm3/h
     co2_flow_rate: float  # L/min
     n2_molecular_weight: float  # g/mol
+    n2_flow_rate_normal: float  # Nm3/h
     n2_flow_rate: float  # L/min
     total_flow_rate: float  # L/min
     total_pressure: float  # MPaA
