@@ -19,6 +19,13 @@ from ..state import (
     DownstreamFlowResult,
     GasFlow,
 )
+from .operation_results import (
+    StopModeResult,
+    BatchAdsorptionResult,
+    FlowAdsorptionResult,
+    EqualizationDepressurizationResult,
+    VacuumDesorptionResult,
+)
 
 warnings.simplefilter("ignore")
 
@@ -161,7 +168,9 @@ class CellCalculator:
         return distributed_inflows
 
 
-def initial_adsorption(tower_conds: TowerConditions, state_manager, tower_num, is_series_operation=False):
+def initial_adsorption(
+    tower_conds: TowerConditions, state_manager, tower_num, is_series_operation=False
+) -> BatchAdsorptionResult:
     """吸着開始時の圧力調整"""
     mode = 0  # 吸着
     calculator = CellCalculator()
@@ -194,16 +203,16 @@ def initial_adsorption(tower_conds: TowerConditions, state_manager, tower_num, i
         is_series_operation=is_series_operation,
     )
 
-    return {
-        "material": balance_results.mass_balance_results,
-        "heat": balance_results.heat_balance_results,
-        "heat_wall": wall_heat_balance_results,
-        "heat_lid": lid_heat_balance_results,
-        "pressure_after_batch_adsorption": pressure_after_batch_adsorption,
-    }
+    return BatchAdsorptionResult(
+        material=balance_results.mass_balance_results,
+        heat=balance_results.heat_balance_results,
+        heat_wall=wall_heat_balance_results,
+        heat_lid=lid_heat_balance_results,
+        pressure_after_batch_adsorption=pressure_after_batch_adsorption,
+    )
 
 
-def stop_mode(tower_conds: TowerConditions, state_manager, tower_num):
+def stop_mode(tower_conds: TowerConditions, state_manager, tower_num) -> StopModeResult:
     """停止モード"""
     mode = 1  # 弁停止モード
     calculator = CellCalculator()
@@ -228,15 +237,15 @@ def stop_mode(tower_conds: TowerConditions, state_manager, tower_num):
         tower_conds, state_manager, tower_num, balance_results.heat_balance_results, wall_heat_balance_results
     )
 
-    return {
-        "material": balance_results.mass_balance_results,
-        "heat": balance_results.heat_balance_results,
-        "heat_wall": wall_heat_balance_results,
-        "heat_lid": lid_heat_balance_results,
-    }
+    return StopModeResult(
+        material=balance_results.mass_balance_results,
+        heat=balance_results.heat_balance_results,
+        heat_wall=wall_heat_balance_results,
+        heat_lid=lid_heat_balance_results,
+    )
 
 
-def flow_adsorption_single_or_upstream(tower_conds: TowerConditions, state_manager, tower_num):
+def flow_adsorption_single_or_upstream(tower_conds: TowerConditions, state_manager, tower_num) -> FlowAdsorptionResult:
     """流通吸着（単独/直列吸着の上流）"""
     mode = 0  # 吸着
     calculator = CellCalculator()
@@ -264,16 +273,18 @@ def flow_adsorption_single_or_upstream(tower_conds: TowerConditions, state_manag
     # 圧力計算
     pressure_after_flow_adsorption = tower_conds.feed_gas.total_pressure
 
-    return {
-        "material": balance_results.mass_balance_results,
-        "heat": balance_results.heat_balance_results,
-        "heat_wall": wall_heat_balance_results,
-        "heat_lid": lid_heat_balance_results,
-        "total_pressure": pressure_after_flow_adsorption,
-    }
+    return FlowAdsorptionResult(
+        material=balance_results.mass_balance_results,
+        heat=balance_results.heat_balance_results,
+        heat_wall=wall_heat_balance_results,
+        heat_lid=lid_heat_balance_results,
+        total_pressure=pressure_after_flow_adsorption,
+    )
 
 
-def batch_adsorption_upstream(tower_conds: TowerConditions, state_manager, tower_num, is_series_operation):
+def batch_adsorption_upstream(
+    tower_conds: TowerConditions, state_manager, tower_num, is_series_operation
+) -> BatchAdsorptionResult:
     """バッチ吸着（上流）"""
     # 初期のバッチ吸着と同じ仕組み
     return initial_adsorption(tower_conds, state_manager, tower_num, is_series_operation)
@@ -281,7 +292,7 @@ def batch_adsorption_upstream(tower_conds: TowerConditions, state_manager, tower
 
 def equalization_pressure_depressurization(
     tower_conds: TowerConditions, state_manager, tower_num, downstream_tower_pressure
-):
+) -> EqualizationDepressurizationResult:
     """バッチ均圧（減圧）"""
     mode = 0  # 吸着
     calculator = CellCalculator()
@@ -325,18 +336,18 @@ def equalization_pressure_depressurization(
         downstream_tower_pressure=downstream_tower_pressure,
     )
 
-    return {
-        "material": balance_results.mass_balance_results,
-        "heat": balance_results.heat_balance_results,
-        "heat_wall": wall_heat_balance_results,
-        "heat_lid": lid_heat_balance_results,
-        "total_pressure": depressurization_results.final_pressure,
-        "diff_press": depressurization_results.pressure_differential,
-        "downflow_params": downstream_flow_and_pressure,
-    }
+    return EqualizationDepressurizationResult(
+        material=balance_results.mass_balance_results,
+        heat=balance_results.heat_balance_results,
+        heat_wall=wall_heat_balance_results,
+        heat_lid=lid_heat_balance_results,
+        total_pressure=depressurization_results.final_pressure,
+        diff_press=depressurization_results.pressure_differential,
+        downflow_params=downstream_flow_and_pressure,
+    )
 
 
-def desorption_by_vacuuming(tower_conds: TowerConditions, state_manager, tower_num):
+def desorption_by_vacuuming(tower_conds: TowerConditions, state_manager, tower_num) -> VacuumDesorptionResult:
     """真空脱着"""
     mode = 2  # 脱着
     calculator = CellCalculator()
@@ -378,20 +389,20 @@ def desorption_by_vacuuming(tower_conds: TowerConditions, state_manager, tower_n
         vacuum_pumping_results=vacuum_pumping_results,
     )
 
-    return {
-        "material": balance_results.mass_balance_results,
-        "heat": balance_results.heat_balance_results,
-        "heat_wall": wall_heat_balance_results,
-        "heat_lid": lid_heat_balance_results,
-        "mol_fraction": (balance_results.mole_fraction_results if balance_results.mole_fraction_results else None),
-        "accum_vacuum_amt": vacuum_pumping_results,
-        "pressure_after_desorption": pressure_after_desorption,
-    }
+    return VacuumDesorptionResult(
+        material=balance_results.mass_balance_results,
+        heat=balance_results.heat_balance_results,
+        heat_wall=wall_heat_balance_results,
+        heat_lid=lid_heat_balance_results,
+        mol_fraction=balance_results.mole_fraction_results if balance_results.mole_fraction_results else None,
+        accum_vacuum_amt=vacuum_pumping_results,
+        pressure_after_desorption=pressure_after_desorption,
+    )
 
 
 def equalization_pressure_pressurization(
     tower_conds: TowerConditions, state_manager: StateVariables, tower_num: int, upstream_params: DownstreamFlowResult
-):
+) -> BatchAdsorptionResult:
     """バッチ均圧（加圧）"""
     mode = 0  # 吸着
     calculator = CellCalculator()
@@ -418,18 +429,18 @@ def equalization_pressure_pressurization(
     )
     pressure_after_batch_adsorption = upstream_params.final_pressure
 
-    return {
-        "material": balance_results.mass_balance_results,
-        "heat": balance_results.heat_balance_results,
-        "heat_wall": wall_heat_balance_results,
-        "heat_lid": lid_heat_balance_results,
-        "pressure_after_batch_adsorption": pressure_after_batch_adsorption,
-    }
+    return BatchAdsorptionResult(
+        material=balance_results.mass_balance_results,
+        heat=balance_results.heat_balance_results,
+        heat_wall=wall_heat_balance_results,
+        heat_lid=lid_heat_balance_results,
+        pressure_after_batch_adsorption=pressure_after_batch_adsorption,
+    )
 
 
 def batch_adsorption_downstream(
     tower_conds: TowerConditions, state_manager, tower_num, is_series_operation, inflow_gas, residual_gas_composition
-):
+) -> BatchAdsorptionResult:
     """バッチ吸着（下流）"""
     mode = 0  # 吸着
     calculator = CellCalculator()
@@ -470,16 +481,18 @@ def batch_adsorption_downstream(
         is_series_operation=is_series_operation,
     )
 
-    return {
-        "material": balance_results.mass_balance_results,
-        "heat": balance_results.heat_balance_results,
-        "heat_wall": wall_heat_balance_results,
-        "heat_lid": lid_heat_balance_results,
-        "pressure_after_batch_adsorption": pressure_after_batch_adsorption,
-    }
+    return BatchAdsorptionResult(
+        material=balance_results.mass_balance_results,
+        heat=balance_results.heat_balance_results,
+        heat_wall=wall_heat_balance_results,
+        heat_lid=lid_heat_balance_results,
+        pressure_after_batch_adsorption=pressure_after_batch_adsorption,
+    )
 
 
-def flow_adsorption_downstream(tower_conds: TowerConditions, state_manager, tower_num, inflow_gas):
+def flow_adsorption_downstream(
+    tower_conds: TowerConditions, state_manager, tower_num, inflow_gas
+) -> FlowAdsorptionResult:
     """流通吸着（下流）"""
     mode = 0  # 吸着
     calculator = CellCalculator()
@@ -514,10 +527,10 @@ def flow_adsorption_downstream(tower_conds: TowerConditions, state_manager, towe
     # 全圧
     pressure_after_flow_adsorption = tower_conds.feed_gas.total_pressure
 
-    return {
-        "material": balance_results.mass_balance_results,
-        "heat": balance_results.heat_balance_results,
-        "heat_wall": wall_heat_balance_results,
-        "heat_lid": lid_heat_balance_results,
-        "total_pressure": pressure_after_flow_adsorption,
-    }
+    return FlowAdsorptionResult(
+        material=balance_results.mass_balance_results,
+        heat=balance_results.heat_balance_results,
+        heat_wall=wall_heat_balance_results,
+        heat_lid=lid_heat_balance_results,
+        total_pressure=pressure_after_flow_adsorption,
+    )

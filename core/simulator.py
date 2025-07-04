@@ -1,7 +1,7 @@
 from copy import deepcopy
 import os
 from dataclasses import dataclass
-from typing import Dict, List, Optional, Any
+from typing import Dict, List, Optional
 
 
 import numpy as np
@@ -336,7 +336,7 @@ class GasAdosorptionBreakthroughsimulator:
                 mode=pressurization_mode,
                 tower_num=pressurization_tower_num,
                 state_manager=self.state_manager,
-                other_tower_params=all_outputs["downflow_params"],
+                other_tower_params=all_outputs.downflow_params,
             )
             # 残りの塔
             for current_tower_num in range(1, 1 + self.num_tower):
@@ -446,7 +446,7 @@ class GasAdosorptionBreakthroughsimulator:
                 tower_num=tower_num,
                 upstream_params=other_tower_params,
             )
-            self.residual_gas_composition = calc_output["material"]
+            self.residual_gas_composition = calc_output.material
         elif mode == "真空脱着":
             calc_output = operation_models.desorption_by_vacuuming(
                 tower_conds=tower_conds, state_manager=state_manager, tower_num=tower_num
@@ -456,13 +456,11 @@ class GasAdosorptionBreakthroughsimulator:
         self.state_manager.update_from_calc_output(tower_num, mode, calc_output)
 
         ### 3. 記録項目の抽出 ----------------------------------------
-        # a. マテバラ・熱バラ
-        key_list = ["material", "heat", "heat_wall", "heat_lid"]
-        other_outputs = {key: calc_output[key] for key in key_list}
-        # b. その他状態変数
-        tower = self.state_manager.towers[tower_num]
+        record_items = calc_output.get_record_items()
 
-        other_outputs["others"] = {
+        # その他状態変数
+        tower = self.state_manager.towers[tower_num]
+        record_items["others"] = {
             "total_pressure": tower.total_press,
             "co2_mole_fraction": tower.co2_mole_fraction.copy(),
             "n2_mole_fraction": tower.n2_mole_fraction.copy(),
@@ -470,7 +468,7 @@ class GasAdosorptionBreakthroughsimulator:
             "cumulative_n2_recovered": tower.cumulative_n2_recovered,
         }
 
-        return other_outputs, calc_output
+        return record_items, calc_output
 
     def _create_termination_cond(self, termination_cond_str: str, timestamp: float, timestamp_p: float) -> bool:
         """文字列の終了条件からブール値の終了条件を作成する

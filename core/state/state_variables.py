@@ -103,12 +103,12 @@ class StateVariables:
         """指定された塔の状態変数を取得"""
         return self.towers[tower_num]
 
-    def update_from_calc_output(self, tower_num: int, mode: str, calc_output: Dict):
+    def update_from_calc_output(self, tower_num: int, mode: str, calc_output):
         """計算結果から状態変数を効率的に更新"""
         tower = self.towers[tower_num]
 
-        heat_results: HeatBalanceResults = calc_output["heat"]  # HeatBalanceResults
-        material_results: MassBalanceResults = calc_output["material"]  # MassBalanceResults
+        heat_results: HeatBalanceResults = calc_output.heat  # HeatBalanceResults
+        material_results: MassBalanceResults = calc_output.material  # MassBalanceResults
 
         # 各セル(stream, section)の結果を状態変数に反映
         for stream in range(1, self.num_streams + 1):
@@ -134,16 +134,14 @@ class StateVariables:
                 )
 
         # 壁面温度の更新
-        heat_wall_results: Dict[int, WallHeatBalanceResult] = calc_output[
-            "heat_wall"
-        ]  # Dict[int, WallHeatBalanceResult]
+        heat_wall_results: Dict[int, WallHeatBalanceResult] = calc_output.heat_wall  # Dict[int, WallHeatBalanceResult]
         tower.temp_wall[:] = np.array(
             [heat_wall_results[section].temperature for section in range(1, self.num_sections + 1)],
             dtype=np.float64,
         )
 
         # 蓋温度の更新
-        heat_lid_results: Dict[str, LidHeatBalanceResult] = calc_output["heat_lid"]  # Dict[str, LidHeatBalanceResult]
+        heat_lid_results: Dict[str, LidHeatBalanceResult] = calc_output.heat_lid  # Dict[str, LidHeatBalanceResult]
         tower.lid_temperature = heat_lid_results["up"].temperature
         tower.bottom_temperature = heat_lid_results["down"].temperature
 
@@ -165,28 +163,31 @@ class StateVariables:
                     tower.co2_mole_fraction[stream - 1, section - 1] = material_result.outlet_gas.co2_mole_fraction
                     tower.n2_mole_fraction[stream - 1, section - 1] = material_result.outlet_gas.n2_mole_fraction
         elif mode == "真空脱着":
-            mol_frac_results: MoleFractionResults = calc_output["mol_fraction"]  # MoleFractionResults
-            for stream in range(1, self.num_streams + 1):
-                for section in range(1, self.num_sections + 1):
-                    mol_frac_result = mol_frac_results.get_result(stream, section)
-                    tower.co2_mole_fraction[stream - 1, section - 1] = (
-                        mol_frac_result.co2_mole_fraction_after_desorption
-                    )
-                    tower.n2_mole_fraction[stream - 1, section - 1] = mol_frac_result.n2_mole_fraction_after_desorption
+            mol_frac_results: MoleFractionResults = calc_output.mol_fraction  # MoleFractionResults
+            if mol_frac_results:  # mol_fractionがNoneでない場合のみ処理
+                for stream in range(1, self.num_streams + 1):
+                    for section in range(1, self.num_sections + 1):
+                        mol_frac_result = mol_frac_results.get_result(stream, section)
+                        tower.co2_mole_fraction[stream - 1, section - 1] = (
+                            mol_frac_result.co2_mole_fraction_after_desorption
+                        )
+                        tower.n2_mole_fraction[stream - 1, section - 1] = (
+                            mol_frac_result.n2_mole_fraction_after_desorption
+                        )
 
         # 全圧の更新
         if mode == "停止":
             pass
         elif mode in ["初回ガス導入", "バッチ吸着_上流", "均圧_加圧", "バッチ吸着_下流"]:
-            tower.total_press = calc_output["pressure_after_batch_adsorption"]
+            tower.total_press = calc_output.pressure_after_batch_adsorption
         elif mode in ["均圧_減圧", "流通吸着_単独/上流", "流通吸着_下流"]:
-            tower.total_press = calc_output["total_pressure"]
+            tower.total_press = calc_output.total_pressure
         elif mode == "真空脱着":
-            tower.total_press = calc_output["pressure_after_desorption"]
+            tower.total_press = calc_output.pressure_after_desorption
 
         # 回収量の更新
         if mode == "真空脱着":
-            accum_vacuum_amt: VacuumPumpingResult = calc_output["accum_vacuum_amt"]
+            accum_vacuum_amt: VacuumPumpingResult = calc_output.accum_vacuum_amt
             tower.cumulative_co2_recovered = accum_vacuum_amt.cumulative_co2_recovered
             tower.cumulative_n2_recovered = accum_vacuum_amt.cumulative_n2_recovered
         else:

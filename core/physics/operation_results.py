@@ -57,12 +57,6 @@ class VacuumDesorptionResult(BaseOperationResult):
     accum_vacuum_amt: "VacuumPumpingResult"
     pressure_after_desorption: float
 
-    def get_record_items(self) -> Dict[str, any]:
-        items = super().get_record_items()
-        items["mol_fraction"] = self.mol_fraction
-        items["accum_vacuum_amt"] = self.accum_vacuum_amt
-        return items
-
 
 OperationResult = (
     StopModeResult
