@@ -55,7 +55,7 @@ class EqualizationDepressurizationResult(BaseOperationResult):
 class VacuumDesorptionResult(BaseOperationResult):
     mol_fraction: Optional["MoleFractionResults"]
     accum_vacuum_amt: "VacuumPumpingResult"
-    pressure_after_desorption: float
+    pressure_after_vacuum_desorption: float
 
 
 OperationResult = (

@@ -290,15 +290,15 @@ def batch_adsorption_upstream(
     return initial_adsorption(tower_conds, state_manager, tower_num, is_series_operation)
 
 
-def equalization_pressure_depressurization(
+def equalization_depressurization(
     tower_conds: TowerConditions, state_manager, tower_num, downstream_tower_pressure
 ) -> EqualizationDepressurizationResult:
-    """バッチ均圧（減圧）"""
+    """均圧（減圧）"""
     mode = 0  # 吸着
     calculator = CellCalculator()
 
     # 上流管からの流入計算
-    depressurization_results = adsorption_base_models.calculate_pressure_after_depressurization(
+    depressurization_results = adsorption_base_models.calculate_depressurization_result(
         tower_conds=tower_conds,
         state_manager=state_manager,
         tower_num=tower_num,
@@ -347,13 +347,13 @@ def equalization_pressure_depressurization(
     )
 
 
-def desorption_by_vacuuming(tower_conds: TowerConditions, state_manager, tower_num) -> VacuumDesorptionResult:
+def vacuum_desorption(tower_conds: TowerConditions, state_manager, tower_num) -> VacuumDesorptionResult:
     """真空脱着"""
     mode = 2  # 脱着
     calculator = CellCalculator()
 
     # 排気後圧力の計算
-    vacuum_pumping_results = adsorption_base_models.calculate_pressure_after_vacuum_pumping(
+    vacuum_pumping_results = adsorption_base_models.calculate_vacuum_pumping_result(
         tower_conds=tower_conds, state_manager=state_manager, tower_num=tower_num
     )
     mass_strategy = DesorptionStrategy(tower_conds, state_manager, tower_num, vacuum_pumping_results)
@@ -378,8 +378,8 @@ def desorption_by_vacuuming(tower_conds: TowerConditions, state_manager, tower_n
         tower_conds, state_manager, tower_num, balance_results.heat_balance_results, wall_heat_balance_results
     )
 
-    # 脱着後の全圧
-    pressure_after_desorption = adsorption_base_models.calculate_pressure_after_desorption(
+    # 真空脱着後の全圧
+    pressure_after_vacuum_desorption = adsorption_base_models.calculate_pressure_after_vacuum_desorption(
         tower_conds=tower_conds,
         state_manager=state_manager,
         tower_num=tower_num,
@@ -396,14 +396,17 @@ def desorption_by_vacuuming(tower_conds: TowerConditions, state_manager, tower_n
         heat_lid=lid_heat_balance_results,
         mol_fraction=balance_results.mole_fraction_results if balance_results.mole_fraction_results else None,
         accum_vacuum_amt=vacuum_pumping_results,
-        pressure_after_desorption=pressure_after_desorption,
+        pressure_after_vacuum_desorption=pressure_after_vacuum_desorption,
     )
 
 
-def equalization_pressure_pressurization(
-    tower_conds: TowerConditions, state_manager: StateVariables, tower_num: int, upstream_params: DownstreamFlowResult
+def equalization_pressurization(
+    tower_conds: TowerConditions,
+    state_manager: StateVariables,
+    tower_num: int,
+    inflow_from_upstream_tower: DownstreamFlowResult,
 ) -> BatchAdsorptionResult:
-    """バッチ均圧（加圧）"""
+    """均圧（加圧）"""
     mode = 0  # 吸着
     calculator = CellCalculator()
 
@@ -411,7 +414,7 @@ def equalization_pressure_pressurization(
     inflow_gas_dict = {}
     num_streams = tower_conds.common.num_streams
     for stream in range(1, 1 + num_streams):
-        inflow_gas_dict[stream] = upstream_params.outlet_flows[stream]
+        inflow_gas_dict[stream] = inflow_from_upstream_tower.outlet_flows[stream]
 
     mass_strategy = AdsorptionStrategy(tower_conds, state_manager, tower_num, external_inflow_gas=inflow_gas_dict)
     balance_results = calculator.calculate_mass_and_heat_balance(
@@ -427,7 +430,7 @@ def equalization_pressure_pressurization(
     lid_heat_balance_results = calculator.calculate_lid_heat_balance(
         tower_conds, state_manager, tower_num, balance_results.heat_balance_results, wall_heat_balance_results
     )
-    pressure_after_batch_adsorption = upstream_params.final_pressure
+    pressure_after_batch_adsorption = inflow_from_upstream_tower.final_pressure
 
     return BatchAdsorptionResult(
         material=balance_results.mass_balance_results,

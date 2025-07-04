@@ -433,22 +433,22 @@ class GasAdosorptionBreakthroughsimulator:
                 residual_gas_composition=self.residual_gas_composition,
             )
         elif mode == "均圧_減圧":
-            calc_output = operation_models.equalization_pressure_depressurization(
+            calc_output = operation_models.equalization_depressurization(
                 tower_conds=tower_conds,
                 state_manager=state_manager,
                 tower_num=tower_num,
                 downstream_tower_pressure=other_tower_params,
             )
         elif mode == "均圧_加圧":
-            calc_output = operation_models.equalization_pressure_pressurization(
+            calc_output = operation_models.equalization_pressurization(
                 tower_conds=tower_conds,
                 state_manager=state_manager,
                 tower_num=tower_num,
-                upstream_params=other_tower_params,
+                inflow_from_upstream_tower=other_tower_params,
             )
             self.residual_gas_composition = calc_output.material
         elif mode == "真空脱着":
-            calc_output = operation_models.desorption_by_vacuuming(
+            calc_output = operation_models.vacuum_desorption(
                 tower_conds=tower_conds, state_manager=state_manager, tower_num=tower_num
             )
 

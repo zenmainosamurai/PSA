@@ -847,9 +847,7 @@ def calculate_heat_balance_for_lid(
     return lid_heat_balance_result
 
 
-def calculate_pressure_after_vacuum_pumping(
-    tower_conds: TowerConditions, state_manager: StateVariables, tower_num: int
-):
+def calculate_vacuum_pumping_result(tower_conds: TowerConditions, state_manager: StateVariables, tower_num: int):
     """排気後圧力とCO2回収濃度の計算
         真空脱着モード
 
@@ -981,8 +979,8 @@ def calculate_pressure_after_vacuum_pumping(
     return vacuum_pumping_result
 
 
-def calculate_pressure_after_depressurization(
-    tower_conds: TowerConditions, state_manager: StateVariables, tower_num: int, downstream_tower_pressure
+def calculate_depressurization_result(
+    tower_conds: TowerConditions, state_manager: StateVariables, tower_num: int, downstream_tower_pressure: float
 ):
     """減圧時の上流からの均圧配管流量計算
         バッチ均圧(上流側)モード
@@ -1191,7 +1189,7 @@ def calculate_downstream_flow_after_depressurization(
     return downstream_flow_result
 
 
-def calculate_pressure_after_desorption(
+def calculate_pressure_after_vacuum_desorption(
     tower_conds: TowerConditions,
     state_manager: StateVariables,
     tower_num: int,
@@ -1234,9 +1232,9 @@ def calculate_pressure_after_desorption(
     # 配管上のモル量を加算
     sum_desorp_mw += vacuum_pumping_results.final_pressure * 1e6 * tower_conds.vacuum_piping.volume / 8.314 / T_K
     # 気相放出後の全圧 [MPaA]
-    pressure_after_desorption = sum_desorp_mw * 8.314 * T_K / tower_conds.vacuum_piping.space_volume * 1e-6
+    pressure_after_vacuum_desorption = sum_desorp_mw * 8.314 * T_K / tower_conds.vacuum_piping.space_volume * 1e-6
 
-    return pressure_after_desorption
+    return pressure_after_vacuum_desorption
 
 
 def calculate_pressure_after_batch_adsorption(

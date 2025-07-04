@@ -183,7 +183,7 @@ class StateVariables:
         elif mode in ["均圧_減圧", "流通吸着_単独/上流", "流通吸着_下流"]:
             tower.total_press = calc_output.total_pressure
         elif mode == "真空脱着":
-            tower.total_press = calc_output.pressure_after_desorption
+            tower.total_press = calc_output.pressure_after_vacuum_desorption
 
         # 回収量の更新
         if mode == "真空脱着":
