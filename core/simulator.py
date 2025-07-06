@@ -9,7 +9,6 @@ import pandas as pd
 from logging import getLogger
 
 from utils import const, plot_csv, other_utils
-from utils.csv_unit_converter import apply_unit_conversion_to_csv_files
 from .physics import operation_models
 from .state import StateVariables
 from .simulation_results import SimulationResults
@@ -510,20 +509,13 @@ class GasAdosorptionBreakthroughsimulator:
     ) -> None:
         """計算結果の出力処理"""
         self.logger.info("(2/3) csv output...")
+        self._apply_unit_conversion_to_results(simulation_results)
 
         for tower_num in range(1, 1 + self.num_tower):
             _tgt_foldapath = output_folderpath + f"/csv/tower_{tower_num}/"
             os.makedirs(_tgt_foldapath, exist_ok=True)
             tower_results = simulation_results.tower_simulation_results[tower_num]
             plot_csv.outputs_to_csv(_tgt_foldapath, tower_results, self.sim_conds.get_tower(tower_num).common)
-
-        apply_unit_conversion_to_csv_files(
-            output_dir=output_folderpath,
-            num_towers=self.num_tower,
-            num_streams=self.num_str,
-            num_sections=self.num_sec,
-            parallel=True,  # 並列処理を有効化
-        )
 
         self.df_operation["終了時刻(min)"] = list(process_completion_log.values())
         self.df_operation.to_csv(output_folderpath + "/プロセス終了時刻.csv", encoding="shift-jis")
@@ -540,3 +532,60 @@ class GasAdosorptionBreakthroughsimulator:
                 timestamp=timestamp,
                 df_p_end=self.df_operation,
             )
+
+    def _convert_cm3_to_nm3(self, volume_cm3: float, pressure_mpa: float, temperature: float) -> float:
+        """
+        単位をcm^3からNm^3（標準状態での体積）に変換する
+
+        Args:
+            volume_cm3 (float): 体積 [cm^3]
+            pressure_mpa (float): 圧力 [MPa]
+            temperature (float): 温度 [℃]
+
+        Returns:
+            float: 標準状態での体積 [Nm^3]
+        """
+        STANDARD_PRESSURE_PA = 101325
+        STANDARD_TEMPERATURE_K = 273.15
+
+        pressure_pa = pressure_mpa * 1e6
+        volume_ncm3 = (
+            volume_cm3 * (pressure_pa / STANDARD_PRESSURE_PA) * (STANDARD_TEMPERATURE_K / (temperature + 273.15))
+        )
+        return volume_ncm3 * 1e-6
+
+    def _apply_unit_conversion_to_results(self, simulation_results: SimulationResults) -> None:
+        """
+        流入CO2流量、流入N2流量、下流流出CO2流量、下流流出N2流量の単位を"_convert_cm3_to_nm3"を使って変換する
+        各時点での圧力・温度を使用して正確な単位変換を行う
+
+        Args:
+            simulation_results (SimulationResults): 時系列シミュレーション結果
+        """
+        for tower_num in range(1, self.num_tower + 1):
+            tower_results = simulation_results.tower_simulation_results[tower_num]
+            time_series_data = tower_results.time_series_data
+
+            for i, material_balance_results in enumerate(time_series_data.material):
+                pressure_mpa = time_series_data.others[i]["total_pressure"]
+
+                for stream_id in range(1, self.num_str + 1):
+                    for section_id in range(1, self.num_sec + 1):
+                        material_balance_result = material_balance_results.get_result(stream_id, section_id)
+
+                        heat_result = time_series_data.heat[i].get_result(stream_id, section_id)
+                        temperature = heat_result.cell_temperatures.bed_temperature
+
+                        material_balance_result.inlet_gas.co2_volume = self._convert_cm3_to_nm3(
+                            material_balance_result.inlet_gas.co2_volume, pressure_mpa, temperature
+                        )
+                        material_balance_result.inlet_gas.n2_volume = self._convert_cm3_to_nm3(
+                            material_balance_result.inlet_gas.n2_volume, pressure_mpa, temperature
+                        )
+
+                        material_balance_result.outlet_gas.co2_volume = self._convert_cm3_to_nm3(
+                            material_balance_result.outlet_gas.co2_volume, pressure_mpa, temperature
+                        )
+                        material_balance_result.outlet_gas.n2_volume = self._convert_cm3_to_nm3(
+                            material_balance_result.outlet_gas.n2_volume, pressure_mpa, temperature
+                        )
