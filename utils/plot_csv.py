@@ -44,7 +44,9 @@ def plot_csv_outputs(tgt_foldapath, df_obs, tgt_sections, tower_num, timestamp, 
     filename_list = glob.glob(tgt_foldapath + f"/csv/tower_{tower_num}/heat/*.csv")
     df_dict = {}
     for filename in filename_list:
-        df_dict[filename.split("/")[-1][:-4].split("\\")[1]] = pd.read_csv(filename, index_col="timestamp")
+        df_dict[filename.split("/")[-1][:-4].split("\\")[1]] = pd.read_csv(
+            filename, index_col="timestamp", encoding="shift_jis"
+        )
 
     num_row = math.ceil((len(df_dict)) / 2)
     fig = plt.figure(figsize=(16 * 2, 5.5 * num_row), tight_layout=True)
@@ -66,12 +68,14 @@ def plot_csv_outputs(tgt_foldapath, df_obs, tgt_sections, tower_num, timestamp, 
                 linestyle=linestyle_dict[section],
                 c=color_dict[stream],
             )
-        plt.title(key + " " + const.UNIT[key])
+        # タイトルに単位を付ける
+        unit = const.UNIT.get(key, "")
+        plt.title(f"{key} {unit}" if unit else key)
         plt.grid()
         plt.legend(fontsize=12)
         plt.xlabel("timestamp")
         # セクション到達温度のみ観測値をプロット
-        if key in ["セクション到達温度", "熱電対温度"]:
+        if "セクション到達温度" in key or "熱電対温度" in key:
             for section in range(1, 4):
                 plt.plot(
                     df_obs.loc[:timestamp, f"T{tower_num}_temp_{section}"],
@@ -101,7 +105,9 @@ def plot_csv_outputs(tgt_foldapath, df_obs, tgt_sections, tower_num, timestamp, 
     filename_list = glob.glob(tgt_foldapath + f"/csv/tower_{tower_num}/material/*.csv")
     df_dict = {}
     for filename in filename_list:
-        df_dict[filename.split("/")[-1][:-4].split("\\")[1]] = pd.read_csv(filename, index_col="timestamp")
+        df_dict[filename.split("/")[-1][:-4].split("\\")[1]] = pd.read_csv(
+            filename, index_col="timestamp", encoding="shift_jis"
+        )
 
     num_row = math.ceil((len(df_dict)) / 2)
     fig = plt.figure(figsize=(16 * 2, 5.5 * num_row), tight_layout=True)
@@ -123,7 +129,9 @@ def plot_csv_outputs(tgt_foldapath, df_obs, tgt_sections, tower_num, timestamp, 
                 linestyle=linestyle_dict[section],
                 c=color_dict[stream],
             )
-        plt.title(key + " " + const.UNIT[key])
+        # タイトルに単位を付ける
+        unit = const.UNIT.get(key, "")
+        plt.title(f"{key} {unit}" if unit else key)
         plt.grid()
         plt.legend(fontsize=16)
         plt.xlabel("timestamp")
@@ -144,8 +152,8 @@ def plot_csv_outputs(tgt_foldapath, df_obs, tgt_sections, tower_num, timestamp, 
     ### 可視化（熱バラ(上下蓋)） -------------------------------------
 
     # csv読み込み
-    filename_list = glob.glob(tgt_foldapath + f"/csv/tower_{tower_num}/heat_lid/heat_lid.csv")
-    df = pd.read_csv(filename_list[0], index_col="timestamp")
+    filename_list = glob.glob(tgt_foldapath + f"/csv/tower_{tower_num}/heat_lid/蓋温度.csv")
+    df = pd.read_csv(filename_list[0], index_col="timestamp", encoding="shift_jis")
 
     num_row = math.ceil((len(df.columns)) / 2)
     fig = plt.figure(figsize=(16 * 2, 5.5 * num_row), tight_layout=True)
@@ -156,13 +164,12 @@ def plot_csv_outputs(tgt_foldapath, df_obs, tgt_sections, tower_num, timestamp, 
         plt.rcParams["font.family"] = "Meiryo"
         plt.subplot(num_row, 2, i + 1)
         plt.plot(df[col])
-        title = const.TRANSLATION[col.split("-")[0]]
-        unit = const.UNIT[title]
-        if col.split("-")[1] == "up":
-            title += "_上蓋"
+        # カラム名から上蓋/下蓋を判定してタイトルを設定
+        if "up" in col:
+            title = "セクション到達温度 [℃]_上蓋"
         else:
-            title += "_下蓋"
-        plt.title(title + " " + unit)
+            title = "セクション到達温度 [℃]_下蓋"
+        plt.title(title)
         plt.grid()
         plt.xlabel("timestamp")
         # プロセス終了時刻の縦線をプロット
@@ -188,10 +195,12 @@ def plot_csv_outputs(tgt_foldapath, df_obs, tgt_sections, tower_num, timestamp, 
     plt_cell = 1
 
     # 1. 全圧
-    filename = tgt_foldapath + f"/csv/tower_{tower_num}/others/total_pressure.csv"
-    df = pd.read_csv(filename, index_col="timestamp")
+    filename = tgt_foldapath + f"/csv/tower_{tower_num}/others/全圧.csv"
+    df = pd.read_csv(filename, index_col="timestamp", encoding="shift_jis")
     plt.subplot(3, 2, plt_cell)
-    plt.plot(df["total_pressure"], label="計算値")
+    # CSVに保存されている実際のカラム名を使用
+    column_name = df.columns[0]  # 最初のカラム名を取得
+    plt.plot(df[column_name], label="計算値")
     plt.plot(df_obs.loc[:timestamp, f"T{tower_num}_press"], label="観測値", c="black")  # 観測値もプロット
     plt.title("全圧 [MPaA]")
     plt.legend()
@@ -212,8 +221,9 @@ def plot_csv_outputs(tgt_foldapath, df_obs, tgt_sections, tower_num, timestamp, 
 
     # 2. モル分率
     for _tgt_name in ["co2_mole_fraction", "n2_mole_fraction"]:
-        filename = tgt_foldapath + f"/csv/tower_{tower_num}/others/{_tgt_name}.csv"
-        df = pd.read_csv(filename, index_col="timestamp")
+        japanese_name = const.TRANSLATION[_tgt_name] if _tgt_name in const.TRANSLATION else _tgt_name
+        filename = tgt_foldapath + f"/csv/tower_{tower_num}/others/{japanese_name}.csv"
+        df = pd.read_csv(filename, index_col="timestamp", encoding="shift_jis")
         plt.subplot(3, 2, plt_cell)
         # 可視化対象のcolumnsを抽出
         plt_tgt_cols = [col for col in df.columns if int(col.split("-")[-1]) in tgt_sections]
@@ -227,7 +237,7 @@ def plot_csv_outputs(tgt_foldapath, df_obs, tgt_sections, tower_num, timestamp, 
                 linestyle=linestyle_dict[section],
                 c=color_dict[stream],
             )
-        plt.title(_tgt_name.split("_")[0] + "モル分率")
+        plt.title(_tgt_name.split("_")[0] + "モル分率 [-]")
         plt.legend()
         plt.grid()
         plt.xlabel("timestamp")
@@ -245,12 +255,13 @@ def plot_csv_outputs(tgt_foldapath, df_obs, tgt_sections, tower_num, timestamp, 
         plt_cell += 1
 
     # 3. CO2,N2回収量
-    title_list = ["CO2回収量 [Nm3]", "N2回収量 [Nm3]", "CO2回収率 [%]"]
-    for i, _tgt_name in enumerate(["cumulative_co2_recovered", "cumulative_n2_recovered", "vacuum_rate_co2"]):
-        filename = tgt_foldapath + f"/csv/tower_{tower_num}/others/vacuum_amount.csv"
-        df = pd.read_csv(filename, index_col="timestamp")
+    title_list = ["CO2回収率 [%]", "累積CO2回収量 [mol]", "累積N2回収量 [mol]"]
+    filename = tgt_foldapath + f"/csv/tower_{tower_num}/others/回収量.csv"
+    df = pd.read_csv(filename, index_col="timestamp", encoding="shift_jis")
+
+    for i, column_name in enumerate(df.columns):
         plt.subplot(3, 2, plt_cell)
-        plt.plot(df[_tgt_name], label="計算値")
+        plt.plot(df[column_name], label="計算値")
         plt.title(title_list[i])
         plt.legend()
         plt.grid()
@@ -272,11 +283,42 @@ def plot_csv_outputs(tgt_foldapath, df_obs, tgt_sections, tower_num, timestamp, 
     plt.close()
 
 
-def _create_dataframe_and_save(values, columns, timestamp_index, file_path):
+def _add_units_to_columns(columns):
+    """カラム名に単位を追加する"""
+    columns_with_units = []
+    for col in columns:
+        # カラム名から基本名を抽出（-XXX-YYY形式の場合）
+        base_name = col.split("-")[0]
+
+        # 翻訳辞書から日本語名を取得
+        if base_name in const.TRANSLATION:
+            japanese_name = const.TRANSLATION[base_name]
+            # 単位辞書から単位を取得
+            if japanese_name in const.UNIT:
+                unit = const.UNIT[japanese_name]
+                # カラム名に単位を追加
+                if "-" in col:
+                    suffix = col[len(base_name) :]
+                    columns_with_units.append(f"{japanese_name}{unit}{suffix}")
+                else:
+                    columns_with_units.append(f"{japanese_name}{unit}")
+            else:
+                columns_with_units.append(col)
+        else:
+            columns_with_units.append(col)
+
+    return columns_with_units
+
+
+def _create_dataframe_and_save(values, columns, timestamp_index, file_path, add_units=True):
     """データフレームを作成してCSVファイルに保存する"""
+    # 単位を追加するかどうかを制御
+    if add_units:
+        columns = _add_units_to_columns(columns)
+
     df = pd.DataFrame(values, columns=columns, index=timestamp_index)
     df.index.name = "timestamp"
-    df.to_csv(file_path)
+    df.to_csv(file_path, encoding="shift_jis")
 
 
 def _generate_stream_section_columns(base_name, num_streams, num_sections):
@@ -329,7 +371,9 @@ def _save_heat_material_data(tgt_foldapath, tower_results, common_conds, data_ty
         key_columns = [columns[i] for i in key_indices]
 
         file_path = os.path.join(folder_path, f"{const.TRANSLATION[key]}.csv")
-        _create_dataframe_and_save(key_values, key_columns, tower_results.time_series_data.timestamps, file_path)
+        _create_dataframe_and_save(
+            key_values, key_columns, tower_results.time_series_data.timestamps, file_path, add_units=True
+        )
 
 
 def _save_heat_lid_data(tgt_foldapath, tower_results):
@@ -347,8 +391,8 @@ def _save_heat_lid_data(tgt_foldapath, tower_results):
         )
 
     columns = ["temp_reached-up", "temp_reached-down"]
-    file_path = os.path.join(folder_path, "heat_lid.csv")
-    _create_dataframe_and_save(values, columns, tower_results.time_series_data.timestamps, file_path)
+    file_path = os.path.join(folder_path, "蓋温度.csv")
+    _create_dataframe_and_save(values, columns, tower_results.time_series_data.timestamps, file_path, add_units=True)
 
 
 def _calculate_vacuum_rate_co2(cumulative_co2, cumulative_n2):
@@ -363,8 +407,10 @@ def _calculate_vacuum_rate_co2(cumulative_co2, cumulative_n2):
 def _save_total_pressure_data(folder_path, tower_results):
     """全圧データをCSVに保存する"""
     values = [record["total_pressure"] for record in tower_results.time_series_data.others]
-    file_path = os.path.join(folder_path, "total_pressure.csv")
-    _create_dataframe_and_save(values, ["total_pressure"], tower_results.time_series_data.timestamps, file_path)
+    file_path = os.path.join(folder_path, "全圧.csv")
+    _create_dataframe_and_save(
+        values, ["total_pressure"], tower_results.time_series_data.timestamps, file_path, add_units=True
+    )
 
 
 def _save_vacuum_amount_data(folder_path, tower_results):
@@ -383,8 +429,8 @@ def _save_vacuum_amount_data(folder_path, tower_results):
         )
 
     columns = ["vacuum_rate_co2", "cumulative_co2_recovered", "cumulative_n2_recovered"]
-    file_path = os.path.join(folder_path, "vacuum_amount.csv")
-    _create_dataframe_and_save(values, columns, tower_results.time_series_data.timestamps, file_path)
+    file_path = os.path.join(folder_path, "回収量.csv")
+    _create_dataframe_and_save(values, columns, tower_results.time_series_data.timestamps, file_path, add_units=True)
 
 
 def _save_mole_fraction_data(folder_path, tower_results, common_conds, fraction_type):
@@ -398,8 +444,9 @@ def _save_mole_fraction_data(folder_path, tower_results, common_conds, fraction_
         values.append(values_tmp)
 
     columns = _generate_stream_section_columns(fraction_type, common_conds.num_streams, common_conds.num_sections)
-    file_path = os.path.join(folder_path, f"{fraction_type}.csv")
-    _create_dataframe_and_save(values, columns, tower_results.time_series_data.timestamps, file_path)
+    japanese_name = const.TRANSLATION[fraction_type] if fraction_type in const.TRANSLATION else fraction_type
+    file_path = os.path.join(folder_path, f"{japanese_name}.csv")
+    _create_dataframe_and_save(values, columns, tower_results.time_series_data.timestamps, file_path, add_units=True)
 
 
 def _save_others_data(tgt_foldapath, tower_results, common_conds):
