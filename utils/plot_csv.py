@@ -255,14 +255,19 @@ def plot_csv_outputs(tgt_foldapath, df_obs, tgt_sections, tower_num, timestamp, 
         plt_cell += 1
 
     # 3. CO2,N2回収量
-    title_list = ["CO2回収率 [%]", "累積CO2回収量 [mol]", "累積N2回収量 [mol]"]
-    filename = tgt_foldapath + f"/csv/tower_{tower_num}/others/回収量.csv"
-    df = pd.read_csv(filename, index_col="timestamp", encoding="shift_jis")
+    file_info_list = [
+        ("CO2回収率.csv", "CO2回収率 [%]"),
+        ("累積CO2回収量.csv", "累積CO2回収量 [Nm3]"),
+        ("累積N2回収量.csv", "累積N2回収量 [Nm3]"),
+    ]
 
-    for i, column_name in enumerate(df.columns):
+    for filename, title in file_info_list:
+        filepath = tgt_foldapath + f"/csv/tower_{tower_num}/others/{filename}"
+        df = pd.read_csv(filepath, index_col="timestamp", encoding="shift_jis")
+
         plt.subplot(3, 2, plt_cell)
-        plt.plot(df[column_name], label="計算値")
-        plt.title(title_list[i])
+        plt.plot(df[df.columns[0]], label="計算値")  # 最初のカラムをプロット
+        plt.title(title)
         plt.legend()
         plt.grid()
         plt.xlabel("timestamp")
@@ -414,23 +419,45 @@ def _save_total_pressure_data(folder_path, tower_results):
 
 
 def _save_vacuum_amount_data(folder_path, tower_results):
-    """CO2, N2回収量データをCSVに保存する"""
-    values = []
+    """CO2, N2回収量データを個別CSVファイルに保存する"""
+    # CO2回収率を個別ファイルに保存
+    vacuum_rate_co2_values = []
     for record in tower_results.time_series_data.others:
         vacuum_rate_co2 = _calculate_vacuum_rate_co2(
             record["cumulative_co2_recovered"], record["cumulative_n2_recovered"]
         )
-        values.append(
-            [
-                vacuum_rate_co2,
-                record["cumulative_co2_recovered"],
-                record["cumulative_n2_recovered"],
-            ]
-        )
+        vacuum_rate_co2_values.append(vacuum_rate_co2)
 
-    columns = ["vacuum_rate_co2", "cumulative_co2_recovered", "cumulative_n2_recovered"]
-    file_path = os.path.join(folder_path, "回収量.csv")
-    _create_dataframe_and_save(values, columns, tower_results.time_series_data.timestamps, file_path, add_units=True)
+    file_path = os.path.join(folder_path, "CO2回収率.csv")
+    _create_dataframe_and_save(
+        vacuum_rate_co2_values,
+        ["vacuum_rate_co2"],
+        tower_results.time_series_data.timestamps,
+        file_path,
+        add_units=True,
+    )
+
+    # 累積CO2回収量を個別ファイルに保存
+    cumulative_co2_values = [record["cumulative_co2_recovered"] for record in tower_results.time_series_data.others]
+    file_path = os.path.join(folder_path, "累積CO2回収量.csv")
+    _create_dataframe_and_save(
+        cumulative_co2_values,
+        ["cumulative_co2_recovered"],
+        tower_results.time_series_data.timestamps,
+        file_path,
+        add_units=True,
+    )
+
+    # 累積N2回収量を個別ファイルに保存
+    cumulative_n2_values = [record["cumulative_n2_recovered"] for record in tower_results.time_series_data.others]
+    file_path = os.path.join(folder_path, "累積N2回収量.csv")
+    _create_dataframe_and_save(
+        cumulative_n2_values,
+        ["cumulative_n2_recovered"],
+        tower_results.time_series_data.timestamps,
+        file_path,
+        add_units=True,
+    )
 
 
 def _save_mole_fraction_data(folder_path, tower_results, common_conds, fraction_type):
