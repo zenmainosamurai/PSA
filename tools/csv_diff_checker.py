@@ -52,8 +52,14 @@ def compare_csv_files(dir1, dir2):
 
         try:
             # CSVファイルを読み込み
-            df1 = pd.read_csv(file1)
-            df2 = pd.read_csv(file2)
+            try:
+                df1 = pd.read_csv(file1)
+            except UnicodeDecodeError:
+                df1 = pd.read_csv(file1, encoding="shift-jis")
+            try:
+                df2 = pd.read_csv(file2)
+            except UnicodeDecodeError:
+                df2 = pd.read_csv(file2, encoding="shift-jis")
 
             # データフレームの比較
             if df1.equals(df2):
