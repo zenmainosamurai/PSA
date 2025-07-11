@@ -1,3 +1,5 @@
+# TODO: ビジネスロジックとログ処理の分離
+
 from copy import deepcopy
 import os
 from dataclasses import dataclass
@@ -173,12 +175,11 @@ class GasAdosorptionBreakthroughsimulator:
         # プロセス開始後経過時間
         timestamp_p = 0
         # 初回限定処理の実施
-        if "バッチ吸着_上流" in mode_list:
+        if "バッチ吸着_上流" in mode_list and "バッチ吸着_下流" in mode_list:
             upstream_tower_number = mode_list.index("バッチ吸着_上流") + 1
             downstream_tower_number = mode_list.index("バッチ吸着_下流") + 1
             upstream_tower_state = self.state_manager.towers[upstream_tower_number]
             downstream_tower_state = self.state_manager.towers[downstream_tower_number]
-            # NOTE: 圧力平均化の位置
             # 圧力の平均化
             total_press_mean = (
                 upstream_tower_state.total_press
@@ -252,6 +253,7 @@ class GasAdosorptionBreakthroughsimulator:
         up_and_down_mode_list = [
             ["流通吸着_単独/上流", "流通吸着_下流"],  # [上流, 下流]
             ["バッチ吸着_上流", "バッチ吸着_下流"],
+            ["バッチ吸着_上流（圧調弁あり）", "バッチ吸着_下流（圧調弁あり）"],
         ]
         has_flow_adsorption_pair = (up_and_down_mode_list[0][0] in mode_list) and (
             up_and_down_mode_list[0][1] in mode_list
@@ -259,14 +261,20 @@ class GasAdosorptionBreakthroughsimulator:
         has_batch_adsorption_pair = (up_and_down_mode_list[1][0] in mode_list) and (
             up_and_down_mode_list[1][1] in mode_list
         )
+        has_batch_adsorption_with_valve = (up_and_down_mode_list[2][0] in mode_list) and (
+            up_and_down_mode_list[2][1] in mode_list
+        )
         # 3塔のうち2塔で上流・下流の組み合わせがある場合
-        if has_flow_adsorption_pair | has_batch_adsorption_pair:
+        if has_flow_adsorption_pair | has_batch_adsorption_pair | has_batch_adsorption_with_valve:
             if has_flow_adsorption_pair:
                 upstream_mode = up_and_down_mode_list[0][0]
                 downstream_mode = up_and_down_mode_list[0][1]
-            else:
+            elif has_batch_adsorption_pair:
                 upstream_mode = up_and_down_mode_list[1][0]
                 downstream_mode = up_and_down_mode_list[1][1]
+            else:
+                upstream_mode = up_and_down_mode_list[2][0]
+                downstream_mode = up_and_down_mode_list[2][1]
             upstream_tower_num = mode_list.index(upstream_mode) + 1
             downstream_tower_num = mode_list.index(downstream_mode) + 1
             # 上流塔のガス吸着計算
@@ -431,6 +439,23 @@ class GasAdosorptionBreakthroughsimulator:
                 inflow_gas=other_tower_params,
                 residual_gas_composition=self.residual_gas_composition,
             )
+        elif mode == "バッチ吸着_上流（圧調弁あり）":
+            calc_output = operation_models.batch_adsorption_upstream_with_pressure_valve(
+                tower_conds=tower_conds,
+                state_manager=state_manager,
+                tower_num=tower_num,
+            )
+        elif mode == "バッチ吸着_下流（圧調弁あり）":
+            if self.residual_gas_composition is None:
+                self.logger.warning("residual_gas_composition計算前にバッチ吸着_下流（圧調弁あり）が呼ばれました")
+            calc_output = operation_models.batch_adsorption_downstream_with_pressure_valve(
+                tower_conds=tower_conds,
+                state_manager=state_manager,
+                tower_num=tower_num,
+                is_series_operation=True,
+                inflow_gas=other_tower_params,
+                residual_gas_composition=self.residual_gas_composition,
+            )
         elif mode == "均圧_減圧":
             calc_output = operation_models.equalization_depressurization(
                 tower_conds=tower_conds,
@@ -469,6 +494,7 @@ class GasAdosorptionBreakthroughsimulator:
 
         return record_items, calc_output
 
+    # TODO: utils/termination_conditions.pyに移動
     def _create_termination_cond(self, termination_cond_str: str, timestamp: float, timestamp_p: float) -> bool:
         """文字列の終了条件からブール値の終了条件を作成する
 
@@ -533,6 +559,7 @@ class GasAdosorptionBreakthroughsimulator:
                 df_p_end=self.df_operation,
             )
 
+    # TODO: utils/unit_converter.pyに移動
     def _convert_cm3_to_nm3(self, volume_cm3: float, pressure_mpa: float, temperature: float) -> float:
         """
         単位をcm^3からNm^3（標準状態での体積）に変換する

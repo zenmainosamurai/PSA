@@ -152,9 +152,11 @@ class StateVariables:
             "初回ガス導入",
             "流通吸着_単独/上流",
             "バッチ吸着_上流",
+            "バッチ吸着_上流（圧調弁あり）",
             "均圧_加圧",
             "均圧_減圧",
             "バッチ吸着_下流",
+            "流通吸着_下流（圧調弁あり）",
             "流通吸着_下流",
         ]:
             for stream in range(1, self.num_streams + 1):
@@ -178,9 +180,15 @@ class StateVariables:
         # 全圧の更新
         if mode == "停止":
             pass
-        elif mode in ["初回ガス導入", "バッチ吸着_上流", "均圧_加圧", "バッチ吸着_下流"]:
+        elif mode in [
+            "初回ガス導入",
+            "バッチ吸着_上流",
+            "バッチ吸着_下流（圧調弁あり）",
+            "均圧_加圧",
+            "バッチ吸着_下流",
+        ]:
             tower.total_press = calc_output.pressure_after_batch_adsorption
-        elif mode in ["均圧_減圧", "流通吸着_単独/上流", "流通吸着_下流"]:
+        elif mode in ["均圧_減圧", "流通吸着_単独/上流", "流通吸着_下流", "バッチ吸着_上流（圧調弁あり）"]:
             tower.total_press = calc_output.total_pressure
         elif mode == "真空脱着":
             tower.total_press = calc_output.pressure_after_vacuum_desorption

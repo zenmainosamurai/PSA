@@ -201,6 +201,7 @@ def initial_adsorption(
         state_manager=state_manager,
         tower_num=tower_num,
         is_series_operation=is_series_operation,
+        has_pressure_valve=False,
     )
 
     return BatchAdsorptionResult(
@@ -288,6 +289,14 @@ def batch_adsorption_upstream(
     """バッチ吸着（上流）"""
     # 初期のバッチ吸着と同じ仕組み
     return initial_adsorption(tower_conds, state_manager, tower_num, is_series_operation)
+
+
+def batch_adsorption_upstream_with_pressure_valve(
+    tower_conds: TowerConditions, state_manager: StateVariables, tower_num: int
+) -> FlowAdsorptionResult:
+    """バッチ吸着（上流・圧調弁あり）"""
+    # 流通吸着（上流）と同じ仕組み
+    return flow_adsorption_single_or_upstream(tower_conds, state_manager, tower_num)
 
 
 def equalization_depressurization(
@@ -442,7 +451,12 @@ def equalization_pressurization(
 
 
 def batch_adsorption_downstream(
-    tower_conds: TowerConditions, state_manager, tower_num, is_series_operation, inflow_gas, residual_gas_composition
+    tower_conds: TowerConditions,
+    state_manager: StateVariables,
+    tower_num: int,
+    is_series_operation: bool,
+    inflow_gas: MassBalanceResults,
+    residual_gas_composition,
 ) -> BatchAdsorptionResult:
     """バッチ吸着（下流）"""
     mode = 0  # 吸着
@@ -482,6 +496,65 @@ def batch_adsorption_downstream(
         state_manager=state_manager,
         tower_num=tower_num,
         is_series_operation=is_series_operation,
+        has_pressure_valve=False,
+    )
+
+    return BatchAdsorptionResult(
+        material=balance_results.mass_balance_results,
+        heat=balance_results.heat_balance_results,
+        heat_wall=wall_heat_balance_results,
+        heat_lid=lid_heat_balance_results,
+        pressure_after_batch_adsorption=pressure_after_batch_adsorption,
+    )
+
+
+def batch_adsorption_downstream_with_pressure_valve(
+    tower_conds: TowerConditions,
+    state_manager: StateVariables,
+    tower_num: int,
+    is_series_operation: bool,
+    inflow_gas: MassBalanceResults,
+    residual_gas_composition,
+) -> BatchAdsorptionResult:
+    """バッチ吸着（下流・圧調弁あり）"""
+    mode = 0  # 吸着
+    calculator = CellCalculator()
+
+    # 流入ガスを各ストリームに分配
+    distributed_inflows = calculator.distribute_inflow_gas(tower_conds, inflow_gas)
+
+    mass_strategy = AdsorptionStrategy(
+        tower_conds,
+        state_manager,
+        tower_num,
+        external_inflow_gas=distributed_inflows,
+        residual_gas_composition=residual_gas_composition,
+    )
+    balance_results = calculator.calculate_mass_and_heat_balance(
+        tower_conds,
+        state_manager,
+        tower_num,
+        mode,
+        mass_strategy=mass_strategy,
+    )
+
+    # 壁面熱バランス計算
+    wall_heat_balance_results = calculator.calculate_wall_heat_balance(
+        tower_conds, state_manager, tower_num, balance_results.heat_balance_results
+    )
+
+    # 蓋熱バランス計算
+    lid_heat_balance_results = calculator.calculate_lid_heat_balance(
+        tower_conds, state_manager, tower_num, balance_results.heat_balance_results, wall_heat_balance_results
+    )
+
+    # バッチ吸着後圧力変化
+    pressure_after_batch_adsorption = adsorption_base_models.calculate_pressure_after_batch_adsorption(
+        tower_conds=tower_conds,
+        state_manager=state_manager,
+        tower_num=tower_num,
+        is_series_operation=True,
+        has_pressure_valve=True,
     )
 
     return BatchAdsorptionResult(

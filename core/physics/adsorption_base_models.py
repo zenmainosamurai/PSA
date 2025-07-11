@@ -1238,7 +1238,11 @@ def calculate_pressure_after_vacuum_desorption(
 
 
 def calculate_pressure_after_batch_adsorption(
-    tower_conds: TowerConditions, state_manager: StateVariables, tower_num: int, is_series_operation
+    tower_conds: TowerConditions,
+    state_manager: StateVariables,
+    tower_num: int,
+    is_series_operation: bool,
+    has_pressure_valve: bool,
 ):
     """バッチ吸着における圧力変化
 
@@ -1261,11 +1265,18 @@ def calculate_pressure_after_batch_adsorption(
     temp_mean = np.mean(temp_mean)
     temp_mean += 273.15
     # 空間体積（配管含む）
-    if is_series_operation:
+    if is_series_operation and not has_pressure_valve:
         V = (
             (tower_conds.packed_bed.void_volume + tower_conds.packed_bed.vessel_internal_void_volume) * 2
             + tower_conds.packed_bed.upstream_piping_volume
             + tower_conds.equalizing_piping.volume
+        )
+    elif is_series_operation and has_pressure_valve:
+        V = (
+            tower_conds.packed_bed.void_volume
+            + tower_conds.packed_bed.vessel_internal_void_volume
+            + tower_conds.equalizing_piping.volume
+            + tower_conds.equalizing_piping.isolated_equalizing_volume
         )
     else:
         V = (
