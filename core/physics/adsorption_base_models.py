@@ -910,8 +910,24 @@ def calculate_vacuum_pumping_result(tower_conds: TowerConditions, state_manager:
         # ポンプ見せかけの全圧 [PaA]
         P_PUMP = (tower.total_press - pressure_loss) * 1e6
         P_PUMP = max(0, P_PUMP)
-        # 真空ポンプ排気速度 [m3/min]
-        vacuum_rate = 25 * (tower_conds.vacuum_piping.diameter**4) * P_PUMP / 2
+        # 真空ポンプみかけの排気速度 [m3/min]
+        # 実行排気速度Seff=排気速度S*コンダクタンスC/(S+C)、C=pi*a^4*p-average/8/mu/Length、これに脱着ガスによる見かけの排気速度低下補正∝全圧をかけた
+        vacuum_rate = (
+            P_PUMP
+            / 101325
+            * 0.1
+            * tower_conds.vacuum_piping.vacuum_pumping_speed
+            * np.pi
+            / 8
+            * (tower_conds.vacuum_piping.diameter**4)
+            * P_PUMP
+            / 2
+            / tower_conds.vacuum_piping.length
+            / (
+                tower_conds.vacuum_piping.vacuum_pumping_speed * viscosity
+                + np.pi / 8 * (tower_conds.vacuum_piping.diameter**4) * P_PUMP / 2 / tower_conds.vacuum_piping.length
+            )
+        )
         # 真空ポンプ排気ノルマル流量 [m3/min]
         vacuum_rate_N = vacuum_rate / 0.1013 * P_PUMP * 1e-6
         # 真空ポンプ排気線流速 [m/3]
@@ -927,6 +943,8 @@ def calculate_vacuum_pumping_result(tower_conds: TowerConditions, state_manager:
             / tower_conds.vacuum_piping.diameter
             * linear_velocity**2
             / (2 * 9.81)
+            * rho
+            * 9.81
         ) * 1e-6
         # 収束判定
         if np.abs(pressure_loss - pressure_loss_old) < tolerance:
@@ -1044,9 +1062,16 @@ def calculate_depressurization_result(
         dP = (tower.total_press - downstream_tower_pressure - pressure_loss) * 1e6
         if np.abs(dP) < 1:
             dP = 0
-        # 配管流速 [m/s]
+        # 配管流速 [m/s]　コンダクタンスの考え方に変更 #係数について要検討
         flow_rate = (
-            dP * tower_conds.equalizing_piping.diameter**2 / (32 * viscosity * tower_conds.equalizing_piping.length)
+            7.2
+            * (tower.total_press - downstream_tower_pressure)
+            / (downstream_tower_pressure)
+            * tower_conds.equalizing_piping.diameter**2
+            / 4
+            * (tower.total_press - downstream_tower_pressure)
+            / 2
+            / (8 * viscosity * tower_conds.equalizing_piping.length)
         )
         flow_rate = max(1e-8, flow_rate)
         # 均圧管レイノルズ数
@@ -1060,6 +1085,8 @@ def calculate_depressurization_result(
             / tower_conds.equalizing_piping.diameter
             * flow_rate**2
             / (2 * 9.81)
+            * rho
+            * 9.81
         ) * 1e-6
         # 収束判定
         if np.abs(pressure_loss - pressure_loss_old) < tolerance:
@@ -1074,7 +1101,7 @@ def calculate_depressurization_result(
         * flow_rate
         / 60
         * tower_conds.equalizing_piping.flow_velocity_correction_factor
-        * 5
+        * 1
     )
     # 均圧配管ノルマル流量 [m3/min]
     standard_flow_rate = volumetric_flow_rate * tower.total_press / 0.1013
