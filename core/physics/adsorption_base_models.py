@@ -8,6 +8,23 @@ import CoolProp.CoolProp as CP
 from .heat_transfer import calc_heat_transfer_coef as _heat_transfer_coef
 from ..state import StateVariables
 from config.sim_conditions import TowerConditions
+from utils.const import (
+    CELSIUS_TO_KELVIN_OFFSET,
+    STANDARD_MOLAR_VOLUME,
+    GAS_CONSTANT,
+    STANDARD_PRESSURE,
+    PA_TO_MPA,
+    MPA_TO_PA,
+    MPA_TO_KPA,
+    MINUTE_TO_SECOND,
+    GRAVITY_ACCELERATION,
+    M3_TO_L,
+    CM3_TO_L,
+    L_TO_CM3,
+    L_TO_M3,
+    MINIMUM_EQUILIBRIUM_LOADING,
+    MINIMUM_CO2_PARTIAL_PRESSURE,
+)
 from ..state import (
     HeatBalanceResult,
     HeatBalanceResults,
@@ -66,8 +83,8 @@ def _calculate_theoretical_uptake(
             / tower_conds.packed_bed.average_particle_diameter
             * (equilibrium_loading - current_loading)
             * tower_conds.common.calculation_step_time
+            * MINUTE_TO_SECOND
             / 1e6
-            * 60
         )
         # セクション理論新規吸着量 [cm3]
         theoretical_uptake_volume = theoretical_loading_delta * section_adsorbent_mass
@@ -84,8 +101,8 @@ def _calculate_theoretical_uptake(
             / tower_conds.packed_bed.average_particle_diameter
             * (equilibrium_loading - current_loading)
             * tower_conds.common.calculation_step_time
+            * MINUTE_TO_SECOND
             / 1e6
-            * 60
         )
         # セクション理論新規吸着量 [cm3]
         theoretical_uptake_volume = theoretical_loading_delta * section_adsorbent_mass
@@ -113,7 +130,7 @@ def calculate_mass_balance_for_adsorption(
         section (int): 対象セルのsection番号
         variables (dict): 温度等の状態変数
         inflow_gas (dict): 上流セル・塔からの流出ガス情報
-        equalization_flow_rate (float): 上流均圧菅からの全流量
+        equalization_flow_rate (float): 上流均圧菅からの全流量[L/min]
 
     Returns:
         MaterialBalanceResult: 対象セルのマテリアルバランスに関する計算結果
@@ -130,28 +147,28 @@ def calculate_mass_balance_for_adsorption(
             tower_conds.feed_gas.co2_flow_rate
             * tower_conds.common.calculation_step_time
             * stream_conds[stream].area_fraction
-            * 1000
+            * L_TO_CM3
         )
         inlet_n2_volume = (
             tower_conds.feed_gas.n2_flow_rate
             * tower_conds.common.calculation_step_time
             * stream_conds[stream].area_fraction
-            * 1000
+            * L_TO_CM3
         )
     elif (section == 1) & (equalization_flow_rate is not None):  # 減圧時の最上流セルのみ対象
         inlet_co2_volume = (
             tower_conds.feed_gas.co2_mole_fraction
             * equalization_flow_rate
+            * L_TO_CM3
             * tower_conds.common.calculation_step_time
             * stream_conds[stream].area_fraction
-            * 1000
         )
         inlet_n2_volume = (
             tower_conds.feed_gas.n2_mole_fraction
             * equalization_flow_rate
+            * L_TO_CM3
             * tower_conds.common.calculation_step_time
             * stream_conds[stream].area_fraction
-            * 1000
         )
     elif inflow_gas is not None:  # 下流セクションや下流塔での吸着など
         inlet_co2_volume = inflow_gas.co2_volume
@@ -180,9 +197,9 @@ def calculate_mass_balance_for_adsorption(
         + tower_conds.feed_gas.n2_specific_heat_capacity * inlet_n2_mole_fraction
     )
     # 現在雰囲気の平衡吸着量 [cm3/g-abs]
-    P_KPA = co2_partial_pressure * 1000  # [kPaA]
-    T_K = temp + 273.15  # [K]
-    equilibrium_loading = max(0.1, _calculate_equilibrium_adsorption_amount(P_KPA, T_K))
+    P_KPA = co2_partial_pressure * MPA_TO_KPA  # [kPaA]
+    T_K = temp + CELSIUS_TO_KELVIN_OFFSET  # [K]
+    equilibrium_loading = max(MINIMUM_EQUILIBRIUM_LOADING, _calculate_equilibrium_adsorption_amount(P_KPA, T_K))
     # 現在の既存吸着量 [cm3/g-abs]
     current_loading = tower.loading[stream - 1, section - 1]
 
@@ -324,22 +341,22 @@ def calculate_mass_balance_for_desorption(
     inlet_co2_volume = mol_amt_section * tower.co2_mole_fraction[stream - 1, section - 1]
     inlet_n2_volume = mol_amt_section * tower.n2_mole_fraction[stream - 1, section - 1]
     # 現在気相ノルマル体積(=流入量) [cm3]
-    inlet_co2_volume *= 22.4 * 1000
-    inlet_n2_volume *= 22.4 * 1000
+    inlet_co2_volume *= STANDARD_MOLAR_VOLUME * L_TO_CM3
+    inlet_n2_volume *= STANDARD_MOLAR_VOLUME * L_TO_CM3
 
     ### 気相放出後モル量の計算 -----------------------------
     # 現在温度 [℃]
-    T_K = tower.temp[stream - 1, section - 1] + 273.15
+    T_K = tower.temp[stream - 1, section - 1] + CELSIUS_TO_KELVIN_OFFSET
     # モル分率
     co2_mole_fraction = tower.co2_mole_fraction[stream - 1, section - 1]
     n2_mole_fraction = tower.n2_mole_fraction[stream - 1, section - 1]
     # CO2分圧 [MPaA]
-    co2_partial_pressure = max(2.5e-3, vacuum_pumping_results.final_pressure * co2_mole_fraction)
+    co2_partial_pressure = max(MINIMUM_CO2_PARTIAL_PRESSURE, vacuum_pumping_results.final_pressure * co2_mole_fraction)
     # セクション吸着材量 [g]
     section_adsorbent_mass = stream_conds[stream].adsorbent_mass / tower_conds.common.num_sections
     # 現在雰囲気の平衡吸着量 [cm3/g-abs]
-    P_KPA = co2_partial_pressure * 1000  # [MPaA] → [kPaA]
-    equilibrium_loading = max(0.1, _calculate_equilibrium_adsorption_amount(P_KPA, T_K))
+    P_KPA = co2_partial_pressure * MPA_TO_KPA  # [MPaA] → [kPaA]
+    equilibrium_loading = max(MINIMUM_EQUILIBRIUM_LOADING, _calculate_equilibrium_adsorption_amount(P_KPA, T_K))
     # 現在の既存吸着量 [cm3/g-abs]
     current_loading = tower.loading[stream - 1, section - 1]
 
@@ -354,7 +371,7 @@ def calculate_mass_balance_for_desorption(
     # 気相放出CO2量 [cm3]
     desorp_mw_co2 = -1 * actual_uptake_volume
     # 気相放出CO2量 [mol]
-    desorp_mw_co2 = desorp_mw_co2 / 1000 / 22.4
+    desorp_mw_co2 = desorp_mw_co2 / (L_TO_CM3 * STANDARD_MOLAR_VOLUME)
     # 気相放出後モル量 [mol]
     desorp_mw_co2_after_vacuum = inlet_co2_volume + desorp_mw_co2
     desorp_mw_n2_after_vacuum = inlet_n2_volume
@@ -365,8 +382,8 @@ def calculate_mass_balance_for_desorption(
     desorp_mf_n2_after_vacuum = desorp_mw_n2_after_vacuum / (desorp_mw_co2_after_vacuum + desorp_mw_n2_after_vacuum)
 
     ### その他（熱バラ渡す用） ---------------------------------------
-    P = vacuum_pumping_results.final_pressure * 1e6
-    P_ATM = 0.101325 * 1e6
+    P = vacuum_pumping_results.final_pressure * MPA_TO_PA
+    P_ATM = STANDARD_PRESSURE
     # ガス密度 [kg/m3]
     gas_density = (
         CP.PropsSI("D", "T", T_K, "P", P, "co2") * co2_mole_fraction
@@ -573,7 +590,7 @@ def calculate_heat_balance_for_bed(
             * section_inner_boundary_area
             * (temp_inside_cell - temp_now)
             * tower_conds.common.calculation_step_time
-            * 60
+            * MINUTE_TO_SECOND
         )
     # 外側境界への熱流束 [J]
     if stream == tower_conds.common.num_streams:
@@ -582,7 +599,7 @@ def calculate_heat_balance_for_bed(
             * section_outer_boundary_area
             * (temp_now - temp_outside_cell)
             * tower_conds.common.calculation_step_time
-            * 60
+            * MINUTE_TO_SECOND
         )
     else:
         heat_flux_to_outer_boundary = (
@@ -590,7 +607,7 @@ def calculate_heat_balance_for_bed(
             * section_outer_boundary_area
             * (temp_now - temp_outside_cell)
             * tower_conds.common.calculation_step_time
-            * 60
+            * MINUTE_TO_SECOND
         )
     # 下流セルへの熱流束 [J]
     if section == tower_conds.common.num_sections:
@@ -599,11 +616,15 @@ def calculate_heat_balance_for_bed(
             * stream_conds[stream].cross_section
             * (temp_now - tower.bottom_temperature)
             * tower_conds.common.calculation_step_time
-            * 60
+            * MINUTE_TO_SECOND
         )
     else:
         downstream_heat_flux = (
-            bed_heat_transfer_coef * Abb * (temp_now - temp_below_cell) * tower_conds.common.calculation_step_time * 60
+            bed_heat_transfer_coef
+            * Abb
+            * (temp_now - temp_below_cell)
+            * tower_conds.common.calculation_step_time
+            * MINUTE_TO_SECOND
         )  # 下流セルへの熱流束
     # 上流セルヘの熱流束 [J]
     if section == 1:  # 上蓋からの熱流束
@@ -612,7 +633,7 @@ def calculate_heat_balance_for_bed(
             * stream_conds[stream].cross_section
             * (temp_now - tower.lid_temperature)
             * tower_conds.common.calculation_step_time
-            * 60
+            * MINUTE_TO_SECOND
         )
     else:  # 上流セルヘの熱流束 = -1 * 上流セルの「下流セルへの熱流束」
         upstream_heat_flux = -heat_output.heat_flux.downstream
@@ -658,7 +679,7 @@ def calculate_heat_balance_for_bed(
             * (tower.temp[stream - 1, section - 1] - tower.thermocouple_temperature[stream - 1, section - 1])
         )
     # 熱電対上昇温度 [℃]
-    temp_increase = heat_flux * tower_conds.common.calculation_step_time * 60 / heat_capacity
+    temp_increase = heat_flux * tower_conds.common.calculation_step_time * MINUTE_TO_SECOND / heat_capacity
     # 次時刻熱電対温度 [℃]
     temp_thermocouple_reached = tower.thermocouple_temperature[stream - 1, section - 1] + temp_increase
 
@@ -722,7 +743,7 @@ def calculate_heat_balance_for_wall(
             * stream_conds[3].cross_section
             * (temp_now - tower.lid_temperature)
             * tower_conds.common.calculation_step_time
-            * 60
+            * MINUTE_TO_SECOND
         )
     else:
         upstream_heat_flux = heat_wall_output.heat_flux.downstream
@@ -733,7 +754,7 @@ def calculate_heat_balance_for_wall(
         / tower_conds.common.num_sections
         * (temp_inside_cell - temp_now)
         * tower_conds.common.calculation_step_time
-        * 60
+        * MINUTE_TO_SECOND
     )
     # 外側境界への熱流束 [J]
     heat_flux_to_outer_boundary = (
@@ -742,7 +763,7 @@ def calculate_heat_balance_for_wall(
         / tower_conds.common.num_sections
         * (temp_now - temp_outside_cell)
         * tower_conds.common.calculation_step_time
-        * 60
+        * MINUTE_TO_SECOND
     )
     # 下流壁への熱流束 [J]
     if section == tower_conds.common.num_sections:
@@ -751,7 +772,7 @@ def calculate_heat_balance_for_wall(
             * stream_conds[3].cross_section
             * (temp_now - tower.bottom_temperature)
             * tower_conds.common.calculation_step_time
-            * 60
+            * MINUTE_TO_SECOND
         )
     else:
         downstream_heat_flux = (
@@ -805,7 +826,7 @@ def calculate_heat_balance_for_lid(
         tower_conds.vessel.external_heat_transfer_coef
         * (temp_now - tower_conds.vessel.ambient_temperature)
         * tower_conds.common.calculation_step_time
-        * 60
+        * MINUTE_TO_SECOND
     )
     if position == "up":
         heat_flux_to_ambient *= tower_conds.bottom.outer_flange_area
@@ -868,10 +889,10 @@ def calculate_vacuum_pumping_result(tower_conds: TowerConditions, state_manager:
                 for section in range(1, 1 + tower_conds.common.num_sections)
             ]
         )
-        + 273.15
+        + CELSIUS_TO_KELVIN_OFFSET
     )
     # 全圧 [PaA]
-    P = tower.total_press * 1e6  # [MPaA]→[Pa]
+    P = tower.total_press * MPA_TO_PA  # [MPaA]→[Pa]
     # 平均co2分率
     average_co2_mole_fraction = np.mean(
         [
@@ -890,7 +911,7 @@ def calculate_vacuum_pumping_result(tower_conds: TowerConditions, state_manager:
     )
     # 真空ポンプ排気ガス粘度 [Pa・s]
     # NOTE: 比熱と熱伝導率と粘度は大気圧を使用
-    P_ATM = 0.101325 * 1e6
+    P_ATM = STANDARD_PRESSURE
     viscosity = (
         CP.PropsSI("V", "T", T_K, "P", P_ATM, "co2") * average_co2_mole_fraction
         + CP.PropsSI("V", "T", T_K, "P", P_ATM, "nitrogen") * average_n2_mole_fraction
@@ -908,13 +929,13 @@ def calculate_vacuum_pumping_result(tower_conds: TowerConditions, state_manager:
     for iter in range(_max_iteration):
         pressure_loss_old = pressure_loss
         # ポンプ見せかけの全圧 [PaA]
-        P_PUMP = (tower.total_press - pressure_loss) * 1e6
+        P_PUMP = (tower.total_press - pressure_loss) * MPA_TO_PA
         P_PUMP = max(0, P_PUMP)
         # 真空ポンプみかけの排気速度 [m3/min]
         # 実行排気速度Seff=排気速度S*コンダクタンスC/(S+C)、C=pi*a^4*p-average/8/mu/Length、これに脱着ガスによる見かけの排気速度低下補正∝全圧をかけた
         vacuum_rate = (
             P_PUMP
-            / 101325
+            / STANDARD_PRESSURE
             * 0.1
             * tower_conds.vacuum_piping.vacuum_pumping_speed
             * np.pi
@@ -929,7 +950,7 @@ def calculate_vacuum_pumping_result(tower_conds: TowerConditions, state_manager:
             )
         )
         # 真空ポンプ排気ノルマル流量 [m3/min]
-        vacuum_rate_N = vacuum_rate / 0.1013 * P_PUMP * 1e-6
+        vacuum_rate_N = vacuum_rate / (STANDARD_PRESSURE * PA_TO_MPA) * P_PUMP * PA_TO_MPA
         # 真空ポンプ排気線流速 [m/3]
         linear_velocity = vacuum_rate / tower_conds.vacuum_piping.cross_section
         # 真空ポンプ排気レイノルズ数
@@ -942,9 +963,9 @@ def calculate_vacuum_pumping_result(tower_conds: TowerConditions, state_manager:
             * tower_conds.vacuum_piping.length
             / tower_conds.vacuum_piping.diameter
             * linear_velocity**2
-            / (2 * 9.81)
+            / (2 * GRAVITY_ACCELERATION)
             * rho
-            * 9.81
+            * GRAVITY_ACCELERATION
         ) * 1e-6
         # 収束判定
         if np.abs(pressure_loss - pressure_loss_old) < tolerance:
@@ -956,15 +977,15 @@ def calculate_vacuum_pumping_result(tower_conds: TowerConditions, state_manager:
 
     ### CO2回収濃度計算 --------------------------------------
     # 排気速度 [mol/min]
-    vacuum_rate_mol = 101325 * vacuum_rate_N / 8.314 / T_K
+    vacuum_rate_mol = STANDARD_PRESSURE * vacuum_rate_N / GAS_CONSTANT / T_K
     # 排気量 [mol]
     moles_pumped = vacuum_rate_mol * tower_conds.common.calculation_step_time
     # 回収量 [mol]
     cumulative_co2_recovered_mol = moles_pumped * average_co2_mole_fraction
     cumulative_n2_recovered_mol = moles_pumped * average_n2_mole_fraction
     # 回収量[Nm3]
-    cumulative_co2_recovered = cumulative_co2_recovered_mol * 0.0224
-    cumulative_n2_recovered = cumulative_n2_recovered_mol * 0.0224
+    cumulative_co2_recovered = cumulative_co2_recovered_mol * STANDARD_MOLAR_VOLUME * L_TO_M3
+    cumulative_n2_recovered = cumulative_n2_recovered_mol * STANDARD_MOLAR_VOLUME * L_TO_M3
     # 累積回収量[Nm3]
     cumulative_co2_recovered = tower.cumulative_co2_recovered + cumulative_co2_recovered
     cumulative_n2_recovered = tower.cumulative_n2_recovered + cumulative_n2_recovered
@@ -975,15 +996,14 @@ def calculate_vacuum_pumping_result(tower_conds: TowerConditions, state_manager:
     # 排気"前"の真空排気空間の現在物質量 [mol]
     case_inner_mol_amt = (
         # P_PUMP * tower_conds.vacuum_piping["space_volume"]
-        (P_PUMP + pressure_loss * 1e6)
+        (P_PUMP + pressure_loss * MPA_TO_PA)
         * tower_conds.vacuum_piping.space_volume
-        / 8.314
-        / T_K
+        / (GAS_CONSTANT * T_K)
     )
     # 排気"後"の現在物質量 [mol]
     remaining_moles = max(0, case_inner_mol_amt - moles_pumped)
     # 排気"後"の容器内部圧力 [MPaA]
-    final_pressure = remaining_moles * 8.314 * T_K / tower_conds.vacuum_piping.space_volume * 1e-6
+    final_pressure = remaining_moles * GAS_CONSTANT * T_K / tower_conds.vacuum_piping.space_volume * PA_TO_MPA
     vacuum_pumping_result = VacuumPumpingResult(
         pressure_loss=pressure_loss,
         cumulative_co2_recovered=cumulative_co2_recovered,
@@ -1020,10 +1040,10 @@ def calculate_depressurization_result(
                 for section in range(1, 1 + tower_conds.common.num_sections)
             ]
         )
-        + 273.15
+        + CELSIUS_TO_KELVIN_OFFSET
     )
     # 全圧 [PaA]
-    P = tower.total_press * 1e6  # [MPaA]→[Pa]
+    P = tower.total_press * MPA_TO_PA  # [MPaA]→[Pa]
     # 平均co2分率
     average_co2_mole_fraction = np.mean(
         [
@@ -1042,7 +1062,7 @@ def calculate_depressurization_result(
     )
     # 上流均圧管ガス粘度 [Pa・s]
     # NOTE: 比熱と熱伝導率と粘度は大気圧を使用
-    P_ATM = 0.101325 * 1e6
+    P_ATM = STANDARD_PRESSURE
     viscosity = (
         CP.PropsSI("V", "T", T_K, "P", P_ATM, "co2") * average_co2_mole_fraction
         + CP.PropsSI("V", "T", T_K, "P", P_ATM, "nitrogen") * average_n2_mole_fraction
@@ -1059,7 +1079,7 @@ def calculate_depressurization_result(
     for iter in range(_max_iteration):
         pressure_loss_old = pressure_loss
         # 塔間の圧力差 [PaA]
-        dP = (tower.total_press - downstream_tower_pressure - pressure_loss) * 1e6
+        dP = (tower.total_press - downstream_tower_pressure - pressure_loss) * MPA_TO_PA
         if np.abs(dP) < 1:
             dP = 0
         # 配管流速 [m/s]　コンダクタンスの考え方に変更 #係数について要検討
@@ -1084,9 +1104,9 @@ def calculate_depressurization_result(
             * tower_conds.equalizing_piping.length
             / tower_conds.equalizing_piping.diameter
             * flow_rate**2
-            / (2 * 9.81)
+            / (2 * GRAVITY_ACCELERATION)
             * rho
-            * 9.81
+            * GRAVITY_ACCELERATION
         ) * 1e-6
         # 収束判定
         if np.abs(pressure_loss - pressure_loss_old) < tolerance:
@@ -1099,22 +1119,22 @@ def calculate_depressurization_result(
     volumetric_flow_rate = (
         tower_conds.equalizing_piping.cross_section
         * flow_rate
-        * 60
+        * MINUTE_TO_SECOND
         * tower_conds.equalizing_piping.flow_velocity_correction_factor
         * 1
     )
     # 均圧配管ノルマル流量 [m3/min]
-    standard_flow_rate = volumetric_flow_rate * tower.total_press / 0.1013
+    standard_flow_rate = volumetric_flow_rate * tower.total_press / (STANDARD_PRESSURE * PA_TO_MPA)
     # 均圧配管流量 [L/min] (下流塔への入力)
-    flow_rate = standard_flow_rate * 1e3
+    flow_rate = standard_flow_rate * M3_TO_L
 
     ### 次時刻の圧力計算 ----------------------------------------
     # 容器上流空間を移動する物質量 [mol]
-    mw_upper_space = standard_flow_rate * 1000 * tower_conds.common.calculation_step_time / 22.4
+    mw_upper_space = standard_flow_rate * M3_TO_L * tower_conds.common.calculation_step_time / STANDARD_MOLAR_VOLUME
     # 上流側の合計体積 [m3]
     V_upper_tower = tower_conds.packed_bed.vessel_internal_void_volume + tower_conds.packed_bed.void_volume
     # 上流容器圧力変化 [MPaA]
-    dP_upper = 8.314 * T_K / V_upper_tower * mw_upper_space * 1e-6
+    dP_upper = GAS_CONSTANT * T_K / V_upper_tower * mw_upper_space * PA_TO_MPA
     # 次時刻の容器圧力 [MPaA]
     final_pressure = tower.total_press - dP_upper
     depressurization_result = DepressurizationResult(
@@ -1158,7 +1178,7 @@ def calculate_downstream_flow_after_depressurization(
                 for section in range(1, 1 + tower_conds.common.num_sections)
             ]
         )
-        + 273.15
+        + CELSIUS_TO_KELVIN_OFFSET
     )
     # 下流流出量合計（最下流セクションの合計）[L]
     most_down_section = tower_conds.common.num_sections
@@ -1173,7 +1193,7 @@ def calculate_downstream_flow_after_depressurization(
         / 1e3
     )
     # 下流流出物質量 [mol]
-    sum_outflow_mol = sum_outflow_fr / 22.4
+    sum_outflow_mol = sum_outflow_fr / STANDARD_MOLAR_VOLUME
     # 均圧下流側空間体積 [m3]
     V_downflow = (
         tower_conds.equalizing_piping.volume
@@ -1181,7 +1201,7 @@ def calculate_downstream_flow_after_depressurization(
         + tower_conds.packed_bed.vessel_internal_void_volume
     )
     # 下流容器圧力変化 [MPaA]
-    dP = 8.314 * T_K / V_downflow * sum_outflow_mol / 1e6
+    dP = GAS_CONSTANT * T_K / V_downflow * sum_outflow_mol * PA_TO_MPA
     # 次時刻の下流容器全圧 [MPaA]
     total_press_after_depressure_downflow = downstream_tower_pressure + dP
 
@@ -1242,7 +1262,7 @@ def calculate_pressure_after_vacuum_desorption(
                 for section in range(1, 1 + tower_conds.common.num_sections)
             ]
         )
-        + 273.15
+        + CELSIUS_TO_KELVIN_OFFSET
     )
     # 気相放出後の全物質量合計 [mol]
     sum_desorp_mw = (
@@ -1253,13 +1273,17 @@ def calculate_pressure_after_vacuum_desorption(
                 for section in range(1, 1 + tower_conds.common.num_sections)
             ]
         )
-        / 22.4
-        / 1e3
+        * CM3_TO_L
+        / STANDARD_MOLAR_VOLUME
     )
     # 配管上のモル量を加算
-    sum_desorp_mw += vacuum_pumping_results.final_pressure * 1e6 * tower_conds.vacuum_piping.volume / 8.314 / T_K
+    sum_desorp_mw += (
+        vacuum_pumping_results.final_pressure * MPA_TO_PA * tower_conds.vacuum_piping.volume / GAS_CONSTANT / T_K
+    )
     # 気相放出後の全圧 [MPaA]
-    pressure_after_vacuum_desorption = sum_desorp_mw * 8.314 * T_K / tower_conds.vacuum_piping.space_volume * 1e-6
+    pressure_after_vacuum_desorption = (
+        sum_desorp_mw * GAS_CONSTANT * T_K / tower_conds.vacuum_piping.space_volume * PA_TO_MPA
+    )
 
     return pressure_after_vacuum_desorption
 
@@ -1283,14 +1307,14 @@ def calculate_pressure_after_batch_adsorption(
     tower = state_manager.towers[tower_num]
 
     # 気体定数 [J/K/mol]
-    R = 8.314
+    R = GAS_CONSTANT
     # 平均温度 [K]
     temp_mean = []
     for stream in range(1, 1 + tower_conds.common.num_streams):
         for section in range(1, 1 + tower_conds.common.num_sections):
             temp_mean.append(tower.temp[stream - 1, section - 1])
     temp_mean = np.mean(temp_mean)
-    temp_mean += 273.15
+    temp_mean += CELSIUS_TO_KELVIN_OFFSET
     # 空間体積（配管含む）
     if is_series_operation and not has_pressure_valve:
         V = (
@@ -1314,7 +1338,9 @@ def calculate_pressure_after_batch_adsorption(
     # ノルマル体積流量
     F = tower_conds.feed_gas.total_flow_rate  # バッチ吸着: 導入ガスの流量
     # 圧力変化量
-    diff_pressure = R * temp_mean / V * (F / 22.4) * tower_conds.common.calculation_step_time / 1e6
+    diff_pressure = (
+        R * temp_mean / V * (F / STANDARD_MOLAR_VOLUME) * tower_conds.common.calculation_step_time * PA_TO_MPA
+    )
     # 変化後全圧
     pressure_after_batch_adsorption = tower.total_press + diff_pressure
 
@@ -1463,15 +1489,21 @@ class AdsorptionPhysicsCalculator(OperationModePhysicsCalculator):
         return (
             material_output.adsorption_state.actual_uptake_volume
             / 1000
-            / 22.4
+            / STANDARD_MOLAR_VOLUME
             * tower_conds.feed_gas.co2_molecular_weight
             * tower_conds.feed_gas.co2_adsorption_heat
         )
 
     def calculate_inlet_gas_mass(self, material_output: MaterialBalanceResult, tower_conds: TowerConditions) -> float:
         return (
-            material_output.inlet_gas.co2_volume / 1000 / 22.4 * tower_conds.feed_gas.co2_molecular_weight
-            + material_output.inlet_gas.n2_volume / 1000 / 22.4 * tower_conds.feed_gas.n2_molecular_weight
+            material_output.inlet_gas.co2_volume
+            / 1000
+            / STANDARD_MOLAR_VOLUME
+            * tower_conds.feed_gas.co2_molecular_weight
+            + material_output.inlet_gas.n2_volume
+            / 1000
+            / STANDARD_MOLAR_VOLUME
+            * tower_conds.feed_gas.n2_molecular_weight
         )
 
     def get_gas_specific_heat(self, material_output: MaterialBalanceResult) -> float:
@@ -1498,7 +1530,7 @@ class DesorptionPhysicsCalculator(OperationModePhysicsCalculator):
         return (
             material_output.adsorption_state.actual_uptake_volume
             / 1000
-            / 22.4
+            / STANDARD_MOLAR_VOLUME
             * tower_conds.feed_gas.co2_molecular_weight
             * tower_conds.feed_gas.co2_adsorption_heat
         )
