@@ -333,7 +333,7 @@ class DepressurizationResult:
     """減圧計算結果"""
 
     final_pressure: float
-    flow_rate: float
+    flow_rate: float  # L/min
     pressure_differential: float
 
 
