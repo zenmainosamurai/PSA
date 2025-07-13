@@ -975,24 +975,45 @@ def calculate_vacuum_pumping_result(tower_conds: TowerConditions, state_manager:
     if iter == _max_iteration - 1:
         print("収束せず: 見せかけの全圧 =", np.abs(pressure_loss - pressure_loss_old))
 
-    ### CO2回収濃度計算 --------------------------------------
-    # 排気速度 [mol/min]
-    vacuum_rate_mol = STANDARD_PRESSURE * vacuum_rate_N / GAS_CONSTANT / T_K
-    # 排気量 [mol]
-    moles_pumped = vacuum_rate_mol * tower_conds.common.calculation_step_time
-    # 回収量 [mol]
-    cumulative_co2_recovered_mol = moles_pumped * average_co2_mole_fraction
-    cumulative_n2_recovered_mol = moles_pumped * average_n2_mole_fraction
-    # 回収量[Nm3]
-    cumulative_co2_recovered = cumulative_co2_recovered_mol * STANDARD_MOLAR_VOLUME * L_TO_M3
-    cumulative_n2_recovered = cumulative_n2_recovered_mol * STANDARD_MOLAR_VOLUME * L_TO_M3
+    ### CO2回収量計算（吸着量における前タイムステップとの差分を使用）
+    total_desorption_volume = 0.0  # [Ncm3]
+    for stream in range(1, 1 + tower_conds.common.num_streams):
+        for section in range(1, 1 + tower_conds.common.num_sections):
+            current_loading = tower.loading[stream - 1, section - 1]
+            previous_loading = tower.previous_loading[stream - 1, section - 1]
+            section_adsorbent_mass = (
+                tower_conds.stream_conditions[stream].adsorbent_mass / tower_conds.common.num_sections
+            )
+            # 前のタイムステップからの脱着量（差分）[Ncm3/g-abs]
+            loading_delta = previous_loading - current_loading
+            # セクション全体での脱着量 [Ncm3]
+            section_desorption_volume = loading_delta * section_adsorbent_mass
+            total_desorption_volume += section_desorption_volume
+
+    # CO2回収量 [Nm3]
+    cumulative_co2_recovered = total_desorption_volume * CM3_TO_L * L_TO_M3
+    # N2回収量を平均モル分率から計算 [Nm3]
+    if average_co2_mole_fraction > 0:
+        cumulative_n2_recovered = cumulative_co2_recovered * average_n2_mole_fraction / average_co2_mole_fraction
+    else:
+        cumulative_n2_recovered = 0.0
+
     # 累積回収量[Nm3]
     cumulative_co2_recovered = tower.cumulative_co2_recovered + cumulative_co2_recovered
     cumulative_n2_recovered = tower.cumulative_n2_recovered + cumulative_n2_recovered
     # 積算排気CO2量 [Nm3]
-    co2_recovery_concentration = (cumulative_co2_recovered / (cumulative_co2_recovered + cumulative_n2_recovered)) * 100
+    co2_recovery_concentration = (
+        (cumulative_co2_recovered / (cumulative_co2_recovered + cumulative_n2_recovered)) * 100
+        if (cumulative_co2_recovered + cumulative_n2_recovered) > 0
+        else 0
+    )
 
     ### 排気後圧力計算 --------------------------------
+    # 排気速度 [mol/min]
+    vacuum_rate_mol = STANDARD_PRESSURE * vacuum_rate_N / GAS_CONSTANT / T_K
+    # 排気量 [mol]
+    moles_pumped = vacuum_rate_mol * tower_conds.common.calculation_step_time
+
     # 排気"前"の真空排気空間の現在物質量 [mol]
     case_inner_mol_amt = (
         # P_PUMP * tower_conds.vacuum_piping["space_volume"]
