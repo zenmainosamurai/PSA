@@ -20,6 +20,7 @@ class TowerStateArrays:
     temp: np.ndarray  # 温度
     thermocouple_temperature: np.ndarray  # 熱電対温度
     loading: np.ndarray  # 吸着量
+    previous_loading: np.ndarray  # 前タイムステップの吸着量
     co2_mole_fraction: np.ndarray  # CO2モル分率
     n2_mole_fraction: np.ndarray  # N2モル分率
     wall_to_bed_heat_transfer_coef: np.ndarray  # 層伝熱係数
@@ -86,6 +87,7 @@ class StateVariables:
             temp=temp_2d.copy(),
             thermocouple_temperature=temp_2d.copy(),
             loading=loading_2d.copy(),
+            previous_loading=loading_2d.copy(),
             co2_mole_fraction=mf_co2_2d.copy(),
             n2_mole_fraction=mf_n2_2d.copy(),
             wall_to_bed_heat_transfer_coef=heat_coef_2d.copy(),
@@ -106,6 +108,9 @@ class StateVariables:
     def update_from_calc_output(self, tower_num: int, mode: str, calc_output):
         """計算結果から状態変数を効率的に更新"""
         tower = self.towers[tower_num]
+
+        # 前のタイムステップの吸着量
+        tower.previous_loading[:] = tower.loading[:]
 
         heat_results: HeatBalanceResults = calc_output.heat  # HeatBalanceResults
         material_results: MassBalanceResults = calc_output.material  # MassBalanceResults
