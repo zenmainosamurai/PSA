@@ -11,7 +11,7 @@ import CoolProp.CoolProp as CP
 from core.state.state_variables import StateVariables
 from config.sim_conditions import TowerConditions
 from core.state.results import MaterialBalanceResult, VacuumPumpingResult
-
+from utils.const import STANDARD_PRESSURE, CELSIUS_TO_KELVIN_OFFSET
 
 # ------------------------------------------------------------------
 # 1. 物性値: 気体熱伝導率
@@ -21,7 +21,7 @@ def compute_gas_k(T_K: float, co2_mole_fraction: float, n2_mole_fraction: float)
     温度 T_K [K]・モル分率から混合気体の熱伝導率 [W/m/K] を返す。
     CoolProp の単体値を線形補間（大気圧を仮定）。
     """
-    P_ATM = 0.101325e6  # Pa
+    P_ATM = STANDARD_PRESSURE  # Pa
     k_co2 = CP.PropsSI("L", "T", T_K, "P", P_ATM, "co2")
     k_n2 = CP.PropsSI("L", "T", T_K, "P", P_ATM, "nitrogen")
     return (k_co2 * co2_mole_fraction + k_n2 * n2_mole_fraction) / 1000
@@ -139,14 +139,14 @@ def calc_heat_transfer_coef(
     """
     tower = state_manager.towers[tower_num]
     stream_conds = tower_conds.stream_conditions
-    T_K = temp_now + 273.15
+    T_K = temp_now + CELSIUS_TO_KELVIN_OFFSET
 
     if mode == 0:  # 吸着
         co2_mole_fraction = material_output.inlet_gas.co2_mole_fraction
         n2_mole_fraction = material_output.inlet_gas.n2_mole_fraction
     elif mode == 2:  # 脱着
-        co2_mole_fraction = tower.co2_mole_fraction[stream - 1, section - 1]
-        n2_mole_fraction = tower.n2_mole_fraction[stream - 1, section - 1]
+        co2_mole_fraction = tower.cell(stream, section).co2_mole_fraction
+        n2_mole_fraction = tower.cell(stream, section).n2_mole_fraction
     else:  # その他はとりあえず吸着と同様
         co2_mole_fraction = material_output.inlet_gas.co2_mole_fraction
         n2_mole_fraction = material_output.inlet_gas.n2_mole_fraction
@@ -169,7 +169,7 @@ def calc_heat_transfer_coef(
     d1 = 2.0 * (stream_conds[stream].cross_section / math.pi) ** 0.5
 
     # NOTE: 気体粘度 μ, 比熱 cp は大気圧を仮定
-    P_ATM = 0.101325e6
+    P_ATM = STANDARD_PRESSURE
     viscosity = (
         CP.PropsSI("V", "T", T_K, "P", P_ATM, "co2") * co2_mole_fraction
         + CP.PropsSI("V", "T", T_K, "P", P_ATM, "nitrogen") * n2_mole_fraction
