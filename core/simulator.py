@@ -10,7 +10,7 @@ import numpy as np
 import pandas as pd
 from logging import getLogger
 
-from utils import const, plot_csv, other_utils
+from utils import const, plot_csv, plot_xlsx, other_utils
 from .physics import operation_models
 from .state import StateVariables
 from .simulation_results import SimulationResults
@@ -534,30 +534,67 @@ class GasAdosorptionBreakthroughsimulator:
         timestamp: float,
     ) -> None:
         """計算結果の出力処理"""
-        self.logger.info("(2/3) csv output...")
-        self._apply_unit_conversion_to_results(simulation_results)
+        # use_xlsxフラグを取得（塔1の共通設定から取得）
+        use_xlsx = self.sim_conds.get_tower(1).common.use_xlsx
 
-        for tower_num in range(1, 1 + self.num_tower):
-            _tgt_foldapath = output_folderpath + f"/csv/tower_{tower_num}/"
-            os.makedirs(_tgt_foldapath, exist_ok=True)
-            tower_results = simulation_results.tower_simulation_results[tower_num]
-            plot_csv.outputs_to_csv(_tgt_foldapath, tower_results, self.sim_conds.get_tower(tower_num).common)
+        if use_xlsx == 1:
+            self.logger.info("(2/3) xlsx output...")
+            self._apply_unit_conversion_to_results(simulation_results)
 
-        self.df_operation["終了時刻(min)"] = list(process_completion_log.values())
-        self.df_operation.to_csv(output_folderpath + "/プロセス終了時刻.csv", encoding="shift-jis")
+            plot_target_sec = [2, 10, 18]
 
-        self.logger.info("(3/3) png output...")
-        plot_target_sec = [2, 10, 18]
+            for tower_num in range(1, 1 + self.num_tower):
+                _tgt_foldapath = output_folderpath + f"/xlsx/tower_{tower_num}/"
+                os.makedirs(_tgt_foldapath, exist_ok=True)
+                tower_results = simulation_results.tower_simulation_results[tower_num]
+                plot_xlsx.outputs_to_xlsx(
+                    _tgt_foldapath,
+                    tower_results,
+                    self.sim_conds.get_tower(tower_num).common,
+                    plot_target_sec,
+                    self.df_obs,
+                    tower_num,
+                )
 
-        for tower_num in range(1, 1 + self.num_tower):
-            plot_csv.plot_csv_outputs(
-                tgt_foldapath=output_folderpath,
-                df_obs=self.df_obs,
-                tgt_sections=plot_target_sec,
-                tower_num=tower_num,
-                timestamp=timestamp,
-                df_p_end=self.df_operation,
-            )
+            self.df_operation["終了時刻(min)"] = list(process_completion_log.values())
+            self.df_operation.to_csv(output_folderpath + "/プロセス終了時刻.csv", encoding="shift-jis")
+
+            self.logger.info("(3/3) xlsx chart output...")
+
+            for tower_num in range(1, 1 + self.num_tower):
+                plot_xlsx.plot_xlsx_outputs(
+                    tgt_foldapath=output_folderpath,
+                    df_obs=self.df_obs,
+                    tgt_sections=plot_target_sec,
+                    tower_num=tower_num,
+                    timestamp=timestamp,
+                    df_p_end=self.df_operation,
+                )
+        else:
+            self.logger.info("(2/3) csv output...")
+            self._apply_unit_conversion_to_results(simulation_results)
+
+            for tower_num in range(1, 1 + self.num_tower):
+                _tgt_foldapath = output_folderpath + f"/csv/tower_{tower_num}/"
+                os.makedirs(_tgt_foldapath, exist_ok=True)
+                tower_results = simulation_results.tower_simulation_results[tower_num]
+                plot_csv.outputs_to_csv(_tgt_foldapath, tower_results, self.sim_conds.get_tower(tower_num).common)
+
+            self.df_operation["終了時刻(min)"] = list(process_completion_log.values())
+            self.df_operation.to_csv(output_folderpath + "/プロセス終了時刻.csv", encoding="shift-jis")
+
+            self.logger.info("(3/3) png output...")
+            plot_target_sec = [2, 10, 18]
+
+            for tower_num in range(1, 1 + self.num_tower):
+                plot_csv.plot_csv_outputs(
+                    tgt_foldapath=output_folderpath,
+                    df_obs=self.df_obs,
+                    tgt_sections=plot_target_sec,
+                    tower_num=tower_num,
+                    timestamp=timestamp,
+                    df_p_end=self.df_operation,
+                )
 
     # TODO: utils/unit_converter.pyに移動
     def _convert_cm3_to_nm3(self, volume_cm3: float, pressure_mpa: float, temperature: float) -> float:
