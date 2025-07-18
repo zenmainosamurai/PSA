@@ -1062,9 +1062,16 @@ def calculate_depressurization_result(
         dP = (tower.total_press - downstream_tower_pressure - pressure_loss) * 1e6
         if np.abs(dP) < 1:
             dP = 0
-        # 配管流速 [m/s]
+        # 配管流速 [m/s]　コンダクタンスの考え方に変更 #係数について要検討
         flow_rate = (
-            dP * tower_conds.equalizing_piping.diameter**2 / (32 * viscosity * tower_conds.equalizing_piping.length)
+            7.2
+            * (tower.total_press - downstream_tower_pressure)
+            / (downstream_tower_pressure)
+            * tower_conds.equalizing_piping.diameter**2
+            / 4
+            * (tower.total_press - downstream_tower_pressure)
+            / 2
+            / (8 * viscosity * tower_conds.equalizing_piping.length)
         )
         flow_rate = max(1e-8, flow_rate)
         # 均圧管レイノルズ数
@@ -1078,6 +1085,8 @@ def calculate_depressurization_result(
             / tower_conds.equalizing_piping.diameter
             * flow_rate**2
             / (2 * 9.81)
+            * rho
+            * 9.81
         ) * 1e-6
         # 収束判定
         if np.abs(pressure_loss - pressure_loss_old) < tolerance:
@@ -1090,9 +1099,9 @@ def calculate_depressurization_result(
     volumetric_flow_rate = (
         tower_conds.equalizing_piping.cross_section
         * flow_rate
-        / 60
+        * 60
         * tower_conds.equalizing_piping.flow_velocity_correction_factor
-        * 5
+        * 1
     )
     # 均圧配管ノルマル流量 [m3/min]
     standard_flow_rate = volumetric_flow_rate * tower.total_press / 0.1013
