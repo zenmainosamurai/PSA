@@ -11,12 +11,14 @@ class CommonConditions:
     calculation_step_time: float  # min
     num_streams: int
     num_sections: int
+    use_xlsx: int = 0  # xlsxファイル出力フラグ（0: 無効, 1: 有効）
 
     def __post_init__(self):
         # 型変換と検証
         self.num_streams = int(self.num_streams)
         self.num_sections = int(self.num_sections)
         self.calculation_step_time = float(self.calculation_step_time)
+        self.use_xlsx = int(self.use_xlsx)
 
 
 @dataclass
