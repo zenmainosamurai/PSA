@@ -158,6 +158,7 @@ class VacuumPipingConditions(PipingConditions):
     """真空引き配管条件"""
 
     space_volume: float  # m^3
+    vacuum_pumping_speed: float  # m^3/min
 
 
 @dataclass

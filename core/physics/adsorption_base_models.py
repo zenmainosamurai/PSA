@@ -910,8 +910,24 @@ def calculate_vacuum_pumping_result(tower_conds: TowerConditions, state_manager:
         # ポンプ見せかけの全圧 [PaA]
         P_PUMP = (tower.total_press - pressure_loss) * 1e6
         P_PUMP = max(0, P_PUMP)
-        # 真空ポンプ排気速度 [m3/min]
-        vacuum_rate = 25 * (tower_conds.vacuum_piping.diameter**4) * P_PUMP / 2
+        # 真空ポンプみかけの排気速度 [m3/min]
+        # 実行排気速度Seff=排気速度S*コンダクタンスC/(S+C)、C=pi*a^4*p-average/8/mu/Length、これに脱着ガスによる見かけの排気速度低下補正∝全圧をかけた
+        vacuum_rate = (
+            P_PUMP
+            / 101325
+            * 0.1
+            * tower_conds.vacuum_piping.vacuum_pumping_speed
+            * np.pi
+            / 8
+            * (tower_conds.vacuum_piping.diameter**4)
+            * P_PUMP
+            / 2
+            / tower_conds.vacuum_piping.length
+            / (
+                tower_conds.vacuum_piping.vacuum_pumping_speed * viscosity
+                + np.pi / 8 * (tower_conds.vacuum_piping.diameter**4) * P_PUMP / 2 / tower_conds.vacuum_piping.length
+            )
+        )
         # 真空ポンプ排気ノルマル流量 [m3/min]
         vacuum_rate_N = vacuum_rate / 0.1013 * P_PUMP * 1e-6
         # 真空ポンプ排気線流速 [m/3]
@@ -927,6 +943,8 @@ def calculate_vacuum_pumping_result(tower_conds: TowerConditions, state_manager:
             / tower_conds.vacuum_piping.diameter
             * linear_velocity**2
             / (2 * 9.81)
+            * rho
+            * 9.81
         ) * 1e-6
         # 収束判定
         if np.abs(pressure_loss - pressure_loss_old) < tolerance:
