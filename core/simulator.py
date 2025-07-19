@@ -8,13 +8,13 @@ from typing import Dict, List, Optional
 
 import numpy as np
 import pandas as pd
-from logging import getLogger
 
 from utils import const, plot_csv, plot_xlsx, other_utils
 from .physics import operation_models
 from .state import StateVariables
 from .simulation_results import SimulationResults
 from config.sim_conditions import SimulationConditions, TowerConditions
+import log
 
 
 import warnings
@@ -41,9 +41,8 @@ class GasAdosorptionBreakthroughsimulator:
         Args:
             cond_id (str): 実験条件の名前(ex. test1)
         """
-        # ロガーの作成
-        # set_logger(log_dir=const.OUTPUT_DIR + cond_id + "/")
-        self.logger = getLogger(__name__)
+        # 子loggerを使用（規約に従った実装）
+        self.logger = log.logger.getChild(__name__)
 
         # クラス変数初期化
         self.cond_id = cond_id
@@ -79,8 +78,6 @@ class GasAdosorptionBreakthroughsimulator:
 
     def execute_simulation(self, filtered_states=None, output_folderpath=None):
         """物理計算を通しで実行"""
-        ### ◆(1/4) 前準備 ------------------------------------------------
-        # 記録用配列の用意
         simulation_results = SimulationResults()
 
         # 塔の初期化
@@ -97,8 +94,6 @@ class GasAdosorptionBreakthroughsimulator:
             output_folderpath = output_folderpath
             os.makedirs(output_folderpath, exist_ok=True)
 
-        ### ◆(2/4) シミュレーション実行 --------------------------------------
-        self.logger.info("(1/3) simulation...")
         # プロセス終了時刻記録用
         process_completion_log = {key: 0 for key in range(1, 1 + len(self.df_operation))}
         # 状態変数の初期化
@@ -126,7 +121,7 @@ class GasAdosorptionBreakthroughsimulator:
             if not process_result.success:
                 self.logger.warning(f"工程 {process_index} でエラーが発生したため、後続処理をスキップします")
                 break
-            self.logger.info(f"プロセス {process_index}: done. timestamp: {round(timestamp, 2)}")
+            self.logger.info(f"プロセス{process_index}終了 timestamp: {round(timestamp, 2)}")
         if simulation_success:
             self._output_results(output_folderpath, simulation_results, process_completion_log, timestamp)
 
@@ -538,7 +533,7 @@ class GasAdosorptionBreakthroughsimulator:
         use_xlsx = self.sim_conds.get_tower(1).common.use_xlsx
 
         if use_xlsx == 1:
-            self.logger.info("(2/3) xlsx output...")
+            self.logger.info("xlsx出力開始")
             self._apply_unit_conversion_to_results(simulation_results)
 
             plot_target_sec = [2, 10, 18]
@@ -559,7 +554,7 @@ class GasAdosorptionBreakthroughsimulator:
             self.df_operation["終了時刻(min)"] = list(process_completion_log.values())
             self.df_operation.to_csv(output_folderpath + "/プロセス終了時刻.csv", encoding="shift-jis")
 
-            self.logger.info("(3/3) xlsx chart output...")
+            self.logger.info("xlsxグラフ出力開始")
 
             for tower_num in range(1, 1 + self.num_tower):
                 plot_xlsx.plot_xlsx_outputs(
@@ -571,7 +566,7 @@ class GasAdosorptionBreakthroughsimulator:
                     df_p_end=self.df_operation,
                 )
         else:
-            self.logger.info("(2/3) csv output...")
+            self.logger.info("csv出力開始")
             self._apply_unit_conversion_to_results(simulation_results)
 
             for tower_num in range(1, 1 + self.num_tower):
@@ -583,7 +578,7 @@ class GasAdosorptionBreakthroughsimulator:
             self.df_operation["終了時刻(min)"] = list(process_completion_log.values())
             self.df_operation.to_csv(output_folderpath + "/プロセス終了時刻.csv", encoding="shift-jis")
 
-            self.logger.info("(3/3) png output...")
+            self.logger.info("png出力開始")
             plot_target_sec = [2, 10, 18]
 
             for tower_num in range(1, 1 + self.num_tower):

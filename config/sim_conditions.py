@@ -2,6 +2,9 @@ from dataclasses import dataclass, field
 from typing import Dict, List, Optional
 import pandas as pd
 import math
+import log
+
+logger = log.logger.getChild(__name__)
 
 
 @dataclass
@@ -253,51 +256,356 @@ class SimulationConditions:
         self.towers: Dict[int, TowerConditions] = {}
         self._load_conditions()
 
+    def _validate_sheet_existence(self, filepath: str, required_sheets: List[str]) -> bool:
+        """
+        必要なシートが存在するかチェック
+
+        Args:
+            filepath (str): Excelファイルのパス
+            required_sheets (List[str]): 必要なシート名のリスト
+
+        Returns:
+            bool: 全てのシートが存在する場合True
+
+        Raises:
+            Exception: 必要なシートが不足している場合
+        """
+        try:
+            excel_file = pd.ExcelFile(filepath)
+            existing_sheets_set = set(excel_file.sheet_names)
+            required_sheets_set = set(required_sheets)
+
+            if required_sheets_set.issubset(existing_sheets_set):
+                return True
+            else:
+                missing_sheets = required_sheets_set - existing_sheets_set
+                error_msg = f"条件ファイル({filepath})に必要なシートが不足しています: {list(missing_sheets)}"
+                logger.error(error_msg)
+                raise Exception(error_msg)
+
+        except FileNotFoundError:
+            error_msg = f"条件ファイルが見つかりません: {filepath}"
+            logger.error(error_msg)
+            raise Exception(error_msg)
+        except Exception as e:
+            error_msg = f"条件ファイルの読み込み中に予期せぬエラーが発生: {str(e)}"
+            logger.error(error_msg)
+            raise Exception(error_msg)
+
+    def _validate_dataclass_fields(
+        self, dataclass_type, sheet_name: str, tower_col: str, extracted_params: Dict
+    ) -> None:
+        """
+        データクラスのフィールドに対してバリデーションを実行
+
+        Args:
+            dataclass_type: バリデーション対象のデータクラス
+            sheet_name (str): シート名
+            tower_col (str): 塔カラム名
+            extracted_params (Dict): 抽出されたパラメータ
+
+        Raises:
+            Exception: バリデーションエラーが発生した場合
+        """
+        expected_fields = set(dataclass_type.__dataclass_fields__.keys())
+        actual_fields = set(extracted_params.keys())
+
+        # 余分なフィールドのチェック
+        extra_fields = actual_fields - expected_fields
+        if extra_fields:
+            error_msg = (
+                f"シート'{sheet_name}'の{tower_col}に予期しない変数（指定外の変数）があります: {list(extra_fields)}"
+            )
+            logger.error(error_msg)
+            raise Exception(error_msg)
+
+        # 不足フィールドのチェック
+        missing_fields = expected_fields - actual_fields
+        if missing_fields:
+            error_msg = f"シート'{sheet_name}'の{tower_col}に必要な変数が不足しています: {list(missing_fields)}"
+            logger.error(error_msg)
+            raise Exception(error_msg)
+
+        # 型チェック
+        for field_name, field_value in extracted_params.items():
+            if field_name in expected_fields:
+                field_info = dataclass_type.__dataclass_fields__[field_name]
+                expected_type = field_info.type
+
+                # デフォルト値がある場合はスキップ
+                if field_info.default != field_info.default_factory and pd.isna(field_value):
+                    continue
+
+                # floatまたはintの型チェック
+                if expected_type == float:
+                    try:
+                        float(field_value)
+                    except (ValueError, TypeError):
+                        error_msg = f"シート'{sheet_name}'の{tower_col}、パラメータ'{field_name}': {field_value} (数値である必要があります)"
+                        logger.error(error_msg)
+                        raise Exception(error_msg)
+                elif expected_type == int:
+                    try:
+                        int(field_value)
+                    except (ValueError, TypeError):
+                        error_msg = f"シート'{sheet_name}'の{tower_col}、パラメータ'{field_name}': {field_value} (整数である必要があります)"
+                        logger.error(error_msg)
+                        raise Exception(error_msg)
+
+        logger.debug(f"シート'{sheet_name}'の{tower_col}のバリデーションが成功しました")
+
+    def _validate_sheet_data(self, df: pd.DataFrame, sheet_name: str) -> None:
+        """
+        シートデータの基本バリデーション
+
+        Args:
+            df (pd.DataFrame): 検証するDataFrame
+            sheet_name (str): シート名
+
+        Raises:
+            Exception: バリデーションエラーが発生した場合
+        """
+        # 塔1〜3の列が存在するかチェック
+        required_columns = ["塔1", "塔2", "塔3"]
+        missing_columns = []
+
+        for col in required_columns:
+            if col not in df.columns:
+                missing_columns.append(col)
+
+        if missing_columns:
+            error_msg = (
+                f"シート'{sheet_name}'に必要な列が不足しています: {missing_columns} (既存の列: {list(df.columns)})"
+            )
+            logger.error(error_msg)
+            raise Exception(error_msg)
+
+        # 各塔の列について値の型チェック
+        for col in required_columns:
+            logger.debug(f"シート'{sheet_name}'の列'{col}'の値を検証中...")
+
+            # 各行について値をチェック
+            for param_name in df.index:
+                value = df.loc[param_name, col]
+
+                # NaN値はスキップ（後でデフォルト値チェックを行う）
+                if pd.isna(value):
+                    continue
+
+                # 数値型であることをチェック
+                if not self._is_numeric_value(value):
+                    error_msg = f"シート'{sheet_name}'の列'{col}'、パラメータ'{param_name}'の値が不正です: {repr(value)} (数値である必要があります)"
+                    logger.error(error_msg)
+                    raise Exception(error_msg)
+
+            logger.debug(f"シート'{sheet_name}'の列'{col}'の型チェックが成功しました")
+
+    def _is_numeric_value(self, value) -> bool:
+        """
+        値が数値として変換可能かチェック
+
+        Args:
+            value: チェック対象の値
+
+        Returns:
+            bool: 数値として変換可能な場合True
+        """
+        try:
+            # まずfloatに変換を試行
+            float(value)
+            return True
+        except (ValueError, TypeError):
+            # 文字列の場合、数値文字列かチェック
+            if isinstance(value, str):
+                # 空白を除去してから再試行
+                cleaned_value = value.strip()
+                if cleaned_value == "":
+                    return False
+                try:
+                    float(cleaned_value)
+                    return True
+                except (ValueError, TypeError):
+                    return False
+            return False
+
+    def _validate_sheet_data_with_types(self, df: pd.DataFrame, sheet_name: str, dataclass_type) -> None:
+        """
+        データクラスの型情報を使用したシートデータの詳細バリデーション
+
+        Args:
+            df (pd.DataFrame): 検証するDataFrame
+            sheet_name (str): シート名
+            dataclass_type: データクラスの型
+
+        Raises:
+            Exception: バリデーションエラーが発生した場合
+        """
+        required_columns = ["塔1", "塔2", "塔3"]
+
+        # データクラスのフィールド情報を取得
+        expected_fields = dataclass_type.__dataclass_fields__
+
+        # 指定外のパラメータ（行）をチェック
+        actual_params = set(df.index)
+        expected_params = set(expected_fields.keys())
+        extra_params = actual_params - expected_params
+
+        if extra_params:
+            error_msg = f"シート'{sheet_name}'に予期しないパラメータ（指定外の行）があります: {list(extra_params)}"
+            logger.error(error_msg)
+            raise Exception(error_msg)
+
+        for col in required_columns:
+            if col not in df.columns:
+                continue
+
+            logger.debug(f"シート'{sheet_name}'の列'{col}'について詳細な型チェックを実行中...")
+
+            for param_name in df.index:
+                if param_name not in expected_fields:
+                    continue
+
+                value = df.loc[param_name, col]
+                field_info = expected_fields[param_name]
+                expected_type = field_info.type
+
+                # NaN値の場合、デフォルト値があるかチェック
+                if pd.isna(value):
+                    if field_info.default == field_info.default_factory:  # デフォルト値なし
+                        error_msg = f"シート'{sheet_name}'の列'{col}'、パラメータ'{param_name}': 値が設定されていません (必須パラメータ)"
+                        logger.error(error_msg)
+                        raise Exception(error_msg)
+                    continue
+
+                # 型に応じた詳細チェック
+                if expected_type == float:
+                    try:
+                        float_val = float(value)
+                        # 特定の範囲チェック（必要に応じて）
+                        if param_name.endswith("_fraction") and not (0 <= float_val <= 1):
+                            error_msg = f"シート'{sheet_name}'の列'{col}'、パラメータ'{param_name}': {value} (分率は0〜1の範囲である必要があります)"
+                            logger.error(error_msg)
+                            raise Exception(error_msg)
+                    except (ValueError, TypeError):
+                        error_msg = f"シート'{sheet_name}'の列'{col}'、パラメータ'{param_name}': {repr(value)} (浮動小数点数である必要があります)"
+                        logger.error(error_msg)
+                        raise Exception(error_msg)
+
+                elif expected_type == int:
+                    try:
+                        int_val = int(value)
+                        # 正の整数チェック（必要に応じて）
+                        if param_name in ["num_streams", "num_sections"] and int_val <= 0:
+                            error_msg = f"シート'{sheet_name}'の列'{col}'、パラメータ'{param_name}': {value} (正の整数である必要があります)"
+                            logger.error(error_msg)
+                            raise Exception(error_msg)
+                    except (ValueError, TypeError):
+                        error_msg = f"シート'{sheet_name}'の列'{col}'、パラメータ'{param_name}': {repr(value)} (整数である必要があります)"
+                        logger.error(error_msg)
+                        raise Exception(error_msg)
+
+            logger.debug(f"シート'{sheet_name}'の列'{col}'の詳細型チェックが成功しました")
+
     def _load_conditions(self):
         """Excelファイルから条件を読み込む"""
         filepath = f"conditions/{self.cond_id}/sim_conds.xlsx"
 
-        sheets = pd.read_excel(
-            filepath,
-            sheet_name=[
-                "共通",
-                "触媒充填層条件",
-                "導入ガス条件",
-                "容器壁条件",
-                "蓋条件",
-                "底条件",
-                "均圧配管条件",
-                "真空引き配管条件",
-                "熱電対条件",
-            ],
-            index_col=1,
-        )
+        required_sheets = [
+            "共通",
+            "触媒充填層条件",
+            "導入ガス条件",
+            "容器壁条件",
+            "蓋条件",
+            "底条件",
+            "均圧配管条件",
+            "真空引き配管条件",
+            "熱電対条件",
+        ]
 
-        # 各塔の条件を読み込み
-        for tower_num in range(1, 4):
-            tower = self._create_tower_conditions(sheets, tower_num)
-            tower.initialize_stream_conditions()
-            self.towers[tower_num] = tower
+        # シート存在チェック（例外が発生すれば即座に終了）
+        self._validate_sheet_existence(filepath, required_sheets)
+
+        try:
+            logger.info(f"条件ファイル({filepath})読み込み開始")
+
+            sheets = pd.read_excel(
+                filepath,
+                sheet_name=required_sheets,
+                index_col=1,
+            )
+
+            dataclass_mappings = [
+                (CommonConditions, "共通"),
+                (PackedBedConditions, "触媒充填層条件"),
+                (FeedGasConditions, "導入ガス条件"),
+                (VesselConditions, "容器壁条件"),
+                (EndCoverConditions, "蓋条件"),
+                (EndCoverConditions, "底条件"),
+                (EqualizingPipingConditions, "均圧配管条件"),
+                (VacuumPipingConditions, "真空引き配管条件"),
+                (ThermocoupleConditions, "熱電対条件"),
+            ]
+
+            sheet_dataclass_mapping = {sheet_name: dataclass_type for dataclass_type, sheet_name in dataclass_mappings}
+
+            for sheet_name, df in sheets.items():
+                # 基本バリデーション（列の存在チェックと基本的な型チェック）
+                self._validate_sheet_data(df, sheet_name)
+
+                # 詳細バリデーション（データクラスの型情報を使用）
+                if sheet_name in sheet_dataclass_mapping:
+                    dataclass_type = sheet_dataclass_mapping[sheet_name]
+                    self._validate_sheet_data_with_types(df, sheet_name, dataclass_type)
+
+            # 各塔のデータクラスフィールドバリデーション
+            for tower_num in range(1, 4):
+                col = f"塔{tower_num}"
+                for dataclass_type, sheet_name in dataclass_mappings:
+                    params = self._extract_params(sheets[sheet_name], col)
+                    self._validate_dataclass_fields(dataclass_type, sheet_name, col, params)
+
+            # 各塔の条件を読み込み
+            for tower_num in range(1, 4):
+                tower = self._create_tower_conditions(sheets, tower_num)
+                tower.initialize_stream_conditions()
+                self.towers[tower_num] = tower
+            logger.info(f"条件ファイル({filepath})の読み込み完了")
+
+        except Exception as e:
+            logger.error(f"条件ファイル読み込み中にエラーが発生: {str(e)}")
+            raise Exception(f"条件ファイル({filepath})の読み込みに失敗しました: {str(e)}")
 
     def _create_tower_conditions(self, sheets: Dict[str, pd.DataFrame], tower_num: int) -> TowerConditions:
         """各塔の条件を作成"""
         col = f"塔{tower_num}"
 
+        extracted_data = {
+            "共通": self._extract_params(sheets["共通"], col),
+            "触媒充填層条件": self._extract_params(sheets["触媒充填層条件"], col),
+            "導入ガス条件": self._extract_params(sheets["導入ガス条件"], col),
+            "容器壁条件": self._extract_params(sheets["容器壁条件"], col),
+            "蓋条件": self._extract_params(sheets["蓋条件"], col),
+            "底条件": self._extract_params(sheets["底条件"], col),
+            "均圧配管条件": self._extract_params(sheets["均圧配管条件"], col),
+            "真空引き配管条件": self._extract_params(sheets["真空引き配管条件"], col),
+            "熱電対条件": self._extract_params(sheets["熱電対条件"], col),
+        }
+
         return TowerConditions(
-            common=CommonConditions(**self._extract_params(sheets["共通"], col)),
-            packed_bed=PackedBedConditions(**self._extract_params(sheets["触媒充填層条件"], col)),
-            feed_gas=FeedGasConditions(**self._extract_params(sheets["導入ガス条件"], col)),
-            vessel=VesselConditions(**self._extract_params(sheets["容器壁条件"], col)),
-            lid=EndCoverConditions(**self._extract_params(sheets["蓋条件"], col)),
-            bottom=EndCoverConditions(**self._extract_params(sheets["底条件"], col)),
-            equalizing_piping=EqualizingPipingConditions(**self._extract_params(sheets["均圧配管条件"], col)),
-            vacuum_piping=VacuumPipingConditions(**self._extract_params(sheets["真空引き配管条件"], col)),
-            thermocouple=ThermocoupleConditions(**self._extract_params(sheets["熱電対条件"], col)),
+            common=CommonConditions(**extracted_data["共通"]),
+            packed_bed=PackedBedConditions(**extracted_data["触媒充填層条件"]),
+            feed_gas=FeedGasConditions(**extracted_data["導入ガス条件"]),
+            vessel=VesselConditions(**extracted_data["容器壁条件"]),
+            lid=EndCoverConditions(**extracted_data["蓋条件"]),
+            bottom=EndCoverConditions(**extracted_data["底条件"]),
+            equalizing_piping=EqualizingPipingConditions(**extracted_data["均圧配管条件"]),
+            vacuum_piping=VacuumPipingConditions(**extracted_data["真空引き配管条件"]),
+            thermocouple=ThermocoupleConditions(**extracted_data["熱電対条件"]),
         )
 
     def _extract_params(self, df: pd.DataFrame, col: str) -> Dict:
         """DataFrameから指定列のパラメータを辞書として抽出"""
-        return {param: df.loc[param, col] for param in df.index if pd.notna(df.loc[param, col])}
+        return {param: df.loc[param, col] for param in df.index}
 
     def get_tower(self, tower_num: int) -> TowerConditions:
         """指定した塔の条件を取得"""
