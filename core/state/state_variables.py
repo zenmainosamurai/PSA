@@ -1,6 +1,6 @@
-import numpy as np
 from dataclasses import dataclass
 from typing import Dict
+import numpy as np
 from config.sim_conditions import SimulationConditions
 from .results import (
     HeatBalanceResults,
@@ -10,6 +10,110 @@ from .results import (
     MoleFractionResults,
     VacuumPumpingResult,
 )
+
+
+class CellAccessor:
+    """セルアクセス用のヘルパークラス
+
+    tower.cell(stream, section).temp のような自然な記法でアクセス可能
+    """
+
+    def __init__(self, tower_state: "TowerStateArrays", stream: int, section: int):
+        self._tower_state = tower_state
+        self._stream = stream
+        self._section = section
+        self._stream_idx = stream - 1  # 0-indexedに変換
+        self._section_idx = section - 1  # 0-indexedに変換
+
+    @property
+    def temp(self) -> float:
+        """温度を取得"""
+        return self._tower_state.temp[self._stream_idx, self._section_idx]
+
+    @temp.setter
+    def temp(self, value: float) -> None:
+        """温度を設定"""
+        self._tower_state.temp[self._stream_idx, self._section_idx] = value
+
+    @property
+    def loading(self) -> float:
+        """吸着量を取得"""
+        return self._tower_state.loading[self._stream_idx, self._section_idx]
+
+    @loading.setter
+    def loading(self, value: float) -> None:
+        """吸着量を設定"""
+        self._tower_state.loading[self._stream_idx, self._section_idx] = value
+
+    @property
+    def co2_mole_fraction(self) -> float:
+        """CO2モル分率を取得"""
+        return self._tower_state.co2_mole_fraction[self._stream_idx, self._section_idx]
+
+    @co2_mole_fraction.setter
+    def co2_mole_fraction(self, value: float) -> None:
+        """CO2モル分率を設定"""
+        self._tower_state.co2_mole_fraction[self._stream_idx, self._section_idx] = value
+
+    @property
+    def n2_mole_fraction(self) -> float:
+        """N2モル分率を取得"""
+        return self._tower_state.n2_mole_fraction[self._stream_idx, self._section_idx]
+
+    @n2_mole_fraction.setter
+    def n2_mole_fraction(self, value: float) -> None:
+        """N2モル分率を設定"""
+        self._tower_state.n2_mole_fraction[self._stream_idx, self._section_idx] = value
+
+    @property
+    def thermocouple_temperature(self) -> float:
+        """熱電対温度を取得"""
+        return self._tower_state.thermocouple_temperature[self._stream_idx, self._section_idx]
+
+    @thermocouple_temperature.setter
+    def thermocouple_temperature(self, value: float) -> None:
+        """熱電対温度を設定"""
+        self._tower_state.thermocouple_temperature[self._stream_idx, self._section_idx] = value
+
+    @property
+    def outlet_co2_partial_pressure(self) -> float:
+        """流出CO2分圧を取得"""
+        return self._tower_state.outlet_co2_partial_pressure[self._stream_idx, self._section_idx]
+
+    @outlet_co2_partial_pressure.setter
+    def outlet_co2_partial_pressure(self, value: float) -> None:
+        """流出CO2分圧を設定"""
+        self._tower_state.outlet_co2_partial_pressure[self._stream_idx, self._section_idx] = value
+
+    @property
+    def wall_to_bed_heat_transfer_coef(self) -> float:
+        """壁-層伝熱係数を取得"""
+        return self._tower_state.wall_to_bed_heat_transfer_coef[self._stream_idx, self._section_idx]
+
+    @wall_to_bed_heat_transfer_coef.setter
+    def wall_to_bed_heat_transfer_coef(self, value: float) -> None:
+        """壁-層伝熱係数を設定"""
+        self._tower_state.wall_to_bed_heat_transfer_coef[self._stream_idx, self._section_idx] = value
+
+    @property
+    def bed_heat_transfer_coef(self) -> float:
+        """層伝熱係数を取得"""
+        return self._tower_state.bed_heat_transfer_coef[self._stream_idx, self._section_idx]
+
+    @bed_heat_transfer_coef.setter
+    def bed_heat_transfer_coef(self, value: float) -> None:
+        """層伝熱係数を設定"""
+        self._tower_state.bed_heat_transfer_coef[self._stream_idx, self._section_idx] = value
+
+    @property
+    def previous_loading(self) -> float:
+        """前タイムステップの吸着量を取得"""
+        return self._tower_state.previous_loading[self._stream_idx, self._section_idx]
+
+    @previous_loading.setter
+    def previous_loading(self, value: float) -> None:
+        """前タイムステップの吸着量を設定"""
+        self._tower_state.previous_loading[self._stream_idx, self._section_idx] = value
 
 
 @dataclass
@@ -36,6 +140,22 @@ class TowerStateArrays:
     total_press: float  # 全圧
     cumulative_co2_recovered: float  # 積算CO2回収量[Nm3]
     cumulative_n2_recovered: float  # 積算N2回収量[Nm3]
+
+    def cell(self, stream: int, section: int) -> CellAccessor:
+        """指定されたstream, sectionのセルアクセッサーを取得
+
+        Usage:
+            tower.cell(1, 1).temp  # stream=1, section=1の温度を取得
+            tower.cell(2, 3).loading = 0.5  # stream=2, section=3の吸着量を設定
+
+        Args:
+            stream: ストリーム番号 (1-indexed)
+            section: セクション番号 (1-indexed)
+
+        Returns:
+            CellAccessor: セルアクセッサー
+        """
+        return CellAccessor(self, stream, section)
 
 
 class StateVariables:
@@ -120,23 +240,21 @@ class StateVariables:
             for section in range(1, self.num_sections + 1):
                 # マテリアルバランス結果の更新
                 material_result = material_results.get_result(stream, section)
-                tower.loading[stream - 1, section - 1] = material_result.adsorption_state.updated_loading
-                tower.outlet_co2_partial_pressure[stream - 1, section - 1] = (
+                tower.cell(stream, section).loading = material_result.adsorption_state.updated_loading
+                tower.cell(stream, section).outlet_co2_partial_pressure = (
                     material_result.pressure_state.outlet_co2_partial_pressure
                 )
 
                 # 熱バランス結果の更新
                 heat_result = heat_results.get_result(stream, section)
-                tower.temp[stream - 1, section - 1] = heat_result.cell_temperatures.bed_temperature
-                tower.thermocouple_temperature[stream - 1, section - 1] = (
+                tower.cell(stream, section).temp = heat_result.cell_temperatures.bed_temperature
+                tower.cell(stream, section).thermocouple_temperature = (
                     heat_result.cell_temperatures.thermocouple_temperature
                 )
-                tower.wall_to_bed_heat_transfer_coef[stream - 1, section - 1] = (
+                tower.cell(stream, section).wall_to_bed_heat_transfer_coef = (
                     heat_result.heat_transfer_coefficients.wall_to_bed
                 )
-                tower.bed_heat_transfer_coef[stream - 1, section - 1] = (
-                    heat_result.heat_transfer_coefficients.bed_to_bed
-                )
+                tower.cell(stream, section).bed_heat_transfer_coef = heat_result.heat_transfer_coefficients.bed_to_bed
 
         # 壁面温度の更新
         heat_wall_results: Dict[int, WallHeatBalanceResult] = calc_output.heat_wall  # Dict[int, WallHeatBalanceResult]
@@ -167,20 +285,18 @@ class StateVariables:
             for stream in range(1, self.num_streams + 1):
                 for section in range(1, self.num_sections + 1):
                     material_result = material_results.get_result(stream, section)
-                    tower.co2_mole_fraction[stream - 1, section - 1] = material_result.outlet_gas.co2_mole_fraction
-                    tower.n2_mole_fraction[stream - 1, section - 1] = material_result.outlet_gas.n2_mole_fraction
+                    tower.cell(stream, section).co2_mole_fraction = material_result.outlet_gas.co2_mole_fraction
+                    tower.cell(stream, section).n2_mole_fraction = material_result.outlet_gas.n2_mole_fraction
         elif mode == "真空脱着":
             mol_frac_results: MoleFractionResults = calc_output.mol_fraction  # MoleFractionResults
             if mol_frac_results:  # mol_fractionがNoneでない場合のみ処理
                 for stream in range(1, self.num_streams + 1):
                     for section in range(1, self.num_sections + 1):
                         mol_frac_result = mol_frac_results.get_result(stream, section)
-                        tower.co2_mole_fraction[stream - 1, section - 1] = (
+                        tower.cell(stream, section).co2_mole_fraction = (
                             mol_frac_result.co2_mole_fraction_after_desorption
                         )
-                        tower.n2_mole_fraction[stream - 1, section - 1] = (
-                            mol_frac_result.n2_mole_fraction_after_desorption
-                        )
+                        tower.cell(stream, section).n2_mole_fraction = mol_frac_result.n2_mole_fraction_after_desorption
 
         # 全圧の更新
         if mode == "停止":
