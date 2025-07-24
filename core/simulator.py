@@ -536,7 +536,7 @@ class GasAdosorptionBreakthroughsimulator:
             self.logger.info("xlsx出力開始")
             self._apply_unit_conversion_to_results(simulation_results)
 
-            plot_target_sec = [2, 10, 18]
+            plot_target_sec = self.sim_conds.get_tower(1).common.get_sections_for_graph()
 
             for tower_num in range(1, 1 + self.num_tower):
                 _tgt_foldapath = output_folderpath + f"/xlsx/tower_{tower_num}/"
@@ -579,7 +579,7 @@ class GasAdosorptionBreakthroughsimulator:
             self.df_operation.to_csv(output_folderpath + "/プロセス終了時刻.csv", encoding="shift-jis")
 
             self.logger.info("png出力開始")
-            plot_target_sec = [2, 10, 18]
+            plot_target_sec = self.sim_conds.get_tower(1).common.get_sections_for_graph()
 
             for tower_num in range(1, 1 + self.num_tower):
                 plot_csv.plot_csv_outputs(

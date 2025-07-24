@@ -15,6 +15,7 @@ class CommonConditions:
     num_streams: int
     num_sections: int
     use_xlsx: int = 0  # xlsxファイル出力フラグ（0: 無効, 1: 有効）
+    sections_for_graph: str = ""  # グラフ用セクション番号（セミコロン区切り）
 
     def __post_init__(self):
         # 型変換と検証
@@ -22,6 +23,26 @@ class CommonConditions:
         self.num_sections = int(self.num_sections)
         self.calculation_step_time = float(self.calculation_step_time)
         self.use_xlsx = int(self.use_xlsx)
+        self.sections_for_graph = str(self.sections_for_graph)
+
+    def get_sections_for_graph(self) -> list:
+        """
+        グラフ用セクション番号を整数のリストとして取得
+
+        Returns:
+            list: セクション番号のリスト（例: [3, 5, 8]）
+        """
+        if not self.sections_for_graph:
+            return [2, 10, 18]
+
+        try:
+            sections = [int(section.strip()) for section in self.sections_for_graph.split(";") if section.strip()]
+            return sections
+        except (ValueError, AttributeError):
+            logger.warning(
+                f"グラフ用セクション番号の解析に失敗しました: {self.sections_for_graph}. デフォルト値を使用します。"
+            )
+            return [2, 10, 18]
 
 
 @dataclass
@@ -336,8 +357,11 @@ class SimulationConditions:
                 if field_info.default != field_info.default_factory and pd.isna(field_value):
                     continue
 
-                # floatまたはintの型チェック
-                if expected_type == float:
+                # floatまたはintまたはstrの型チェック
+                if expected_type == str:
+                    # 文字列型の場合はそのまま通す
+                    pass
+                elif expected_type == float:
                     try:
                         float(field_value)
                     except (ValueError, TypeError):
@@ -390,6 +414,10 @@ class SimulationConditions:
 
                 # NaN値はスキップ（後でデフォルト値チェックを行う）
                 if pd.isna(value):
+                    continue
+
+                # sections_for_graph は文字列なので数値チェックをスキップ
+                if param_name == "sections_for_graph":
                     continue
 
                 # 数値型であることをチェック
@@ -477,8 +505,10 @@ class SimulationConditions:
                         raise Exception(error_msg)
                     continue
 
-                # 型に応じた詳細チェック
-                if expected_type == float:
+                if expected_type == str:
+                    # 文字列型の場合はそのまま通す
+                    pass
+                elif expected_type == float:
                     try:
                         float_val = float(value)
                         # 特定の範囲チェック（必要に応じて）
