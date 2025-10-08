@@ -11,3 +11,4 @@ build/
 ~*
 *props_usage.csv
 *prop_table.npz
+distribution/
