@@ -54,13 +54,21 @@ class GasAdosorptionBreakthroughsimulator:
         self.num_str = self.sim_conds.get_tower(1).common.num_streams  # ストリーム数
         self.num_sec = self.sim_conds.get_tower(1).common.num_sections  # セクション数
 
-        # 観測値(data)の読み込み
+        # 観測値(data)の読み込み（存在しない場合は警告を出して継続）
         filepath = const.DATA_DIR + "3塔データ.csv"
-        if filepath[-3:] == "csv":
-            self.df_obs = pd.read_csv(filepath, index_col=0)
-        else:
-            self.df_obs = pd.read_excel(filepath, sheet_name=self.sim_conds[1]["sheet_name"], index_col="time")
-        self.df_obs = other_utils.resample_obs_data(self.df_obs, self.dt)  # リサンプリング
+        self.df_obs: Optional[pd.DataFrame] = None
+        try:
+            if filepath.lower().endswith("csv"):
+                df = pd.read_csv(filepath, index_col=0)
+            else:
+                df = pd.read_excel(filepath, sheet_name=self.sim_conds[1]["sheet_name"], index_col="time")
+
+            # リサンプリング
+            self.df_obs = other_utils.resample_obs_data(df, self.dt)
+        except FileNotFoundError:
+            self.logger.warning(f"観測データファイルが存在しないため比較をスキップします: {filepath}")
+        except Exception as exc:
+            self.logger.error(f"観測データの読み込みに失敗しましたが処理を継続します: {exc}")
 
         # 稼働表の読み込み
         filepath = const.CONDITIONS_DIR + self.cond_id + "/" + "稼働工程表.xlsx"

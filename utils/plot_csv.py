@@ -76,14 +76,17 @@ def plot_csv_outputs(tgt_foldapath, df_obs, tgt_sections, tower_num, timestamp, 
         plt.xlabel("timestamp")
         # セクション到達温度のみ観測値をプロット
         if "セクション到達温度" in key or "熱電対温度" in key:
-            for section in range(1, 4):
-                plt.plot(
-                    df_obs.loc[:timestamp, f"T{tower_num}_temp_{section}"],
-                    label=f"(str,sec) = (1, {tgt_sections[section-1]})",
-                    linestyle=linestyle_dict[tgt_sections[section - 1]],
-                    c="black",
-                )
-            plt.legend(fontsize=12)
+            if df_obs is not None and not df_obs.empty:
+                for section in range(1, 4):
+                    col_name = f"T{tower_num}_temp_{section}"
+                    if col_name in df_obs.columns:
+                        plt.plot(
+                            df_obs.loc[:timestamp, col_name],
+                            label=f"(str,sec) = (1, {tgt_sections[section-1]})",
+                            linestyle=linestyle_dict[tgt_sections[section - 1]],
+                            c="black",
+                        )
+                plt.legend(fontsize=12)
         # プロセス終了時刻の縦線をプロット
         ax = plt.gca()
         ymin, ymax = ax.get_ylim()
@@ -201,7 +204,10 @@ def plot_csv_outputs(tgt_foldapath, df_obs, tgt_sections, tower_num, timestamp, 
     # CSVに保存されている実際のカラム名を使用
     column_name = df.columns[0]  # 最初のカラム名を取得
     plt.plot(df[column_name], label="計算値")
-    plt.plot(df_obs.loc[:timestamp, f"T{tower_num}_press"], label="観測値", c="black")  # 観測値もプロット
+    if df_obs is not None and not df_obs.empty:
+        press_col = f"T{tower_num}_press"
+        if press_col in df_obs.columns:
+            plt.plot(df_obs.loc[:timestamp, press_col], label="観測値", c="black")
     plt.title("全圧 [MPaA]")
     plt.legend()
     plt.grid()
