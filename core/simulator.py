@@ -71,11 +71,6 @@ class GasAdosorptionBreakthroughsimulator:
 
         self.state_manager = StateVariables(self.num_tower, self.num_str, self.num_sec, self.sim_conds)
 
-    def _init_variables(self):
-        """各塔の状態変数を初期化"""
-        for tower_num in range(1, self.num_tower + 1):
-            self.state_manager.towers[tower_num].total_press = self.df_obs.loc[0, f"T{tower_num}_press"]
-
     def execute_simulation(self, filtered_states=None, output_folderpath=None):
         """物理計算を通しで実行"""
         simulation_results = SimulationResults()
@@ -96,8 +91,6 @@ class GasAdosorptionBreakthroughsimulator:
 
         # プロセス終了時刻記録用
         process_completion_log = {key: 0 for key in range(1, 1 + len(self.df_operation))}
-        # 状態変数の初期化
-        self._init_variables()
         # 吸着計算
         timestamp = 0
         simulation_success = True

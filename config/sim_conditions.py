@@ -7,6 +7,7 @@ import log
 logger = log.logger.getChild(__name__)
 
 
+# sim_conds.xlsx記載の各条件
 @dataclass
 class CommonConditions:
     """共通条件"""
@@ -63,7 +64,7 @@ class PackedBedConditions:
     average_porosity: float  # -
     average_particle_diameter: float  # m
     particle_shape_factor: float  # -
-    initial_internal_pressure: float  # kPaA
+    initial_internal_pressure: float  # MPaA
     adsorption_mass_transfer_coef: float  # 1e-6/sec
     desorption_mass_transfer_coef: float  # 1e-6/sec
     void_volume: float  # m^3
@@ -218,7 +219,7 @@ class StreamConditions:
 
 @dataclass
 class TowerConditions:
-    """塔ごとの条件"""
+    """1つの塔の全条件をまとめたクラス"""
 
     common: CommonConditions
     packed_bed: PackedBedConditions

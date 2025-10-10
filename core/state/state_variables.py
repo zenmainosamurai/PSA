@@ -197,8 +197,10 @@ class StateVariables:
         heat_coef_wall_2d = np.full((self.num_streams, self.num_sections), 14.0, dtype=np.float64)
 
         # 流出CO2分圧の初期化
-        total_press_init = tower_cond.feed_gas.total_pressure
-        outflow_pco2_2d = np.full((self.num_streams, self.num_sections), total_press_init, dtype=np.float64)
+        total_press_init = tower_cond.packed_bed.initial_internal_pressure
+        outflow_pco2_2d = np.full(
+            (self.num_streams, self.num_sections), tower_cond.feed_gas.total_pressure, dtype=np.float64
+        )
 
         # 1D配列の初期化
         temp_wall_1d = np.full(self.num_sections, ambient_temperature, dtype=np.float64)
