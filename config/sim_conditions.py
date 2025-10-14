@@ -186,6 +186,8 @@ class VacuumPipingConditions(PipingConditions):
 
     space_volume: float  # m^3
     vacuum_pumping_speed: float  # m^3/min
+    pump_correction_factor_1: float  # -
+    pump_correction_factor_2: float  # -
 
 
 @dataclass

@@ -934,9 +934,9 @@ def calculate_vacuum_pumping_result(tower_conds: TowerConditions, state_manager:
         # 真空ポンプみかけの排気速度 [m3/min]
         # 実行排気速度Seff=排気速度S*コンダクタンスC/(S+C)、C=pi*a^4*p-average/8/mu/Length、これに脱着ガスによる見かけの排気速度低下補正∝全圧をかけた
         vacuum_rate = (
-            P_PUMP
+            (P_PUMP + tower_conds.vacuum_piping.pump_correction_factor_2)
             / STANDARD_PRESSURE
-            * 0.1
+            * tower_conds.vacuum_piping.pump_correction_factor_1
             * tower_conds.vacuum_piping.vacuum_pumping_speed
             * np.pi
             / 8
