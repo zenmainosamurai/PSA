@@ -93,7 +93,7 @@ def _calculate_theoretical_uptake(
     else:
         # 脱着モード
         theoretical_loading_delta = (
-            tower_conds.packed_bed.desorption_mass_transfer_coef ** (current_loading / equilibrium_loading)
+            tower_conds.packed_bed.desorption_mass_transfer_coef
             / tower_conds.packed_bed.adsorbent_bulk_density
             * 6
             * (1 - tower_conds.packed_bed.average_porosity)
