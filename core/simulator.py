@@ -533,11 +533,11 @@ class GasAdosorptionBreakthroughsimulator:
         # use_xlsxフラグを取得（塔1の共通設定から取得）
         use_xlsx = self.sim_conds.get_tower(1).common.use_xlsx
 
+        self._apply_unit_conversion_to_results(simulation_results)
+        plot_target_sec = self.sim_conds.get_tower(1).common.get_sections_for_graph()
+
         if use_xlsx == 1:
             self.logger.info("xlsx出力開始")
-            self._apply_unit_conversion_to_results(simulation_results)
-
-            plot_target_sec = self.sim_conds.get_tower(1).common.get_sections_for_graph()
 
             for tower_num in range(1, 1 + self.num_tower):
                 _tgt_foldapath = output_folderpath + f"/xlsx/tower_{tower_num}/"
@@ -552,9 +552,6 @@ class GasAdosorptionBreakthroughsimulator:
                     tower_num,
                 )
 
-            self.df_operation["終了時刻(min)"] = list(process_completion_log.values())
-            self.df_operation.to_csv(output_folderpath + "/プロセス終了時刻.csv", encoding="shift-jis")
-
             self.logger.info("xlsxグラフ出力開始")
 
             for tower_num in range(1, 1 + self.num_tower):
@@ -566,31 +563,29 @@ class GasAdosorptionBreakthroughsimulator:
                     timestamp=timestamp,
                     df_p_end=self.df_operation,
                 )
-        else:
-            self.logger.info("csv出力開始")
-            self._apply_unit_conversion_to_results(simulation_results)
 
-            for tower_num in range(1, 1 + self.num_tower):
-                _tgt_foldapath = output_folderpath + f"/csv/tower_{tower_num}/"
-                os.makedirs(_tgt_foldapath, exist_ok=True)
-                tower_results = simulation_results.tower_simulation_results[tower_num]
-                plot_csv.outputs_to_csv(_tgt_foldapath, tower_results, self.sim_conds.get_tower(tower_num).common)
+        self.logger.info("csv出力開始")
 
-            self.df_operation["終了時刻(min)"] = list(process_completion_log.values())
-            self.df_operation.to_csv(output_folderpath + "/プロセス終了時刻.csv", encoding="shift-jis")
+        for tower_num in range(1, 1 + self.num_tower):
+            _tgt_foldapath = output_folderpath + f"/csv/tower_{tower_num}/"
+            os.makedirs(_tgt_foldapath, exist_ok=True)
+            tower_results = simulation_results.tower_simulation_results[tower_num]
+            plot_csv.outputs_to_csv(_tgt_foldapath, tower_results, self.sim_conds.get_tower(tower_num).common)
 
-            self.logger.info("png出力開始")
-            plot_target_sec = self.sim_conds.get_tower(1).common.get_sections_for_graph()
+        self.df_operation["終了時刻(min)"] = list(process_completion_log.values())
+        self.df_operation.to_csv(output_folderpath + "/プロセス終了時刻.csv", encoding="shift-jis")
 
-            for tower_num in range(1, 1 + self.num_tower):
-                plot_csv.plot_csv_outputs(
-                    tgt_foldapath=output_folderpath,
-                    df_obs=self.df_obs,
-                    tgt_sections=plot_target_sec,
-                    tower_num=tower_num,
-                    timestamp=timestamp,
-                    df_p_end=self.df_operation,
-                )
+        self.logger.info("png出力開始")
+
+        for tower_num in range(1, 1 + self.num_tower):
+            plot_csv.plot_csv_outputs(
+                tgt_foldapath=output_folderpath,
+                df_obs=self.df_obs,
+                tgt_sections=plot_target_sec,
+                tower_num=tower_num,
+                timestamp=timestamp,
+                df_p_end=self.df_operation,
+            )
 
     # TODO: utils/unit_converter.pyに移動
     def _convert_cm3_to_nm3(self, volume_cm3: float, pressure_mpa: float, temperature: float) -> float:
