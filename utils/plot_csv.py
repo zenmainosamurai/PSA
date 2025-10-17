@@ -99,7 +99,7 @@ def plot_csv_outputs(tgt_foldapath, df_obs, tgt_sections, tower_num, timestamp, 
             plt.vlines(tgt_timestamp, ymin=ymin, ymax=ymax, colors="tab:orange", alpha=1)
             p_name_bfr = p_name
         plt.legend(fontsize=12, loc="upper left", bbox_to_anchor=(1, 1))
-    plt.savefig(output_foldapath + "heat.png", dpi=100)
+    plt.savefig(os.path.join(output_foldapath, f"heat_tower{tower_num}.png"), dpi=100)
     plt.close()
 
     ### 可視化（マテバラ） -------------------------------------
@@ -149,7 +149,7 @@ def plot_csv_outputs(tgt_foldapath, df_obs, tgt_sections, tower_num, timestamp, 
             tgt_timestamp = df_p_end.loc[idx, "終了時刻(min)"]
             plt.vlines(tgt_timestamp, ymin=ymin, ymax=ymax, colors="tab:orange", alpha=1)
             p_name_bfr = p_name
-    plt.savefig(output_foldapath + "material.png", dpi=100)
+    plt.savefig(os.path.join(output_foldapath, f"material_tower{tower_num}.png"), dpi=100)
     plt.close()
 
     ### 可視化（熱バラ(上下蓋)） -------------------------------------
@@ -186,7 +186,7 @@ def plot_csv_outputs(tgt_foldapath, df_obs, tgt_sections, tower_num, timestamp, 
             tgt_timestamp = df_p_end.loc[idx, "終了時刻(min)"]
             plt.vlines(tgt_timestamp, ymin=ymin, ymax=ymax, colors="tab:orange", alpha=1)
             p_name_bfr = p_name
-    plt.savefig(output_foldapath + "heat_lid.png", dpi=100)
+    plt.savefig(os.path.join(output_foldapath, f"heat_lid_tower{tower_num}.png"), dpi=100)
     plt.close()
 
     ### 可視化（others） -------------------------------------
@@ -290,7 +290,7 @@ def plot_csv_outputs(tgt_foldapath, df_obs, tgt_sections, tower_num, timestamp, 
             p_name_bfr = p_name
         plt_cell += 1
 
-    plt.savefig(output_foldapath + f"others.png", dpi=100)
+    plt.savefig(os.path.join(output_foldapath, f"others_tower{tower_num}.png"), dpi=100)
     plt.close()
 
 
