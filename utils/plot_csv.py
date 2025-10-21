@@ -377,7 +377,7 @@ def _save_heat_material_data(tgt_foldapath, tower_results, common_conds, data_ty
     # キーごとにCSVファイルを作成
     sample_result_data = record_data[0].get_result(1, 1).to_dict()
     for key in sample_result_data.keys():
-        key_indices = [i for i, col in enumerate(columns) if key in col]
+        key_indices = [i for i, col in enumerate(columns) if (col.split("-")[0] if "-" in col else col) == key]
         key_values = np.array(values)[:, key_indices]
         key_columns = [columns[i] for i in key_indices]
 
