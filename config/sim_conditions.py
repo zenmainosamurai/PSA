@@ -72,6 +72,10 @@ class PackedBedConditions:
     vessel_internal_void_volume: float  # m^3
     initial_adsorption_amount: float  # cm^3/g-abs
     initial_temperature: float  # degC
+    initial_co2_partial_pressure: float  # MPaA
+    initial_n2_partial_pressure: float  # MPaA
+    initial_co2_mole_fraction: float  # -
+    initial_n2_mole_fraction: float  # -
 
     def __post_init__(self):
         for field_name in self.__dataclass_fields__:

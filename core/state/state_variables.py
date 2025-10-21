@@ -183,8 +183,8 @@ class StateVariables:
         temp_2d = np.full((self.num_streams, self.num_sections), packed_bed_initial_temperature, dtype=np.float64)
 
         # モル分率の初期化
-        mf_co2_init = tower_cond.feed_gas.co2_mole_fraction
-        mf_n2_init = tower_cond.feed_gas.n2_mole_fraction
+        mf_co2_init = tower_cond.packed_bed.initial_co2_mole_fraction
+        mf_n2_init = tower_cond.packed_bed.initial_n2_mole_fraction
         mf_co2_2d = np.full((self.num_streams, self.num_sections), mf_co2_init, dtype=np.float64)
         mf_n2_2d = np.full((self.num_streams, self.num_sections), mf_n2_init, dtype=np.float64)
 
@@ -197,9 +197,8 @@ class StateVariables:
         heat_coef_wall_2d = np.full((self.num_streams, self.num_sections), 14.0, dtype=np.float64)
 
         # 流出CO2分圧の初期化
-        total_press_init = tower_cond.packed_bed.initial_internal_pressure
         outflow_pco2_2d = np.full(
-            (self.num_streams, self.num_sections), tower_cond.feed_gas.total_pressure, dtype=np.float64
+            (self.num_streams, self.num_sections), tower_cond.packed_bed.initial_co2_partial_pressure, dtype=np.float64
         )
 
         # 1D配列の初期化
@@ -218,7 +217,7 @@ class StateVariables:
             temp_wall=temp_wall_1d.copy(),
             lid_temperature=ambient_temperature,
             bottom_temperature=ambient_temperature,
-            total_press=total_press_init,
+            total_press=tower_cond.packed_bed.initial_internal_pressure,
             cumulative_co2_recovered=0.0,
             cumulative_n2_recovered=0.0,
         )
