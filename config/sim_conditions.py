@@ -182,6 +182,7 @@ class EqualizingPipingConditions(PipingConditions):
     flow_velocity_correction_factor: float  # -
     main_part_volume: float  # m^3
     isolated_equalizing_volume: float  # m^3
+    pipe_correction_factor: float  # -
 
 
 @dataclass
