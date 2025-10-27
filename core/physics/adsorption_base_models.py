@@ -1105,7 +1105,7 @@ def calculate_depressurization_result(
             dP = 0
         # 配管流速 [m/s]　コンダクタンスの考え方に変更 #係数について要検討
         flow_rate = (
-            7.2
+            tower_conds.equalizing_piping.pipe_correction_factor
             * (tower.total_press - downstream_tower_pressure)
             / (downstream_tower_pressure)
             * tower_conds.equalizing_piping.diameter**2
