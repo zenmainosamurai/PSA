@@ -5,152 +5,41 @@
 
 ---
 
-## 1. 【優先度: 高】`state/` に同じ目的のファイルが2つある
+## 解決済みの問題
 
-### 現状
+### ~~1. 【優先度: 高】`state/` に同じ目的のファイルが2つある~~
 
+**解決日: 2024-12-27**
+
+- `state/calculation_results.py` を削除
+- `MassBalanceCalculationResult` を `state/results.py` に移動
+- 未使用クラス（`TowerResults`, `OperationResult`）を削除
+
+現在の構成:
 ```
 state/
-├── results.py              # 旧コード（345行）
-├── calculation_results.py  # 新コード（534行）
-├── state_variables.py
-└── __init__.py
+├── results.py          # 全計算結果クラス
+├── state_variables.py  # 状態変数管理
+└── __init__.py         # エクスポート定義
 ```
-
-### 問題点
-
-- `results.py` と `calculation_results.py` に**ほぼ同じクラスが重複定義**されている
-- 以下のクラスが両方に存在:
-  - `GasFlow`
-  - `GasProperties`
-  - `AdsorptionState`
-  - `PressureState`
-  - `MaterialBalanceResult`
-  - `HeatBalanceResult`
-  - `WallHeatBalanceResult`
-  - `LidHeatBalanceResult`
-  - `VacuumPumpingResult`
-  - `DepressurizationResult`
-  - `DownstreamFlowResult`
-  - `DesorptionMoleFractionResult`
-- どちらを使うべきか混乱する
-- `state/__init__.py` が両方からインポートしているため、名前衝突のリスク
-
-### 現状の使用状況
-
-```python
-# results.py のクラス → 物質収支・熱収支のコレクションクラス
-MassBalanceResults       # Dict[stream, Dict[section, MaterialBalanceResult]] のラッパー
-HeatBalanceResults       # Dict[stream, Dict[section, HeatBalanceResult]] のラッパー
-MoleFractionResults      # 脱着時専用
-
-# calculation_results.py のクラス → 新コードで定義したが未使用
-TowerResults             # 直感的なアクセサー付き（未使用）
-OperationResult          # 運転モード計算結果（未使用）
-MassBalanceCalculationResult  # physics/mass_balance.py で使用
-```
-
-### 推奨対応
-
-1. **統合方針を決定**
-   - `results.py` の `MassBalanceResults`, `HeatBalanceResults` は実際に使用されている
-   - `calculation_results.py` の `TowerResults`, `OperationResult` は未使用
-
-2. **対応手順**
-   ```
-   a. calculation_results.py の未使用クラス（TowerResults, OperationResult）を削除
-   b. 基本データクラス（GasFlow等）を1ファイルに統合
-   c. results.py の階層的アクセサー（SectionResults, StreamSectionResults等）を
-      シンプルな辞書アクセスに置き換えるか、そのまま残すか判断
-   d. 最終的に1ファイルに統合するか、役割で分離するか決定
-   ```
-
-3. **影響範囲**
-   - `operation_modes/*.py` - `MassBalanceResults`, `HeatBalanceResults` を使用
-   - `physics/*.py` - `MaterialBalanceResult`, `MassBalanceCalculationResult` を使用
-   - `process/process_executor.py` - `MassBalanceResults` を使用
 
 ---
 
-## 2. 【優先度: 高】`utils/const.py` と `common/` の重複
+### ~~2. 【優先度: 高】`utils/const.py` と `common/` の重複~~
 
-### 現状
+**解決日: 2024-12-27**
 
-```python
-# utils/const.py（旧コード、130行）
-CELSIUS_TO_KELVIN_OFFSET = 273.15
-GAS_CONSTANT = 8.314
-CONDITIONS_DIR = "conditions/"
-OUTPUT_DIR = "output/"
-TRANSLATION = {...}   # 英語→日本語変換辞書（45項目）
-UNIT = {...}          # 単位辞書（42項目）
-OPERATION_MODE = {...}  # 稼働モード辞書
-
-# common/constants.py（新コード）
-CELSIUS_TO_KELVIN_OFFSET = 273.15  # 同じ定義
-GAS_CONSTANT = 8.314               # 同じ定義
-
-# common/paths.py（新コード）
-CONDITIONS_DIR = "conditions/"     # 同じ定義
-OUTPUT_DIR = "output/"             # 同じ定義
-
-# common/translations.py（新コード）
-TRANSLATION = {...}  # 同じ定義
-UNIT = {...}         # 同じ定義
-```
-
-### 問題点
-
-- 同じ定数が2箇所に定義されている
-- 以下のモジュールが `utils/const` を参照:
-  - `process/simulator.py`
-  - `utils/plot_csv.py`
-  - `utils/plot_xlsx.py`
-  - `utils/plot_xlsx_new.py`
-- 以下のモジュールが `common/` を参照:
-  - `physics/heat_transfer.py` → `common/constants`
-  - `physics/*.py` → `common/constants`
-- 将来的に値の乖離が起きる可能性
-
-### 推奨対応
-
-**方針A: `utils/const.py` を削除し、`common/` に統合**
-
-```python
-# utils/const.py を以下に置き換え（エイリアス化）
-from common.constants import *
-from common.paths import *
-from common.translations import *
-
-# 追加で必要な項目（common/ に未移行のもの）
-OPERATION_MODE = {
-    1: "初回ガス導入",
-    2: "停止",
-    ...
-}
-```
-
-**方針B: 参照元を全て `common/` に変更**
-
-```bash
-# 変更が必要なファイル
-process/simulator.py:    from utils import const → from common import paths, translations
-utils/plot_csv.py:       from utils import const → from common import paths, translations
-utils/plot_xlsx.py:      from utils import const → from common import paths, translations
-utils/plot_xlsx_new.py:  from utils import const → from common import paths, translations
-```
-
-### 影響範囲
-
-- `process/simulator.py` - `const.CONDITIONS_DIR`, `const.OUTPUT_DIR`, `const.DATA_DIR`
-- `utils/plot_csv.py` - `const.TRANSLATION`, `const.UNIT`
-- `utils/plot_xlsx.py` - `const.TRANSLATION`, `const.UNIT`
+- `utils/const.py` を `common/` からの再エクスポートに変更
+- 定数の一元管理を実現（`common/` が正）
+- 後方互換性を維持
 
 ---
 
-## 3. 【優先度: 中】シミュレーターの責務が大きすぎる
+## 未解決の問題
 
-### 現状
+### 3. 【優先度: 中】シミュレーターの責務が大きすぎる
+
+#### 現状
 
 ```python
 # process/simulator.py（約500行）
@@ -177,14 +66,14 @@ class GasAdosorptionBreakthroughsimulator:
         # 結果出力（CSV/PNG/XLSX）
 ```
 
-### 問題点
+#### 問題点
 
 - 単一クラスに入出力・計算・出力が混在
 - 単体テストが困難（ファイルI/Oが必須）
 - 出力形式の変更が本体クラスに影響
 - 条件読み込みとシミュレーション実行が密結合
 
-### 推奨対応
+#### 推奨対応
 
 **責務分離案**
 
@@ -241,22 +130,22 @@ class GasAdsorptionBreakthroughSimulator:
         self.exporter.export_png(results, ...)
 ```
 
-### メリット
+#### メリット
 
 - 各クラスが単一責務になり、テストが容易
 - 出力形式の追加・変更が `ResultExporter` のみで完結
 - シミュレーション実行のみのテストが可能
 
-### 影響範囲
+#### 影響範囲
 
 - `main.py` - 後方互換のファサードを使えば変更不要
 - `tests/test_simulation.py` - より詳細なテストが可能に
 
 ---
 
-## 4. 【優先度: 中】定数の命名が不統一
+### 4. 【優先度: 中】定数の命名が不統一
 
-### 現状
+#### 現状
 
 ```python
 # operation_modes/common.py - 熱収支計算のモード定数（整数）
@@ -281,14 +170,14 @@ def _get_heat_mode(mode: OperationMode) -> int:
         return MODE_ADSORPTION    # 0
 ```
 
-### 問題点
+#### 問題点
 
 - `MODE_ADSORPTION`（整数）と `OperationMode.FLOW_ADSORPTION_UPSTREAM`（Enum）が混在
 - 熱収支計算では整数、工程実行ではEnumを使用
 - 変換ロジックが `_get_heat_mode()` に隠れている
 - 新しいモードを追加する際に2箇所の修正が必要
 
-### 推奨対応
+#### 推奨対応
 
 **方針A: OperationMode に熱計算モードを統合**
 
@@ -330,7 +219,7 @@ def get_heat_mode(mode: OperationMode) -> int:
     return HEAT_MODE_MAP.get(mode, 0)
 ```
 
-### 影響範囲
+#### 影響範囲
 
 - `operation_modes/common.py` - `_get_heat_mode()` を削除
 - `physics/heat_balance.py` - モード引数の型を変更（int → HeatCalculationMode）
@@ -339,15 +228,16 @@ def get_heat_mode(mode: OperationMode) -> int:
 
 ## 対応優先度まとめ
 
-| 優先度 | 問題 | 対応コスト | 推奨タイミング |
-|--------|------|-----------|---------------|
-| **高** | `state/` の重複ファイル | 中（2-3時間） | 次回リファクタリング時 |
-| **高** | `utils/const` と `common/` の重複 | 低（1時間） | 即時対応可能 |
-| **中** | シミュレーターの責務過多 | 高（1日） | 機能追加時に段階的に |
-| **中** | 定数の命名不統一 | 中（2時間） | 次回リファクタリング時 |
+| 優先度 | 問題 | 対応コスト | 状態 |
+|--------|------|-----------|------|
+| ~~**高**~~ | ~~`state/` の重複ファイル~~ | ~~中~~ | **解決済み** |
+| ~~**高**~~ | ~~`utils/const` と `common/` の重複~~ | ~~低~~ | **解決済み** |
+| **中** | シミュレーターの責務過多 | 高（1日） | 未着手 |
+| **中** | 定数の命名不統一 | 中（2時間） | 未着手 |
 
 ---
 
 ## 更新履歴
 
 - 2024-12-27: 初版作成
+- 2024-12-27: 優先度高の2件を解決済みに更新
