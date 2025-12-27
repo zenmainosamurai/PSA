@@ -39,15 +39,9 @@ from .results import (
     DepressurizationResult,
     DownstreamFlowResult,
     DesorptionMoleFractionResult,
+    MassBalanceCalculationResult,
     # Combined results
     MassAndHeatBalanceResults,
-)
-
-# Additional result structures from calculation_results.py
-from .calculation_results import (
-    TowerResults,
-    OperationResult,
-    MassBalanceCalculationResult,
 )
 
 __all__ = [
@@ -77,10 +71,7 @@ __all__ = [
     "DepressurizationResult",
     "DownstreamFlowResult",
     "DesorptionMoleFractionResult",
+    "MassBalanceCalculationResult",
     # Combined results
     "MassAndHeatBalanceResults",
-    # Additional from calculation_results
-    "TowerResults",
-    "OperationResult",
-    "MassBalanceCalculationResult",
 ]

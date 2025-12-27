@@ -42,8 +42,8 @@ from state import (
     VacuumPumpingResult,
     MassBalanceResults,
     DesorptionMoleFractionResult,
+    MassBalanceCalculationResult,
 )
-from state.calculation_results import MassBalanceCalculationResult
 
 
 # ============================================================

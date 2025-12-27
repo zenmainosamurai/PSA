@@ -343,3 +343,24 @@ class DownstreamFlowResult:
 
     final_pressure: float
     outlet_flows: Dict[int, GasFlow]
+
+
+@dataclass
+class MassBalanceCalculationResult:
+    """
+    物質収支計算の結果
+    
+    PSA担当者向け説明:
+    1セルの物質収支計算結果です。
+    脱着モードの場合はモル分率データも含まれます。
+    
+    Attributes:
+        material_balance: 物質収支結果
+        mole_fraction_data: モル分率データ（脱着モードのみ）
+    """
+    material_balance: MaterialBalanceResult
+    mole_fraction_data: Optional[DesorptionMoleFractionResult] = None
+    
+    def has_mole_fraction_data(self) -> bool:
+        """モル分率データを持っているか"""
+        return self.mole_fraction_data is not None
