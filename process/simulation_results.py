@@ -2,7 +2,7 @@
 
 from dataclasses import dataclass, field
 from typing import Dict, List, Any, Optional
-from .state import (
+from state import (
     MassBalanceResults,
     HeatBalanceResults,
     WallHeatBalanceResult,

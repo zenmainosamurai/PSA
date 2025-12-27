@@ -2,7 +2,7 @@ from dataclasses import dataclass, field
 from typing import Dict, List, Optional
 import pandas as pd
 import math
-import log
+import logger as log
 
 logger = log.logger.getChild(__name__)
 

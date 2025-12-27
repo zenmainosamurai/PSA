@@ -26,7 +26,7 @@ from typing import Dict, Optional
 from operation_modes.mode_types import OperationMode
 from operation_modes.common import calculate_full_tower, distribute_inflow_gas
 from config.sim_conditions import TowerConditions
-from core.state import (
+from state import (
     StateVariables,
     MassBalanceResults,
     HeatBalanceResults,

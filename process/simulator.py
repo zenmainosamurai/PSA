@@ -10,11 +10,11 @@ import numpy as np
 import pandas as pd
 
 from utils import const, plot_csv, plot_xlsx, other_utils
-from .state import StateVariables
+from state import StateVariables
 from process.process_executor import execute_mode_list, prepare_batch_adsorption_pressure
-from .simulation_results import SimulationResults
+from process.simulation_results import SimulationResults
 from config.sim_conditions import SimulationConditions, TowerConditions
-import log
+import logger as log
 
 
 import warnings

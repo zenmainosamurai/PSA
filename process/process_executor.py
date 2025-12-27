@@ -45,7 +45,7 @@ from operation_modes import (
     execute_initial_gas_introduction,
 )
 from config.sim_conditions import SimulationConditions, TowerConditions
-from core.state import StateVariables, MassBalanceResults
+from state import StateVariables, MassBalanceResults
 
 
 @dataclass

@@ -1,9 +1,9 @@
 import yaml
 import time
 
-from core import GasAdosorptionBreakthroughsimulator
+from process import GasAdosorptionBreakthroughsimulator
 import utils.prop_table
-import log
+import logger as log
 
 logger = log.logger
 

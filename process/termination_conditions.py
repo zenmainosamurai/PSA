@@ -23,7 +23,7 @@ from enum import Enum
 from typing import Optional
 import numpy as np
 
-from core.state import StateVariables
+from state import StateVariables
 
 
 class TerminationConditionType(Enum):

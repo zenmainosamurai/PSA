@@ -8,10 +8,10 @@ from typing import Tuple, Optional
 
 import CoolProp.CoolProp as CP
 
-from core.state.state_variables import StateVariables
+from state.state_variables import StateVariables
 from config.sim_conditions import TowerConditions
-from core.state.results import MaterialBalanceResult, VacuumPumpingResult
-from utils.const import STANDARD_PRESSURE, CELSIUS_TO_KELVIN_OFFSET
+from state.results import MaterialBalanceResult, VacuumPumpingResult
+from common.constants import STANDARD_PRESSURE, CELSIUS_TO_KELVIN_OFFSET
 
 # ------------------------------------------------------------------
 # 1. 物性値: 気体熱伝導率

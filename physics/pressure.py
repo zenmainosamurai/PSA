@@ -36,7 +36,7 @@ from common.constants import (
 
 # 旧コードとの互換性のためインポート
 from config.sim_conditions import TowerConditions
-from core.state import (
+from state import (
     StateVariables,
     MassBalanceResults,
     MoleFractionResults,

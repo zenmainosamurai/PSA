@@ -4,74 +4,83 @@ PSA担当者向け説明:
 塔の状態変数（温度、圧力、吸着量など）と計算結果のデータクラスを提供します。
 
 主要なエクスポート:
-- TowerResults: 1塔の計算結果
-- OperationResult: 運転モード計算の統一結果
+- StateVariables: 塔の状態変数管理
+- TowerStateArrays: 塔ごとの状態配列
 - MaterialBalanceResult: 物質収支結果
 - HeatBalanceResult: 熱収支結果
+- MassBalanceResults: 物質収支結果コレクション
 """
 
-from .calculation_results import (
-    # 基本データクラス
+# State management
+from .state_variables import StateVariables, TowerStateArrays
+
+# Result structures from results.py
+from .results import (
+    # Basic data structures
     GasFlow,
     GasProperties,
     AdsorptionState,
     PressureState,
     CellTemperatures,
-    HeatTransferCoefficients,
     HeatFlux,
+    HeatTransferCoefficients,
     WallHeatFlux,
-    
-    # 物質収支結果
+    # Main result classes
     MaterialBalanceResult,
-    MassBalanceCalculationResult,
-    
-    # 熱収支結果
     HeatBalanceResult,
     WallHeatBalanceResult,
     LidHeatBalanceResult,
-    
-    # 真空脱着関連
+    # Collections
+    MassBalanceResults,
+    HeatBalanceResults,
+    MoleFractionResults,
+    # Specialized results
     VacuumPumpingResult,
-    DesorptionMoleFractionResult,
-    
-    # 均圧関連
     DepressurizationResult,
     DownstreamFlowResult,
-    
-    # 統合結果
+    DesorptionMoleFractionResult,
+    # Combined results
+    MassAndHeatBalanceResults,
+)
+
+# Additional result structures from calculation_results.py
+from .calculation_results import (
     TowerResults,
     OperationResult,
+    MassBalanceCalculationResult,
 )
 
 __all__ = [
-    # 基本データクラス
+    # State management
+    "StateVariables",
+    "TowerStateArrays",
+    # Basic data structures
     "GasFlow",
     "GasProperties",
     "AdsorptionState",
     "PressureState",
     "CellTemperatures",
-    "HeatTransferCoefficients",
     "HeatFlux",
+    "HeatTransferCoefficients",
     "WallHeatFlux",
-    
-    # 物質収支結果
+    # Main result classes
     "MaterialBalanceResult",
-    "MassBalanceCalculationResult",
-    
-    # 熱収支結果
     "HeatBalanceResult",
     "WallHeatBalanceResult",
     "LidHeatBalanceResult",
-    
-    # 真空脱着関連
+    # Collections
+    "MassBalanceResults",
+    "HeatBalanceResults",
+    "MoleFractionResults",
+    # Specialized results
     "VacuumPumpingResult",
-    "DesorptionMoleFractionResult",
-    
-    # 均圧関連
     "DepressurizationResult",
     "DownstreamFlowResult",
-    
-    # 統合結果
+    "DesorptionMoleFractionResult",
+    # Combined results
+    "MassAndHeatBalanceResults",
+    # Additional from calculation_results
     "TowerResults",
     "OperationResult",
+    "MassBalanceCalculationResult",
 ]

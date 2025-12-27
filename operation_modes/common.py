@@ -15,7 +15,7 @@ from dataclasses import dataclass
 
 from operation_modes.mode_types import OperationMode
 from config.sim_conditions import TowerConditions
-from core.state import (
+from state import (
     StateVariables,
     MassBalanceResults,
     HeatBalanceResults,

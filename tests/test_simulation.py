@@ -16,10 +16,9 @@ import numpy as np
 import pandas as pd
 
 from config.sim_conditions import SimulationConditions
-from core.state.state_variables import StateVariables
-from core import GasAdosorptionBreakthroughsimulator
+from state.state_variables import StateVariables
+from process import GasAdosorptionBreakthroughsimulator
 from process.process_executor import execute_mode_list, prepare_batch_adsorption_pressure
-from utils import const
 
 
 def test_simulator_initialization():
