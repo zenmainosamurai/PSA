@@ -39,7 +39,7 @@ from core.state import (
     WallHeatBalanceResult,
     LidHeatBalanceResult,
 )
-from core.physics.heat_transfer import calc_heat_transfer_coef as _heat_transfer_coef
+from physics.heat_transfer import calc_heat_transfer_coef as _heat_transfer_coef
 
 
 # ============================================================
