@@ -1,0 +1,670 @@
+"""熱収支計算モジュール
+
+PSA担当者向け説明:
+このモジュールはPSAプロセスにおける熱収支（ヒートバランス）を計算します。
+
+- 充填層の熱収支: 吸着熱、ガス流入熱、隣接セルとの熱交換
+- 壁面の熱収支: 充填層からの熱流入、外気への放熱
+- 蓋（上・下）の熱収支: 充填層・壁からの熱流入、外気への放熱
+
+主要な関数:
+- calculate_bed_heat_balance(): 充填層の熱収支計算
+- calculate_wall_heat_balance(): 壁面の熱収支計算
+- calculate_lid_heat_balance(): 蓋の熱収支計算
+"""
+
+from typing import Optional, Dict
+import numpy as np
+from scipy import optimize
+
+from operation_modes.mode_types import OperationMode
+from common.constants import (
+    CELSIUS_TO_KELVIN_OFFSET,
+    STANDARD_MOLAR_VOLUME,
+    MINUTE_TO_SECOND,
+)
+
+# 旧コードとの互換性のためインポート
+from config.sim_conditions import TowerConditions
+from core.state import (
+    StateVariables,
+    MaterialBalanceResult,
+    HeatBalanceResult,
+    HeatBalanceResults,
+    VacuumPumpingResult,
+    HeatTransferCoefficients,
+    HeatFlux,
+    CellTemperatures,
+    WallHeatFlux,
+    WallHeatBalanceResult,
+    LidHeatBalanceResult,
+)
+from core.physics.heat_transfer import calc_heat_transfer_coef as _heat_transfer_coef
+
+
+# ============================================================
+# 運転モード定数（内部使用）
+# ============================================================
+
+MODE_ADSORPTION = 0
+MODE_VALVE_CLOSED = 1
+MODE_DESORPTION = 2
+
+
+# ============================================================
+# 充填層の熱収支計算
+# ============================================================
+
+def calculate_bed_heat_balance(
+    tower_conds: TowerConditions,
+    stream: int,
+    section: int,
+    state_manager: StateVariables,
+    tower_num: int,
+    mode: int,
+    material_output: Optional[MaterialBalanceResult] = None,
+    heat_output: Optional[HeatBalanceResult] = None,
+    vacuum_pumping_results: Optional[VacuumPumpingResult] = None,
+) -> HeatBalanceResult:
+    """
+    充填層セルの熱収支計算
+    
+    PSA担当者向け説明:
+    各セル（ストリーム×セクション）の温度変化を計算します。
+    
+    熱の出入り:
+    - 吸着熱: CO2吸着時に発生する熱（発熱）
+    - ガス流入熱: 流入ガスが持ち込む熱
+    - 隣接セルとの熱交換: 内側・外側・上流・下流セルとの伝熱
+    
+    Args:
+        tower_conds: 塔条件
+        stream: ストリーム番号 (1-indexed)
+        section: セクション番号 (1-indexed)
+        state_manager: 状態変数管理
+        tower_num: 塔番号
+        mode: 運転モード (0:吸着, 1:停止, 2:脱着)
+        material_output: 物質収支計算結果
+        heat_output: 上流セクションの熱収支結果
+        vacuum_pumping_results: 真空排気結果（脱着時）
+    
+    Returns:
+        HeatBalanceResult: 熱収支計算結果
+    """
+    tower = state_manager.towers[tower_num]
+    stream_conds = tower_conds.stream_conditions
+
+    # === 現在温度の取得 ===
+    temp_now = tower.cell(stream, section).temp
+    
+    # 内側セル温度 [℃]
+    if stream == 1:
+        temp_inside_cell = 18  # 中心部の想定温度
+    else:
+        temp_inside_cell = tower.cell(stream - 1, section).temp
+    
+    # 外側セル温度 [℃]
+    if stream != tower_conds.common.num_streams:
+        temp_outside_cell = tower.cell(stream + 1, section).temp
+    else:
+        temp_outside_cell = tower.temp_wall[section - 1]
+    
+    # 下流セル温度 [℃]
+    if section != tower_conds.common.num_sections:
+        temp_below_cell = tower.cell(stream, section + 1).temp
+
+    # === 物理量の計算（モード依存）===
+    adsorption_heat = _get_adsorption_heat(mode, material_output, tower_conds)
+    inlet_gas_mass = _get_inlet_gas_mass(mode, material_output, tower_conds)
+    gas_specific_heat = _get_gas_specific_heat(mode, material_output)
+
+    # === 境界面積 ===
+    section_inner_boundary_area = stream_conds[stream].inner_boundary_area / tower_conds.common.num_sections
+    section_outer_boundary_area = stream_conds[stream].outer_boundary_area / tower_conds.common.num_sections
+    cross_section_area = stream_conds[stream].cross_section
+
+    # === 伝熱係数の計算 ===
+    if mode == MODE_ADSORPTION:
+        wall_to_bed_htc, bed_htc = _heat_transfer_coef(
+            tower_conds, stream, section, temp_now, mode,
+            state_manager, tower_num, material_output,
+        )
+    elif mode == MODE_VALVE_CLOSED:
+        # 停止モードでは直前値を使用
+        wall_to_bed_htc = tower.cell(stream, section).wall_to_bed_heat_transfer_coef
+        bed_htc = tower.cell(stream, section).bed_heat_transfer_coef
+    elif mode == MODE_DESORPTION:
+        wall_to_bed_htc, bed_htc = _heat_transfer_coef(
+            tower_conds, stream, section, temp_now, mode,
+            state_manager, tower_num, material_output, vacuum_pumping_results,
+        )
+    else:
+        raise ValueError(f"未対応のモード: {mode}")
+
+    # === 熱流束の計算 [J] ===
+    
+    # 内側境界からの熱流束
+    if stream == 1:
+        heat_flux_from_inner = 0
+    else:
+        heat_flux_from_inner = (
+            bed_htc
+            * section_inner_boundary_area
+            * (temp_inside_cell - temp_now)
+            * tower_conds.common.calculation_step_time
+            * MINUTE_TO_SECOND
+        )
+    
+    # 外側境界への熱流束
+    if stream == tower_conds.common.num_streams:
+        heat_flux_to_outer = (
+            wall_to_bed_htc
+            * section_outer_boundary_area
+            * (temp_now - temp_outside_cell)
+            * tower_conds.common.calculation_step_time
+            * MINUTE_TO_SECOND
+        )
+    else:
+        heat_flux_to_outer = (
+            bed_htc
+            * section_outer_boundary_area
+            * (temp_now - temp_outside_cell)
+            * tower_conds.common.calculation_step_time
+            * MINUTE_TO_SECOND
+        )
+    
+    # 下流セルへの熱流束
+    if section == tower_conds.common.num_sections:
+        # 下蓋への熱流束
+        downstream_heat_flux = (
+            wall_to_bed_htc
+            * cross_section_area
+            * (temp_now - tower.bottom_temperature)
+            * tower_conds.common.calculation_step_time
+            * MINUTE_TO_SECOND
+        )
+    else:
+        downstream_heat_flux = (
+            bed_htc
+            * cross_section_area
+            * (temp_now - temp_below_cell)
+            * tower_conds.common.calculation_step_time
+            * MINUTE_TO_SECOND
+        )
+    
+    # 上流セルへの熱流束
+    if section == 1:
+        # 上蓋への熱流束
+        upstream_heat_flux = (
+            wall_to_bed_htc
+            * cross_section_area
+            * (temp_now - tower.lid_temperature)
+            * tower_conds.common.calculation_step_time
+            * MINUTE_TO_SECOND
+        )
+    else:
+        # 上流セルの下流熱流束の負値
+        upstream_heat_flux = -heat_output.heat_flux.downstream
+
+    # === 到達温度の計算（Newton法）===
+    args = (
+        tower_conds,
+        gas_specific_heat,
+        inlet_gas_mass,
+        temp_now,
+        adsorption_heat,
+        heat_flux_from_inner,
+        heat_flux_to_outer,
+        downstream_heat_flux,
+        upstream_heat_flux,
+        stream,
+    )
+    temp_reached = optimize.newton(_optimize_bed_temperature, temp_now, args=args)
+
+    # === 熱電対温度の計算 ===
+    thermocouple_temp = _calculate_thermocouple_temperature(
+        tower_conds, tower, stream, section, mode, wall_to_bed_htc
+    )
+
+    # === 結果オブジェクトの構築 ===
+    return HeatBalanceResult(
+        cell_temperatures=CellTemperatures(
+            bed_temperature=temp_reached,
+            thermocouple_temperature=thermocouple_temp,
+        ),
+        heat_transfer_coefficients=HeatTransferCoefficients(
+            wall_to_bed=wall_to_bed_htc,
+            bed_to_bed=bed_htc,
+        ),
+        heat_flux=HeatFlux(
+            adsorption=adsorption_heat,
+            from_inner_boundary=heat_flux_from_inner,
+            to_outer_boundary=heat_flux_to_outer,
+            downstream=downstream_heat_flux,
+            upstream=upstream_heat_flux,
+        ),
+    )
+
+
+# ============================================================
+# 壁面の熱収支計算
+# ============================================================
+
+def calculate_wall_heat_balance(
+    tower_conds: TowerConditions,
+    section: int,
+    state_manager: StateVariables,
+    tower_num: int,
+    heat_output: HeatBalanceResult,
+    heat_wall_output: Optional[WallHeatBalanceResult] = None,
+) -> WallHeatBalanceResult:
+    """
+    壁面の熱収支計算
+    
+    PSA担当者向け説明:
+    容器壁の温度変化を計算します。
+    充填層からの熱流入と外気への放熱のバランスで決まります。
+    
+    Args:
+        tower_conds: 塔条件
+        section: セクション番号 (1-indexed)
+        state_manager: 状態変数管理
+        tower_num: 塔番号
+        heat_output: 隣接セル（最外ストリーム）の熱収支結果
+        heat_wall_output: 上流セクションの壁面熱収支結果
+    
+    Returns:
+        WallHeatBalanceResult: 壁面熱収支結果
+    """
+    tower = state_manager.towers[tower_num]
+    stream_conds = tower_conds.stream_conditions
+    
+    # 現在温度
+    temp_now = tower.temp_wall[section - 1]
+    
+    # 内側セル温度（最外ストリーム）
+    temp_inside_cell = tower.cell(tower_conds.common.num_streams, section).temp
+    
+    # 外側温度（外気）
+    temp_outside = tower_conds.vessel.ambient_temperature
+    
+    # 下流壁温度
+    if section != tower_conds.common.num_sections:
+        temp_below = tower.temp_wall[section]
+
+    # === 熱流束の計算 [J] ===
+    
+    # 上流壁への熱流束
+    if section == 1:
+        upstream_heat_flux = (
+            tower_conds.vessel.wall_thermal_conductivity
+            * stream_conds[3].cross_section
+            * (temp_now - tower.lid_temperature)
+            * tower_conds.common.calculation_step_time
+            * MINUTE_TO_SECOND
+        )
+    else:
+        upstream_heat_flux = heat_wall_output.heat_flux.downstream
+    
+    # 内側境界からの熱流束
+    heat_flux_from_inner = (
+        heat_output.heat_transfer_coefficients.wall_to_bed
+        * stream_conds[3].inner_boundary_area
+        / tower_conds.common.num_sections
+        * (temp_inside_cell - temp_now)
+        * tower_conds.common.calculation_step_time
+        * MINUTE_TO_SECOND
+    )
+    
+    # 外側境界への熱流束（外気への放熱）
+    heat_flux_to_outer = (
+        tower_conds.vessel.external_heat_transfer_coef
+        * stream_conds[3].outer_boundary_area
+        / tower_conds.common.num_sections
+        * (temp_now - temp_outside)
+        * tower_conds.common.calculation_step_time
+        * MINUTE_TO_SECOND
+    )
+    
+    # 下流壁への熱流束
+    if section == tower_conds.common.num_sections:
+        downstream_heat_flux = (
+            tower_conds.vessel.wall_thermal_conductivity
+            * stream_conds[3].cross_section
+            * (temp_now - tower.bottom_temperature)
+            * tower_conds.common.calculation_step_time
+            * MINUTE_TO_SECOND
+        )
+    else:
+        downstream_heat_flux = (
+            tower_conds.vessel.wall_thermal_conductivity
+            * stream_conds[3].cross_section
+            * (temp_now - tower.temp_wall[section])
+        )
+
+    # === 到達温度の計算 ===
+    args = (
+        tower_conds,
+        temp_now,
+        heat_flux_from_inner,
+        heat_flux_to_outer,
+        downstream_heat_flux,
+        upstream_heat_flux,
+    )
+    temp_reached = optimize.newton(_optimize_wall_temperature, temp_now, args=args)
+
+    return WallHeatBalanceResult(
+        temperature=temp_reached,
+        heat_flux=WallHeatFlux(
+            from_inner_boundary=heat_flux_from_inner,
+            to_outer_boundary=heat_flux_to_outer,
+            downstream=downstream_heat_flux,
+            upstream=upstream_heat_flux,
+        ),
+    )
+
+
+# ============================================================
+# 蓋の熱収支計算
+# ============================================================
+
+def calculate_lid_heat_balance(
+    tower_conds: TowerConditions,
+    position: str,
+    state_manager: StateVariables,
+    tower_num: int,
+    heat_output: HeatBalanceResults,
+    heat_wall_output: Dict[int, WallHeatBalanceResult],
+) -> LidHeatBalanceResult:
+    """
+    上下蓋の熱収支計算
+    
+    PSA担当者向け説明:
+    容器の上蓋・下蓋の温度変化を計算します。
+    
+    Args:
+        tower_conds: 塔条件
+        position: "up"（上蓋）または "down"（下蓋）
+        state_manager: 状態変数管理
+        tower_num: 塔番号
+        heat_output: 各セルの熱収支結果
+        heat_wall_output: 壁面の熱収支結果
+    
+    Returns:
+        LidHeatBalanceResult: 蓋の熱収支結果
+    """
+    tower = state_manager.towers[tower_num]
+    
+    # 現在温度
+    temp_now = tower.lid_temperature if position == "up" else tower.bottom_temperature
+    
+    # 外気への熱流束
+    heat_flux_to_ambient = (
+        tower_conds.vessel.external_heat_transfer_coef
+        * (temp_now - tower_conds.vessel.ambient_temperature)
+        * tower_conds.common.calculation_step_time
+        * MINUTE_TO_SECOND
+    )
+    
+    if position == "up":
+        heat_flux_to_ambient *= tower_conds.bottom.outer_flange_area
+    else:
+        heat_flux_to_ambient *= tower_conds.lid.outer_flange_area
+
+    # 正味の熱流入
+    if position == "up":
+        stream2_section1_upstream = heat_output.get_result(2, 1).heat_flux.upstream
+        stream1_section1_upstream = heat_output.get_result(1, 1).heat_flux.upstream
+        wall_section1_upstream = heat_wall_output[1].heat_flux.upstream
+        net_heat_input = (
+            stream2_section1_upstream
+            - stream1_section1_upstream
+            - heat_flux_to_ambient
+            - wall_section1_upstream
+        )
+    else:
+        last_section = tower_conds.common.num_sections
+        stream2_lastsection_upstream = heat_output.get_result(2, last_section).heat_flux.upstream
+        stream1_lastsection_upstream = heat_output.get_result(1, last_section).heat_flux.upstream
+        net_heat_input = (
+            stream2_lastsection_upstream
+            - stream1_lastsection_upstream
+            - heat_flux_to_ambient
+            - heat_wall_output[last_section].heat_flux.downstream
+        )
+
+    # 到達温度の計算
+    args = (tower_conds, temp_now, net_heat_input, position)
+    temp_reached = optimize.newton(_optimize_lid_temperature, temp_now, args=args)
+
+    return LidHeatBalanceResult(temperature=temp_reached)
+
+
+# ============================================================
+# ヘルパー関数（モード依存の物理量計算）
+# ============================================================
+
+def _get_adsorption_heat(
+    mode: int,
+    material_output: Optional[MaterialBalanceResult],
+    tower_conds: TowerConditions,
+) -> float:
+    """
+    吸着熱を計算 [J]
+    
+    PSA担当者向け説明:
+    CO2が吸着材に吸着される際に発生する熱を計算します。
+    停止モードでは吸着が起きないため0です。
+    """
+    if mode == MODE_VALVE_CLOSED:
+        return 0.0
+    
+    if material_output is None:
+        return 0.0
+    
+    # 吸着・脱着は同じ計算式
+    return (
+        material_output.adsorption_state.actual_uptake_volume
+        / 1000
+        / STANDARD_MOLAR_VOLUME
+        * tower_conds.feed_gas.co2_molecular_weight
+        * tower_conds.feed_gas.co2_adsorption_heat
+    )
+
+
+def _get_inlet_gas_mass(
+    mode: int,
+    material_output: Optional[MaterialBalanceResult],
+    tower_conds: TowerConditions,
+) -> float:
+    """
+    流入ガス質量を計算 [g]
+    
+    PSA担当者向け説明:
+    セルに流入するガスの質量を計算します。
+    停止・脱着モードではガス流入がないため0です。
+    """
+    if mode in (MODE_VALVE_CLOSED, MODE_DESORPTION):
+        return 0.0
+    
+    if material_output is None:
+        return 0.0
+    
+    return (
+        material_output.inlet_gas.co2_volume
+        / 1000
+        / STANDARD_MOLAR_VOLUME
+        * tower_conds.feed_gas.co2_molecular_weight
+        + material_output.inlet_gas.n2_volume
+        / 1000
+        / STANDARD_MOLAR_VOLUME
+        * tower_conds.feed_gas.n2_molecular_weight
+    )
+
+
+def _get_gas_specific_heat(
+    mode: int,
+    material_output: Optional[MaterialBalanceResult],
+) -> float:
+    """
+    ガス比熱を取得 [kJ/kg/K]
+    
+    停止モードでは0を返します。
+    """
+    if mode == MODE_VALVE_CLOSED:
+        return 0.0
+    
+    if material_output is None:
+        return 0.0
+    
+    return material_output.gas_properties.specific_heat
+
+
+def _calculate_thermocouple_temperature(
+    tower_conds: TowerConditions,
+    tower,
+    stream: int,
+    section: int,
+    mode: int,
+    wall_to_bed_htc: float,
+) -> float:
+    """
+    熱電対温度を計算
+    
+    PSA担当者向け説明:
+    熱電対は充填層内に設置されており、層温度に追従して変化します。
+    熱電対と層の間の伝熱を考慮して計算します。
+    """
+    # 熱電対熱容量 [J/K]
+    heat_capacity = tower_conds.thermocouple.specific_heat * tower_conds.thermocouple.weight
+    
+    # 熱電対側面積 [m2]
+    S_side = 0.004 * np.pi * 0.1
+    
+    # 伝熱係数
+    thermocouple_htc = wall_to_bed_htc
+    
+    # 補正係数（脱着モードでは異なる）
+    if mode != MODE_DESORPTION:
+        correction_factor = tower_conds.thermocouple.heat_transfer_correction_factor
+    else:
+        correction_factor = 100
+    
+    # 熱流束 [W]
+    heat_flux = (
+        thermocouple_htc
+        * correction_factor
+        * S_side
+        * (tower.cell(stream, section).temp - tower.cell(stream, section).thermocouple_temperature)
+    )
+    
+    # 温度上昇 [℃]
+    temp_increase = (
+        heat_flux
+        * tower_conds.common.calculation_step_time
+        * MINUTE_TO_SECOND
+        / heat_capacity
+    )
+    
+    return tower.cell(stream, section).thermocouple_temperature + temp_increase
+
+
+# ============================================================
+# Newton法用の最適化関数
+# ============================================================
+
+def _optimize_bed_temperature(
+    temp_reached: float,
+    tower_conds: TowerConditions,
+    gas_specific_heat: float,
+    inlet_gas_mass: float,
+    temp_now: float,
+    adsorption_heat: float,
+    heat_flux_from_inner: float,
+    heat_flux_to_outer: float,
+    downstream_heat_flux: float,
+    upstream_heat_flux: float,
+    stream: int,
+) -> float:
+    """
+    充填層到達温度のソルバー用関数
+    
+    熱収支基準と時間基準の差分が0になる温度を求めます。
+    """
+    stream_conds = tower_conds.stream_conditions
+    
+    # 流入ガスが受け取る熱 [J]
+    H_gas = gas_specific_heat * inlet_gas_mass * (temp_reached - temp_now)
+    
+    # 充填層が受け取る熱（時間基準）[J]
+    H_bed_time = (
+        tower_conds.packed_bed.heat_capacity
+        * stream_conds[stream].area_fraction
+        / tower_conds.common.num_sections
+        * (temp_reached - temp_now)
+    )
+    
+    # 充填層が受け取る熱（熱収支基準）[J]
+    H_bed_balance = (
+        adsorption_heat
+        - H_gas
+        + heat_flux_from_inner
+        - heat_flux_to_outer
+        - downstream_heat_flux
+        - upstream_heat_flux
+    )
+    
+    return H_bed_balance - H_bed_time
+
+
+def _optimize_wall_temperature(
+    temp_reached: float,
+    tower_conds: TowerConditions,
+    temp_now: float,
+    heat_flux_from_inner: float,
+    heat_flux_to_outer: float,
+    downstream_heat_flux: float,
+    upstream_heat_flux: float,
+) -> float:
+    """
+    壁面到達温度のソルバー用関数
+    """
+    stream_conds = tower_conds.stream_conditions
+    
+    # 壁が受け取る熱（熱収支基準）[J]
+    H_wall_balance = (
+        heat_flux_from_inner
+        - upstream_heat_flux
+        - heat_flux_to_outer
+        - downstream_heat_flux
+    )
+    
+    # 壁が受け取る熱（時間基準）[J]
+    H_wall_time = (
+        tower_conds.vessel.wall_specific_heat_capacity
+        * stream_conds[1 + tower_conds.common.num_streams].wall_weight
+        * (temp_reached - temp_now)
+    )
+    
+    return H_wall_balance - H_wall_time
+
+
+def _optimize_lid_temperature(
+    temp_reached: float,
+    tower_conds: TowerConditions,
+    temp_now: float,
+    net_heat_input: float,
+    position: str,
+) -> float:
+    """
+    蓋到達温度のソルバー用関数
+    """
+    # 蓋が受け取る熱（時間基準）[J]
+    H_lid_time = tower_conds.vessel.wall_specific_heat_capacity * (temp_reached - temp_now)
+    
+    if position == "up":
+        H_lid_time *= tower_conds.lid.flange_total_weight
+    else:
+        H_lid_time *= tower_conds.bottom.flange_total_weight
+    
+    return net_heat_input - H_lid_time
