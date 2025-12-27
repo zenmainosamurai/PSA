@@ -56,6 +56,11 @@ class EqualizationDepressurizationResult:
     pressure_difference: float  # 圧力差 [MPa]
     downstream_flow_co2: float  # 下流への流出CO2量 [m3]
     downstream_flow_n2: float  # 下流への流出N2量 [m3]
+    
+    @property
+    def total_pressure(self) -> float:
+        """互換性のための別名（state_variables.update_from_calc_outputで使用）"""
+        return self.final_total_pressure
 
 
 @dataclass
@@ -107,17 +112,17 @@ def execute_equalization_depressurization(
         print(f"CO2流出量: {result.downstream_flow_co2} m3")
     """
     # 現在の圧力を取得
-    current_pressure = state_manager.get_total_pressure(tower_num)
+    current_pressure = state_manager.towers[tower_num].total_press
     
     # 減圧結果の計算（圧力差と均圧流量）
     depressurization_result = calculate_depressurization(
         tower_conds=tower_conds,
         state_manager=state_manager,
         tower_num=tower_num,
-        target_tower_pressure=target_tower_pressure,
+        downstream_tower_pressure=target_tower_pressure,  # target_tower_pressureをdownstream_tower_pressureとして渡す
     )
     
-    equalization_flow_rate = depressurization_result.equalization_flow_rate
+    equalization_flow_rate = depressurization_result.flow_rate
     
     # 塔全体の計算を実行（均圧流量を使用）
     tower_results = calculate_full_tower(
@@ -129,12 +134,20 @@ def execute_equalization_depressurization(
     )
     
     # 下流への流出ガス量計算
-    downstream_flow = calculate_downstream_flow(
+    downstream_flow_result = calculate_downstream_flow(
         tower_conds=tower_conds,
         state_manager=state_manager,
         tower_num=tower_num,
         mass_balance_results=tower_results.mass_balance,
-        equalization_flow_rate=equalization_flow_rate,
+        downstream_tower_pressure=target_tower_pressure,
+    )
+    
+    # 全ストリームの流出量を合計
+    total_co2_flow = sum(
+        flow.co2_volume for flow in downstream_flow_result.outlet_flows.values()
+    )
+    total_n2_flow = sum(
+        flow.n2_volume for flow in downstream_flow_result.outlet_flows.values()
     )
     
     # 圧力差
@@ -147,8 +160,8 @@ def execute_equalization_depressurization(
         heat_lid=tower_results.lid_heat,
         final_total_pressure=depressurization_result.final_pressure,
         pressure_difference=pressure_difference,
-        downstream_flow_co2=downstream_flow.co2_volume,
-        downstream_flow_n2=downstream_flow.n2_volume,
+        downstream_flow_co2=total_co2_flow,
+        downstream_flow_n2=total_n2_flow,
     )
 
 

@@ -48,6 +48,11 @@ class InitialGasIntroductionResult:
     heat_wall: Dict[int, WallHeatBalanceResult]
     heat_lid: Dict[str, LidHeatBalanceResult]
     pressure_after_introduction: float  # ガス導入後の圧力 [MPaA]
+    
+    @property
+    def pressure_after_batch_adsorption(self) -> float:
+        """互換性のための別名（state_variables.update_from_calc_outputで使用）"""
+        return self.pressure_after_introduction
 
 
 def execute_initial_gas_introduction(

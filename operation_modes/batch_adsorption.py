@@ -50,6 +50,11 @@ class BatchAdsorptionResult:
     heat_wall: Dict[int, WallHeatBalanceResult]
     heat_lid: Dict[str, LidHeatBalanceResult]
     pressure_after_batch_adsorption: float  # バッチ吸着後の圧力 [MPaA]
+    
+    @property
+    def total_pressure(self) -> float:
+        """旧コード互換性のためのプロパティ"""
+        return self.pressure_after_batch_adsorption
 
 
 def execute_batch_adsorption_upstream(

@@ -205,7 +205,7 @@ def _execute_equalization(
     pressurization_tower_num = mode_list.index("均圧_加圧") + 1
     
     # 加圧側の圧力を取得
-    pressurization_pressure = state_manager.get_total_pressure(pressurization_tower_num)
+    pressurization_pressure = state_manager.towers[pressurization_tower_num].total_press
     
     # 減圧塔の計算
     depressurization_result = execute_equalization_depressurization(

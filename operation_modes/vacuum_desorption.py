@@ -57,8 +57,14 @@ class VacuumDesorptionResult:
     heat_wall: Dict[int, WallHeatBalanceResult]
     heat_lid: Dict[str, LidHeatBalanceResult]
     mole_fraction: MoleFractionResults
+    
+    @property
+    def mol_fraction(self) -> MoleFractionResults:
+        """互換性のための別名（state_variables.update_from_calc_outputで使用）"""
+        return self.mole_fraction
     accumulative_vacuum_amount: float  # 累積真空排気量 [Nm3]
     pressure_after_vacuum_desorption: float  # 脱着後の圧力 [MPaA]
+    accum_vacuum_amt: VacuumPumpingResult = None  # 互換性のため（state_variables.update_from_calc_outputで使用）
 
 
 def execute_vacuum_desorption(
@@ -145,4 +151,5 @@ def execute_vacuum_desorption(
         mole_fraction=mole_fraction,
         accumulative_vacuum_amount=accumulative,
         pressure_after_vacuum_desorption=pressure_after,
+        accum_vacuum_amt=vacuum_pumping_results,  # 互換性のため
     )

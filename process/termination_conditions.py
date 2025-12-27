@@ -144,7 +144,7 @@ def check_termination_condition(
             print("工程終了")
     """
     if condition.condition_type == TerminationConditionType.PRESSURE_REACHED:
-        current_pressure = state_manager.get_total_pressure(condition.tower_num)
+        current_pressure = state_manager.towers[condition.tower_num].total_press
         # 圧力が目標値未満なら継続
         return current_pressure < condition.target_value
     
