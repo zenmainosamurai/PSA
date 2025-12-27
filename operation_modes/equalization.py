@@ -37,6 +37,7 @@ from physics.pressure import (
     calculate_downstream_flow,
     calculate_pressure_after_batch_adsorption,
 )
+from core.state.results import DownstreamFlowResult
 
 
 @dataclass
@@ -56,11 +57,17 @@ class EqualizationDepressurizationResult:
     pressure_difference: float  # 圧力差 [MPa]
     downstream_flow_co2: float  # 下流への流出CO2量 [m3]
     downstream_flow_n2: float  # 下流への流出N2量 [m3]
+    downstream_flow_result: DownstreamFlowResult  # 下流流量計算結果（加圧側で使用）
     
     @property
     def total_pressure(self) -> float:
         """互換性のための別名（state_variables.update_from_calc_outputで使用）"""
         return self.final_total_pressure
+    
+    @property
+    def downflow_params(self) -> DownstreamFlowResult:
+        """旧コード互換性のためのプロパティ"""
+        return self.downstream_flow_result
 
 
 @dataclass
@@ -162,6 +169,7 @@ def execute_equalization_depressurization(
         pressure_difference=pressure_difference,
         downstream_flow_co2=total_co2_flow,
         downstream_flow_n2=total_n2_flow,
+        downstream_flow_result=downstream_flow_result,
     )
 
 
@@ -194,13 +202,13 @@ def execute_equalization_pressurization(
             upstream_depressurization_result=depressurization_result
         )
     """
-    # 減圧側からの流入ガスを作成
-    inflow_gas = _create_equalization_inflow(upstream_depressurization_result)
+    # 減圧側の下流流量結果から各ストリームへの流入ガスを取得
+    downstream_flow_result = upstream_depressurization_result.downstream_flow_result
     
-    # 外部流入ガスとして分配
-    distributed_inflows = _distribute_equalization_inflow(
-        tower_conds, inflow_gas
-    )
+    # 外部流入ガスとして設定（旧コードと同じ方法）
+    external_inflow_gas: Dict[int, GasFlow] = {}
+    for stream in range(1, 1 + tower_conds.common.num_streams):
+        external_inflow_gas[stream] = downstream_flow_result.outlet_flows[stream]
     
     # 塔全体の計算を実行
     tower_results = calculate_full_tower(
@@ -208,17 +216,11 @@ def execute_equalization_pressurization(
         tower_conds=tower_conds,
         state_manager=state_manager,
         tower_num=tower_num,
-        external_inflow_gas=distributed_inflows,
+        external_inflow_gas=external_inflow_gas,
     )
     
-    # 加圧後の圧力計算
-    pressure_after = calculate_pressure_after_batch_adsorption(
-        tower_conds=tower_conds,
-        state_manager=state_manager,
-        tower_num=tower_num,
-        is_series_operation=False,
-        has_pressure_valve=False,
-    )
+    # 加圧後の圧力は下流流量結果のfinal_pressureを使用（旧コードと同じ）
+    pressure_after = downstream_flow_result.final_pressure
     
     return EqualizationPressurizationResult(
         material=tower_results.mass_balance,
