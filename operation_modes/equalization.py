@@ -33,8 +33,8 @@ from core.state import (
     GasFlow,
 )
 from physics.pressure import (
-    calculate_depressurization_result,
-    calculate_downstream_flow_after_depressurization,
+    calculate_depressurization,
+    calculate_downstream_flow,
     calculate_pressure_after_batch_adsorption,
 )
 
@@ -110,7 +110,7 @@ def execute_equalization_depressurization(
     current_pressure = state_manager.get_total_pressure(tower_num)
     
     # 減圧結果の計算（圧力差と均圧流量）
-    depressurization_result = calculate_depressurization_result(
+    depressurization_result = calculate_depressurization(
         tower_conds=tower_conds,
         state_manager=state_manager,
         tower_num=tower_num,
@@ -129,7 +129,7 @@ def execute_equalization_depressurization(
     )
     
     # 下流への流出ガス量計算
-    downstream_flow = calculate_downstream_flow_after_depressurization(
+    downstream_flow = calculate_downstream_flow(
         tower_conds=tower_conds,
         state_manager=state_manager,
         tower_num=tower_num,

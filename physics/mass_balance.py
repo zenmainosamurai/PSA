@@ -240,6 +240,12 @@ def _calculate_adsorption_mass_balance(
             inlet_n2_volume=inlet_n2_volume,
             section_adsorbent_mass=section_adsorbent_mass,
             current_loading=current_loading,
+            updated_loading=updated_loading,
+            actual_uptake_volume=actual_uptake_volume,
+            outlet_co2_volume=outlet_co2_volume,
+            outlet_n2_volume=outlet_n2_volume,
+            outlet_co2_mole_fraction=outlet_co2_mole_fraction,
+            outlet_n2_mole_fraction=outlet_n2_mole_fraction,
         )
 
     # === 結果オブジェクトの構築 ===
@@ -581,6 +587,12 @@ def _adjust_outlet_pressure(
     inlet_n2_volume: float,
     section_adsorbent_mass: float,
     current_loading: float,
+    updated_loading: float,
+    actual_uptake_volume: float,
+    outlet_co2_volume: float,
+    outlet_n2_volume: float,
+    outlet_co2_mole_fraction: float,
+    outlet_n2_mole_fraction: float,
 ) -> Tuple[float, float, float, float, float, float, float]:
     """
     流出CO2分圧の整合性調整
@@ -618,11 +630,6 @@ def _adjust_outlet_pressure(
             return (outlet_co2_partial_pressure, actual_uptake_volume, updated_loading,
                     outlet_co2_volume, outlet_n2_volume, outlet_co2_mole_fraction, outlet_n2_mole_fraction)
     
-    # 調整不要の場合は None を返す（呼び出し側で元の値を使用）
-    outlet_co2_volume = inlet_co2_volume - (updated_loading - current_loading) * section_adsorbent_mass
-    outlet_n2_volume = inlet_n2_volume
-    outlet_co2_mole_fraction = outlet_co2_volume / (outlet_co2_volume + outlet_n2_volume) if (outlet_co2_volume + outlet_n2_volume) > 0 else 0
-    outlet_n2_mole_fraction = outlet_n2_volume / (outlet_co2_volume + outlet_n2_volume) if (outlet_co2_volume + outlet_n2_volume) > 0 else 0
-    # 元の計算値を返す
-    return (outlet_co2_partial_pressure, (updated_loading - current_loading) * section_adsorbent_mass, updated_loading,
+    # 調整不要の場合は元の値をそのまま返す
+    return (outlet_co2_partial_pressure, actual_uptake_volume, updated_loading,
             outlet_co2_volume, outlet_n2_volume, outlet_co2_mole_fraction, outlet_n2_mole_fraction)

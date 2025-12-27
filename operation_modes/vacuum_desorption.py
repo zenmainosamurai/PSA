@@ -35,7 +35,7 @@ from core.state import (
     VacuumPumpingResult,
 )
 from physics.pressure import (
-    calculate_vacuum_pumping_result,
+    calculate_vacuum_pumping,
     calculate_pressure_after_vacuum_desorption,
 )
 
@@ -101,7 +101,7 @@ def execute_vacuum_desorption(
         print(f"累積排気量: {result.accumulative_vacuum_amount} Nm3")
     """
     # 真空排気結果の計算
-    vacuum_pumping_results = calculate_vacuum_pumping_result(
+    vacuum_pumping_results = calculate_vacuum_pumping(
         tower_conds=tower_conds,
         state_manager=state_manager,
         tower_num=tower_num,
@@ -126,13 +126,15 @@ def execute_vacuum_desorption(
         tower_conds=tower_conds,
         state_manager=state_manager,
         tower_num=tower_num,
+        mole_fraction_results=mole_fraction,
         vacuum_pumping_results=vacuum_pumping_results,
     )
     
-    # 累積排気量の更新
+    # 累積排気量の更新（CO2とN2の合計）
     accumulative = (
         previous_accumulative_vacuum_amount +
-        vacuum_pumping_results.total_pumped_amount
+        vacuum_pumping_results.cumulative_co2_recovered +
+        vacuum_pumping_results.cumulative_n2_recovered
     )
     
     return VacuumDesorptionResult(
