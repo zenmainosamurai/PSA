@@ -1,7 +1,7 @@
 """シミュレーション結果を管理するデータクラス"""
 
 from dataclasses import dataclass, field
-from typing import Dict, List, Any, Optional
+from typing import Dict, List, Any
 from state import (
     MassBalanceResults,
     HeatBalanceResults,

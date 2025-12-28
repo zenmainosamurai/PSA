@@ -1,7 +1,6 @@
 import os
 import pandas as pd
 import numpy as np
-import glob
 from utils import const
 import xlsxwriter
 
@@ -493,4 +492,3 @@ def plot_xlsx_outputs(output_dir, df_obs, target_sections, tower_num, timestamp,
         df_schedule (pd.DataFrame): プロセス終了時刻を含むデータフレーム
     """
     # 統合ファイルは作成しない
-    pass

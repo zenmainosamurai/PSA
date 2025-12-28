@@ -24,12 +24,10 @@ from common.constants import (
     MPA_TO_KPA,
     MINUTE_TO_SECOND,
     L_TO_CM3,
-    CM3_TO_L,
     MINIMUM_EQUILIBRIUM_LOADING,
     MINIMUM_CO2_PARTIAL_PRESSURE,
 )
 
-# 旧コードとの互換性のためインポート
 from config.sim_conditions import TowerConditions
 from state import (
     StateVariables,

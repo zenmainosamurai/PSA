@@ -6,12 +6,10 @@
 
 import json
 import numpy as np
-from config.sim_conditions import SimulationConditions
 from state import StateVariables
 from process import SimulationRunner
 from process.simulation_io import SimulationIO
 
-import utils.prop_table
 
 
 def extract_state_snapshot(state_manager: StateVariables, num_towers: int, num_streams: int, num_sections: int) -> dict:

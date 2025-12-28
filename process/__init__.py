@@ -39,7 +39,6 @@ PSA工程（稼働工程表）に従ってシミュレーションを進行さ�
 # シミュレーター（ファサード）
 from .simulator import (
     GasAdsorptionBreakthroughSimulator,
-    GasAdosorptionBreakthroughsimulator,  # 後方互換性（タイポを含む旧名称）
     ProcessResults,
 )
 
@@ -78,7 +77,6 @@ from .termination_conditions import (
 __all__ = [
     # シミュレーター（ファサード）
     "GasAdsorptionBreakthroughSimulator",
-    "GasAdosorptionBreakthroughsimulator",  # 後方互換性
     "ProcessResults",
     # 入出力
     "SimulationIO",

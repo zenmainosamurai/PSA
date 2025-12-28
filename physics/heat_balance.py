@@ -16,14 +16,12 @@ from typing import Optional, Dict
 import numpy as np
 from scipy import optimize
 
-from operation_modes.mode_types import OperationMode, HeatCalculationMode
+from operation_modes.mode_types import HeatCalculationMode
 from common.constants import (
-    CELSIUS_TO_KELVIN_OFFSET,
     STANDARD_MOLAR_VOLUME,
     MINUTE_TO_SECOND,
 )
 
-# 旧コードとの互換性のためインポート
 from config.sim_conditions import TowerConditions
 from state import (
     StateVariables,
@@ -39,12 +37,6 @@ from state import (
     LidHeatBalanceResult,
 )
 from physics.heat_transfer import calc_heat_transfer_coef as _heat_transfer_coef
-
-
-# 後方互換性のためのエイリアス（新規コードではHeatCalculationModeを直接使用推奨）
-MODE_ADSORPTION = HeatCalculationMode.ADSORPTION
-MODE_VALVE_CLOSED = HeatCalculationMode.VALVE_CLOSED
-MODE_DESORPTION = HeatCalculationMode.DESORPTION
 
 
 # ============================================================

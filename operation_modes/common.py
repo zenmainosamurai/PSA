@@ -12,7 +12,7 @@
 from typing import Dict, Optional
 from dataclasses import dataclass
 
-from operation_modes.mode_types import OperationMode, HeatCalculationMode
+from operation_modes.mode_types import OperationMode
 from config.sim_conditions import TowerConditions
 from state import (
     StateVariables,

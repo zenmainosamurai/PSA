@@ -13,19 +13,18 @@ PSAシミュレーションを実行するためのメインクラスです。
     simulator = GasAdsorptionBreakthroughSimulator("5_08_mod_logging2")
     simulator.execute_simulation()
 
-旧コードとの互換性:
-    GasAdosorptionBreakthroughsimulator は GasAdsorptionBreakthroughSimulator のエイリアスです。
+
 """
 
 import os
 from dataclasses import dataclass
-from typing import Dict, List, Optional
+from typing import List, Optional
 
 from common.paths import OUTPUT_DIR
 from config.sim_conditions import SimulationConditions
 from state import StateVariables
 from process.simulation_io import SimulationIO
-from process.simulation_runner import SimulationRunner, SimulationOutput
+from process.simulation_runner import SimulationRunner
 from process.result_exporter import ResultExporter
 from process.simulation_results import SimulationResults
 import logger as log
@@ -203,6 +202,3 @@ class GasAdsorptionBreakthroughSimulator:
         
         return record_outputs_tower
 
-
-# 後方互換性のためのエイリアス（タイポを含む旧名称）
-GasAdosorptionBreakthroughsimulator = GasAdsorptionBreakthroughSimulator

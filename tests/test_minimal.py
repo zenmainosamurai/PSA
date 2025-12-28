@@ -9,7 +9,7 @@ sys.path.insert(0, "/home/user/webapp")
 os.chdir("/home/user/webapp")
 
 import numpy as np
-from state.state_variables import TowerStateArrays, CellAccessor
+from state.state_variables import TowerStateArrays
 
 def test_cell_accessor():
     """CellAccessorのテスト"""

@@ -18,10 +18,10 @@
 """
 
 from dataclasses import dataclass
-from typing import Dict, Optional
+from typing import Dict
 
 from operation_modes.mode_types import OperationMode
-from operation_modes.common import calculate_full_tower, distribute_inflow_gas
+from operation_modes.common import calculate_full_tower
 from config.sim_conditions import TowerConditions
 from state import (
     StateVariables,
@@ -34,7 +34,6 @@ from state import (
 from physics.pressure import (
     calculate_depressurization,
     calculate_downstream_flow,
-    calculate_pressure_after_batch_adsorption,
 )
 from state.results import DownstreamFlowResult
 

@@ -33,7 +33,6 @@ from common.constants import (
     L_TO_M3,
 )
 
-# 旧コードとの互換性のためインポート
 from config.sim_conditions import TowerConditions
 from state import (
     StateVariables,

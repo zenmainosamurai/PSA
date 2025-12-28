@@ -3,7 +3,7 @@ import pandas as pd
 
 import sys
 import os
-from logging import getLogger, handlers, Formatter, StreamHandler, DEBUG, INFO
+from logging import getLogger, handlers, Formatter, StreamHandler, INFO
 
 
 def resample_obs_data(df_obs, simulation_step):

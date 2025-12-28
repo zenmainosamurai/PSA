@@ -26,7 +26,6 @@ import pandas as pd
 
 from config.sim_conditions import SimulationConditions
 from process.simulation_results import SimulationResults
-from common.constants import STANDARD_PRESSURE
 from utils import plot_csv, plot_xlsx
 import logger as log
 

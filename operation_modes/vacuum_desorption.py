@@ -19,7 +19,7 @@
 """
 
 from dataclasses import dataclass
-from typing import Dict, Optional
+from typing import Dict
 
 from operation_modes.mode_types import OperationMode
 from operation_modes.common import calculate_full_tower

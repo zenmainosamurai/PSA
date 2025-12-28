@@ -10,9 +10,7 @@ sys.path.insert(0, "/home/user/webapp")
 os.chdir("/home/user/webapp")
 
 # 物性テーブル高速化
-import utils.prop_table
 
-import numpy as np
 
 from config.sim_conditions import SimulationConditions
 from state.state_variables import StateVariables

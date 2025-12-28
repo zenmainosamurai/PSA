@@ -2,7 +2,6 @@ import yaml
 import time
 
 from process import GasAdsorptionBreakthroughSimulator
-import utils.prop_table
 import logger as log
 
 logger = log.logger
@@ -48,7 +47,6 @@ def execute_assimilation_mode():
     """
     # TODO: データ同化処理の実装
     logger.info("データ同化モード: 未実装")
-    pass
 
 
 def execute_optimize_mode():
@@ -57,7 +55,6 @@ def execute_optimize_mode():
     """
     # TODO: 最適化処理の実装
     logger.info("最適化モード: 未実装")
-    pass
 
 
 def execute_calculation(settings):
