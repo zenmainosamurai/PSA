@@ -44,7 +44,9 @@ def plot_csv_outputs(tgt_foldapath, df_obs, tgt_sections, tower_num, timestamp, 
     filename_list = glob.glob(tgt_foldapath + f"/csv/tower_{tower_num}/heat/*.csv")
     df_dict = {}
     for filename in filename_list:
-        df_dict[filename.split("/")[-1][:-4].split("\\")[1]] = pd.read_csv(
+        # ファイル名（拡張子なし）を取得（クロスプラットフォーム対応）
+        basename = os.path.splitext(os.path.basename(filename))[0]
+        df_dict[basename] = pd.read_csv(
             filename, index_col="timestamp", encoding="shift_jis"
         )
 
@@ -108,7 +110,9 @@ def plot_csv_outputs(tgt_foldapath, df_obs, tgt_sections, tower_num, timestamp, 
     filename_list = glob.glob(tgt_foldapath + f"/csv/tower_{tower_num}/material/*.csv")
     df_dict = {}
     for filename in filename_list:
-        df_dict[filename.split("/")[-1][:-4].split("\\")[1]] = pd.read_csv(
+        # ファイル名（拡張子なし）を取得（クロスプラットフォーム対応）
+        basename = os.path.splitext(os.path.basename(filename))[0]
+        df_dict[basename] = pd.read_csv(
             filename, index_col="timestamp", encoding="shift_jis"
         )
 
