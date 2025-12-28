@@ -84,22 +84,22 @@ def run_full_simulation(cond_id: str) -> dict:
         from process.termination_conditions import should_continue_process
         
         # 工程内ループ
-        timestamp_p = 0.0
+        elapsed_time = 0.0
         step_count = 0
         max_steps = 10000  # 安全のため上限設定
         
-        while should_continue_process(termination_cond_str, state_manager, timestamp, timestamp_p, num_sections):
+        while should_continue_process(termination_cond_str, state_manager, timestamp, elapsed_time, num_sections):
             # 1ステップ実行
             outputs, residual_gas_composition = execute_mode_list(
                 sim_conds, mode_list, state_manager, residual_gas_composition
             )
             
-            timestamp_p += dt
+            elapsed_time += dt
             step_count += 1
             total_steps += 1
             
             # タイムアウト（20分）
-            if timestamp_p >= 20:
+            if elapsed_time >= 20:
                 print(f"  警告: タイムアウト（20分超過）")
                 break
             
@@ -108,7 +108,7 @@ def run_full_simulation(cond_id: str) -> dict:
                 print(f"  警告: 最大ステップ数到達")
                 break
         
-        timestamp += timestamp_p
+        timestamp += elapsed_time
         print(f"  完了: {step_count}ステップ, timestamp={timestamp:.2f}min")
         
         # 塔の状態を表示（最終工程または5工程ごと）

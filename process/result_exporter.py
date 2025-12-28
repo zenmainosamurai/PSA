@@ -51,8 +51,8 @@ class ResultExporter:
         
         # 基本パラメータ
         self.num_tower = sim_conds.num_towers
-        self.num_str = sim_conds.get_tower(1).common.num_streams
-        self.num_sec = sim_conds.get_tower(1).common.num_sections
+        self.num_streams = sim_conds.get_tower(1).common.num_streams
+        self.num_sections = sim_conds.get_tower(1).common.num_sections
     
     def export_all(
         self,
@@ -132,7 +132,7 @@ class ResultExporter:
         self,
         output_dir: str,
         df_obs: Optional[pd.DataFrame],
-        tgt_sections: list,
+        target_sections: list,
         timestamp: float,
         df_operation: pd.DataFrame,
     ) -> None:
@@ -142,7 +142,7 @@ class ResultExporter:
         Args:
             output_dir: 出力先ディレクトリ
             df_obs: 観測データ
-            tgt_sections: 対象セクション
+            target_sections: 対象セクション
             timestamp: 最終タイムスタンプ
             df_operation: 稼働工程表
         """
@@ -150,19 +150,19 @@ class ResultExporter:
         
         for tower_num in range(1, 1 + self.num_tower):
             plot_csv.plot_csv_outputs(
-                tgt_foldapath=output_dir,
+                output_dir=output_dir,
                 df_obs=df_obs,
-                tgt_sections=tgt_sections,
+                target_sections=target_sections,
                 tower_num=tower_num,
                 timestamp=timestamp,
-                df_p_end=df_operation,
+                df_schedule=df_operation,
             )
     
     def export_xlsx(
         self,
         output_dir: str,
         simulation_results: SimulationResults,
-        tgt_sections: list,
+        target_sections: list,
         df_obs: Optional[pd.DataFrame],
         timestamp: float,
         df_operation: pd.DataFrame,
@@ -173,7 +173,7 @@ class ResultExporter:
         Args:
             output_dir: 出力先ディレクトリ
             simulation_results: シミュレーション結果
-            tgt_sections: 対象セクション
+            target_sections: 対象セクション
             df_obs: 観測データ
             timestamp: 最終タイムスタンプ
             df_operation: 稼働工程表
@@ -189,7 +189,7 @@ class ResultExporter:
                 tower_folder,
                 tower_results,
                 self.sim_conds.get_tower(tower_num).common,
-                tgt_sections,
+                target_sections,
                 df_obs,
                 tower_num,
             )
@@ -198,12 +198,12 @@ class ResultExporter:
         
         for tower_num in range(1, 1 + self.num_tower):
             plot_xlsx.plot_xlsx_outputs(
-                tgt_foldapath=output_dir,
+                output_dir=output_dir,
                 df_obs=df_obs,
-                tgt_sections=tgt_sections,
+                target_sections=target_sections,
                 tower_num=tower_num,
                 timestamp=timestamp,
-                df_p_end=df_operation,
+                df_schedule=df_operation,
             )
     
     def _apply_unit_conversion(self, simulation_results: SimulationResults) -> None:
@@ -221,8 +221,8 @@ class ResultExporter:
             for i, material_balance_results in enumerate(time_series_data.material):
                 pressure_mpa = time_series_data.others[i]["total_pressure"]
                 
-                for stream_id in range(1, self.num_str + 1):
-                    for section_id in range(1, self.num_sec + 1):
+                for stream_id in range(1, self.num_streams + 1):
+                    for section_id in range(1, self.num_sections + 1):
                         material_balance_result = material_balance_results.get_result(
                             stream_id, section_id
                         )

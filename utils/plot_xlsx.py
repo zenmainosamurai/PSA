@@ -42,7 +42,7 @@ def _create_dataframe_and_save_xlsx(
     file_path,
     add_units=True,
     chart_title="",
-    tgt_sections=None,
+    target_sections=None,
     observed_data=None,
     tower_num=None,
 ):
@@ -108,14 +108,14 @@ def _create_dataframe_and_save_xlsx(
     if len(df.columns) > 0:
         chart = workbook.add_chart({"type": "line"})
 
-        # 可視化対象のカラムを抽出（tgt_sectionsが指定されている場合）
-        if tgt_sections is not None:
+        # 可視化対象のカラムを抽出（target_sectionsが指定されている場合）
+        if target_sections is not None:
             target_columns = []
             for col in df.columns:
                 try:
                     if "-" in col:
                         section = int(col.split("-")[-1])
-                        if section in tgt_sections:
+                        if section in target_sections:
                             target_columns.append(col)
                     else:
                         target_columns.append(col)
@@ -208,7 +208,7 @@ def _generate_heat_material_columns(record_data, common_conds):
     return columns
 
 
-def _get_observed_data_for_key(df_obs, key, tower_num, tgt_sections=None):
+def _get_observed_data_for_key(df_obs, key, tower_num, target_sections=None):
     """指定されたキーと塔番号に対応する実測値データを取得"""
     if df_obs is None or df_obs.empty:
         return None
@@ -218,10 +218,10 @@ def _get_observed_data_for_key(df_obs, key, tower_num, tgt_sections=None):
 
     # 温度データの場合
     if "セクション到達温度" in key or "熱電対温度" in key:
-        # plot_csvと同じ仕様：tgt_sectionsの値を使用
-        if tgt_sections is not None:
+        # plot_csvと同じ仕様：target_sectionsの値を使用
+        if target_sections is not None:
             for section in range(1, 4):  # section 1, 2, 3
-                target_section = tgt_sections[section - 1]  # 実際のセクション番号
+                target_section = target_sections[section - 1]  # 実際のセクション番号
                 temp_col = f"T{tower_num}_temp_{section}"
                 if temp_col in df_obs.columns:
                     # シミュレーション値と同じ形式で「実測」を先頭に付ける
@@ -276,10 +276,10 @@ def _interpolate_observed_data_to_calc_timestamps(observed_data, calc_timestamps
 
 
 def _save_heat_material_data_xlsx(
-    tgt_foldapath, tower_results, common_conds, data_type, tgt_sections=None, df_obs=None, tower_num=1
+    output_dir, tower_results, common_conds, data_type, target_sections=None, df_obs=None, tower_num=1
 ):
     """heat/materialデータをXLSXに保存する"""
-    folder_path = os.path.join(tgt_foldapath, data_type)
+    folder_path = os.path.join(output_dir, data_type)
     os.makedirs(folder_path, exist_ok=True)
 
     record_data = getattr(tower_results.time_series_data, data_type)
@@ -299,7 +299,7 @@ def _save_heat_material_data_xlsx(
         chart_title = f"{japanese_name} {const.UNIT.get(japanese_name, '')}"
 
         # 実測値データを取得
-        observed_data = _get_observed_data_for_key(df_obs, japanese_name, tower_num, tgt_sections)
+        observed_data = _get_observed_data_for_key(df_obs, japanese_name, tower_num, target_sections)
 
         _create_dataframe_and_save_xlsx(
             key_values,
@@ -308,15 +308,15 @@ def _save_heat_material_data_xlsx(
             file_path,
             add_units=True,
             chart_title=chart_title,
-            tgt_sections=tgt_sections,
+            target_sections=target_sections,
             observed_data=observed_data,
             tower_num=tower_num,
         )
 
 
-def _save_heat_lid_data_xlsx(tgt_foldapath, tower_results):
+def _save_heat_lid_data_xlsx(output_dir, tower_results):
     """heat_lidデータをXLSXに保存する"""
-    folder_path = os.path.join(tgt_foldapath, "heat_lid")
+    folder_path = os.path.join(output_dir, "heat_lid")
     os.makedirs(folder_path, exist_ok=True)
 
     values = []
@@ -345,12 +345,12 @@ def _calculate_vacuum_rate_co2(cumulative_co2, cumulative_n2):
         return 0
 
 
-def _save_total_pressure_data_xlsx(folder_path, tower_results, df_obs=None, tower_num=1, tgt_sections=None):
+def _save_total_pressure_data_xlsx(folder_path, tower_results, df_obs=None, tower_num=1, target_sections=None):
     """全圧データをXLSXに保存する"""
     values = [[record["total_pressure"]] for record in tower_results.time_series_data.others]
 
     # 実測値データを取得
-    observed_data = _get_observed_data_for_key(df_obs, "全圧", tower_num, tgt_sections)
+    observed_data = _get_observed_data_for_key(df_obs, "全圧", tower_num, target_sections)
 
     file_path = os.path.join(folder_path, "全圧.xlsx")
     chart_title = f"全圧 {const.UNIT.get('全圧', '[MPaA]')}"
@@ -414,7 +414,7 @@ def _save_vacuum_amount_data_xlsx(folder_path, tower_results):
     )
 
 
-def _save_mole_fraction_data_xlsx(folder_path, tower_results, common_conds, fraction_type, tgt_sections=None):
+def _save_mole_fraction_data_xlsx(folder_path, tower_results, common_conds, fraction_type, target_sections=None):
     """モル分率データをXLSXに保存する"""
     values = []
     for record in tower_results.time_series_data.others:
@@ -436,61 +436,61 @@ def _save_mole_fraction_data_xlsx(folder_path, tower_results, common_conds, frac
         file_path,
         add_units=True,
         chart_title=chart_title,
-        tgt_sections=tgt_sections,
+        target_sections=target_sections,
     )
 
 
-def _save_others_data_xlsx(tgt_foldapath, tower_results, common_conds, tgt_sections=None, df_obs=None, tower_num=1):
+def _save_others_data_xlsx(output_dir, tower_results, common_conds, target_sections=None, df_obs=None, tower_num=1):
     """othersデータをXLSXに保存する"""
-    folder_path = os.path.join(tgt_foldapath, "others")
+    folder_path = os.path.join(output_dir, "others")
     os.makedirs(folder_path, exist_ok=True)
 
     # 全圧
-    _save_total_pressure_data_xlsx(folder_path, tower_results, df_obs, tower_num, tgt_sections)
+    _save_total_pressure_data_xlsx(folder_path, tower_results, df_obs, tower_num, target_sections)
 
     # CO2, N2回収量
     _save_vacuum_amount_data_xlsx(folder_path, tower_results)
 
     # モル分率
     for fraction_type in ["co2_mole_fraction", "n2_mole_fraction"]:
-        _save_mole_fraction_data_xlsx(folder_path, tower_results, common_conds, fraction_type, tgt_sections)
+        _save_mole_fraction_data_xlsx(folder_path, tower_results, common_conds, fraction_type, target_sections)
 
 
 def outputs_to_xlsx(
-    tgt_foldapath, tower_results, common_conds: CommonConditions, tgt_sections=None, df_obs=None, tower_num=1
+    output_dir, tower_results, common_conds: CommonConditions, target_sections=None, df_obs=None, tower_num=1
 ):
     """計算結果をxlsx出力する
 
     Args:
-        tgt_foldapath (str): 出力先フォルダパス
+        output_dir (str): 出力先フォルダパス
         tower_results (TowerSimulationResults): 計算結果
         common_conds (CommonConditions): 実験パラメータ
-        tgt_sections (list): 可視化対象のセクション
+        target_sections (list): 可視化対象のセクション
         df_obs (pd.DataFrame): 観測値のデータフレーム
         tower_num (int): 塔番号
     """
     # heat, material データの保存
     for data_type in ["heat", "material"]:
         _save_heat_material_data_xlsx(
-            tgt_foldapath, tower_results, common_conds, data_type, tgt_sections, df_obs, tower_num
+            output_dir, tower_results, common_conds, data_type, target_sections, df_obs, tower_num
         )
 
     # heat_lid データの保存
-    _save_heat_lid_data_xlsx(tgt_foldapath, tower_results)
+    _save_heat_lid_data_xlsx(output_dir, tower_results)
 
     # others データの保存
-    _save_others_data_xlsx(tgt_foldapath, tower_results, common_conds, tgt_sections, df_obs, tower_num)
+    _save_others_data_xlsx(output_dir, tower_results, common_conds, target_sections, df_obs, tower_num)
 
 
-def plot_xlsx_outputs(tgt_foldapath, df_obs, tgt_sections, tower_num, timestamp, df_p_end):
+def plot_xlsx_outputs(output_dir, df_obs, target_sections, tower_num, timestamp, df_schedule):
     """熱バラ計算結果のxlsx可視化（統合ファイルは作成しない）
 
     Args:
-        tgt_foldapath (str): 出力先フォルダパス
+        output_dir (str): 出力先フォルダパス
         df_obs (pd.DataFrame): 観測値のデータフレーム
-        tgt_sections (list): 可視化対象のセクション
+        target_sections (list): 可視化対象のセクション
         tower_num (int): 塔番号
-        df_p_end (pd.DataFrame): プロセス終了時刻を含むデータフレーム
+        df_schedule (pd.DataFrame): プロセス終了時刻を含むデータフレーム
     """
     # 統合ファイルは作成しない
     pass

@@ -17,14 +17,14 @@ import pandas as pd
 
 from config.sim_conditions import SimulationConditions
 from state.state_variables import StateVariables
-from process import GasAdosorptionBreakthroughsimulator
+from process import GasAdsorptionBreakthroughSimulator
 from process.process_executor import execute_mode_list, prepare_batch_adsorption_pressure
 
 
 def test_simulator_initialization():
     """シミュレーター初期化テスト"""
     print("テスト1: シミュレーター初期化...")
-    sim = GasAdosorptionBreakthroughsimulator('5_08_mod_logging2')
+    sim = GasAdsorptionBreakthroughSimulator('5_08_mod_logging2')
     assert sim.sim_conds is not None
     assert sim.state_manager is not None
     print("  ✅ 成功")

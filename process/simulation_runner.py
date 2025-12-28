@@ -171,13 +171,13 @@ class SimulationRunner:
         Returns:
             ProcessResult: 工程実行結果
         """
-        timestamp_p = 0.0
+        elapsed_time = 0.0
         
         # 初回限定処理（バッチ吸着の圧力平均化）
         prepare_batch_adsorption_pressure(self.state_manager, self.sim_conds, mode_list)
         
         # 逐次計算
-        while self._check_termination_condition(termination_cond_str, timestamp, timestamp_p):
+        while self._check_termination_condition(termination_cond_str, timestamp, elapsed_time):
             # 各塔の吸着計算
             outputs, new_residual = execute_mode_list(
                 sim_conds=self.sim_conds,
@@ -191,11 +191,11 @@ class SimulationRunner:
                 self.residual_gas_composition = new_residual
             
             # タイムスタンプ更新
-            timestamp_p += self.dt
+            elapsed_time += self.dt
             
             # 結果記録
             for tower_num, output in outputs.items():
-                current_timestamp = timestamp + timestamp_p
+                current_timestamp = timestamp + elapsed_time
                 simulation_results.add_tower_result(
                     tower_id=tower_num,
                     timestamp=current_timestamp,
@@ -208,17 +208,17 @@ class SimulationRunner:
             
             # 時間超過による強制終了
             time_threshold = 20
-            if timestamp_p >= time_threshold:
+            if elapsed_time >= time_threshold:
                 self.logger.warning(f"{time_threshold}分以内に終了しなかったため強制終了")
                 return ProcessResult(
-                    timestamp=timestamp + timestamp_p,
+                    timestamp=timestamp + elapsed_time,
                     simulation_results=simulation_results,
                     success=False,
                     error_message=f"時間超過（{time_threshold}分）",
                 )
         
         return ProcessResult(
-            timestamp=timestamp + timestamp_p,
+            timestamp=timestamp + elapsed_time,
             simulation_results=simulation_results,
             success=True,
         )
@@ -227,7 +227,7 @@ class SimulationRunner:
         self,
         termination_cond_str: str,
         timestamp: float,
-        timestamp_p: float,
+        elapsed_time: float,
     ) -> bool:
         """
         終了条件をチェック
@@ -235,7 +235,7 @@ class SimulationRunner:
         Args:
             termination_cond_str: 終了条件文字列
             timestamp: 工程開始時のタイムスタンプ
-            timestamp_p: 工程内経過時間
+            elapsed_time: 工程内経過時間
             
         Returns:
             bool: 継続する場合True、終了する場合False
@@ -259,10 +259,10 @@ class SimulationRunner:
             unit = cond_list[2]
             if unit == "s":
                 time /= 60
-            return timestamp_p < time
+            return elapsed_time < time
         
         elif cond_list[0] == "時間到達":
             time = float(cond_list[1])
-            return timestamp + timestamp_p < time
+            return timestamp + elapsed_time < time
         
         return False

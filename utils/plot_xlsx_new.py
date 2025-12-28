@@ -36,7 +36,7 @@ def _add_units_to_columns(columns):
 
 
 def _create_dataframe_and_save_xlsx(
-    values, columns, timestamp_index, file_path, add_units=True, chart_title="", tgt_sections=None
+    values, columns, timestamp_index, file_path, add_units=True, chart_title="", target_sections=None
 ):
     """データフレームを作成してXLSXファイルに保存し、グラフシートも追加する"""
     # 単位を追加するかどうかを制御
@@ -69,14 +69,14 @@ def _create_dataframe_and_save_xlsx(
     if len(df.columns) > 0:
         chart = workbook.add_chart({"type": "line"})
 
-        # 可視化対象のカラムを抽出（tgt_sectionsが指定されている場合）
-        if tgt_sections is not None:
+        # 可視化対象のカラムを抽出（target_sectionsが指定されている場合）
+        if target_sections is not None:
             target_columns = []
             for col in df.columns:
                 try:
                     if "-" in col:
                         section = int(col.split("-")[-1])
-                        if section in tgt_sections:
+                        if section in target_sections:
                             target_columns.append(col)
                     else:
                         target_columns.append(col)
@@ -145,9 +145,9 @@ def _generate_heat_material_columns(record_data, common_conds):
     return columns
 
 
-def _save_heat_material_data_xlsx(tgt_foldapath, tower_results, common_conds, data_type, tgt_sections=None):
+def _save_heat_material_data_xlsx(output_dir, tower_results, common_conds, data_type, target_sections=None):
     """heat/materialデータをXLSXに保存する"""
-    folder_path = os.path.join(tgt_foldapath, data_type)
+    folder_path = os.path.join(output_dir, data_type)
     os.makedirs(folder_path, exist_ok=True)
 
     record_data = getattr(tower_results.time_series_data, data_type)
@@ -172,13 +172,13 @@ def _save_heat_material_data_xlsx(tgt_foldapath, tower_results, common_conds, da
             file_path,
             add_units=True,
             chart_title=chart_title,
-            tgt_sections=tgt_sections,
+            target_sections=target_sections,
         )
 
 
-def _save_heat_lid_data_xlsx(tgt_foldapath, tower_results):
+def _save_heat_lid_data_xlsx(output_dir, tower_results):
     """heat_lidデータをXLSXに保存する"""
-    folder_path = os.path.join(tgt_foldapath, "heat_lid")
+    folder_path = os.path.join(output_dir, "heat_lid")
     os.makedirs(folder_path, exist_ok=True)
 
     values = []
@@ -265,7 +265,7 @@ def _save_vacuum_amount_data_xlsx(folder_path, tower_results):
     )
 
 
-def _save_mole_fraction_data_xlsx(folder_path, tower_results, common_conds, fraction_type, tgt_sections=None):
+def _save_mole_fraction_data_xlsx(folder_path, tower_results, common_conds, fraction_type, target_sections=None):
     """モル分率データをXLSXに保存する"""
     values = []
     for record in tower_results.time_series_data.others:
@@ -287,13 +287,13 @@ def _save_mole_fraction_data_xlsx(folder_path, tower_results, common_conds, frac
         file_path,
         add_units=True,
         chart_title=chart_title,
-        tgt_sections=tgt_sections,
+        target_sections=target_sections,
     )
 
 
-def _save_others_data_xlsx(tgt_foldapath, tower_results, common_conds, tgt_sections=None):
+def _save_others_data_xlsx(output_dir, tower_results, common_conds, target_sections=None):
     """othersデータをXLSXに保存する"""
-    folder_path = os.path.join(tgt_foldapath, "others")
+    folder_path = os.path.join(output_dir, "others")
     os.makedirs(folder_path, exist_ok=True)
 
     # 全圧
@@ -304,72 +304,72 @@ def _save_others_data_xlsx(tgt_foldapath, tower_results, common_conds, tgt_secti
 
     # モル分率
     for fraction_type in ["co2_mole_fraction", "n2_mole_fraction"]:
-        _save_mole_fraction_data_xlsx(folder_path, tower_results, common_conds, fraction_type, tgt_sections)
+        _save_mole_fraction_data_xlsx(folder_path, tower_results, common_conds, fraction_type, target_sections)
 
 
-def outputs_to_xlsx(tgt_foldapath, tower_results, common_conds: CommonConditions, tgt_sections=None):
+def outputs_to_xlsx(output_dir, tower_results, common_conds: CommonConditions, target_sections=None):
     """計算結果をxlsx出力する
 
     Args:
-        tgt_foldapath (str): 出力先フォルダパス
+        output_dir (str): 出力先フォルダパス
         tower_results (TowerSimulationResults): 計算結果
         common_conds (CommonConditions): 実験パラメータ
-        tgt_sections (list): 可視化対象のセクション
+        target_sections (list): 可視化対象のセクション
     """
     # heat, material データの保存
     for data_type in ["heat", "material"]:
-        _save_heat_material_data_xlsx(tgt_foldapath, tower_results, common_conds, data_type, tgt_sections)
+        _save_heat_material_data_xlsx(output_dir, tower_results, common_conds, data_type, target_sections)
 
     # heat_lid データの保存
-    _save_heat_lid_data_xlsx(tgt_foldapath, tower_results)
+    _save_heat_lid_data_xlsx(output_dir, tower_results)
 
     # others データの保存
-    _save_others_data_xlsx(tgt_foldapath, tower_results, common_conds, tgt_sections)
+    _save_others_data_xlsx(output_dir, tower_results, common_conds, target_sections)
 
 
-def plot_xlsx_outputs(tgt_foldapath, df_obs, tgt_sections, tower_num, timestamp, df_p_end):
+def plot_xlsx_outputs(output_dir, df_obs, target_sections, tower_num, timestamp, df_schedule):
     """熱バラ計算結果のxlsx可視化（統合されたファイルを作成）
 
     Args:
-        tgt_foldapath (str): 出力先フォルダパス
+        output_dir (str): 出力先フォルダパス
         df_obs (pd.DataFrame): 観測値のデータフレーム
-        tgt_sections (list): 可視化対象のセクション
+        target_sections (list): 可視化対象のセクション
         tower_num (int): 塔番号
-        df_p_end (pd.DataFrame): プロセス終了時刻を含むデータフレーム
+        df_schedule (pd.DataFrame): プロセス終了時刻を含むデータフレーム
     """
-    output_foldapath = tgt_foldapath + f"/xlsx/tower_{tower_num}/"
+    output_foldapath = output_dir + f"/xlsx/tower_{tower_num}/"
     os.makedirs(output_foldapath, exist_ok=True)
 
     # 統合されたExcelファイルを作成
-    _create_integrated_xlsx_files(tgt_foldapath, tower_num, df_obs, timestamp, df_p_end, tgt_sections, output_foldapath)
+    _create_integrated_xlsx_files(output_dir, tower_num, df_obs, timestamp, df_schedule, target_sections, output_foldapath)
 
 
 def _create_integrated_xlsx_files(
-    tgt_foldapath, tower_num, df_obs, timestamp, df_p_end, tgt_sections, output_foldapath
+    output_dir, tower_num, df_obs, timestamp, df_schedule, target_sections, output_foldapath
 ):
     """統合されたXLSXファイルを作成する"""
 
     # heat.xlsx
-    _create_integrated_heat_xlsx(tgt_foldapath, tower_num, df_obs, timestamp, df_p_end, tgt_sections, output_foldapath)
+    _create_integrated_heat_xlsx(output_dir, tower_num, df_obs, timestamp, df_schedule, target_sections, output_foldapath)
 
     # material.xlsx
     _create_integrated_material_xlsx(
-        tgt_foldapath, tower_num, df_obs, timestamp, df_p_end, tgt_sections, output_foldapath
+        output_dir, tower_num, df_obs, timestamp, df_schedule, target_sections, output_foldapath
     )
 
     # heat_lid.xlsx
-    _create_integrated_heat_lid_xlsx(tgt_foldapath, tower_num, df_obs, timestamp, df_p_end, output_foldapath)
+    _create_integrated_heat_lid_xlsx(output_dir, tower_num, df_obs, timestamp, df_schedule, output_foldapath)
 
     # others.xlsx
     _create_integrated_others_xlsx(
-        tgt_foldapath, tower_num, df_obs, timestamp, df_p_end, tgt_sections, output_foldapath
+        output_dir, tower_num, df_obs, timestamp, df_schedule, target_sections, output_foldapath
     )
 
 
-def _create_integrated_heat_xlsx(tgt_foldapath, tower_num, df_obs, timestamp, df_p_end, tgt_sections, output_foldapath):
+def _create_integrated_heat_xlsx(output_dir, tower_num, df_obs, timestamp, df_schedule, target_sections, output_foldapath):
     """統合されたheat.xlsxファイルを作成する"""
     # CSVファイルからデータを読み込み
-    filename_list = glob.glob(tgt_foldapath + f"/csv/tower_{tower_num}/heat/*.csv")
+    filename_list = glob.glob(output_dir + f"/csv/tower_{tower_num}/heat/*.csv")
 
     if not filename_list:
         return
@@ -385,15 +385,15 @@ def _create_integrated_heat_xlsx(tgt_foldapath, tower_num, df_obs, timestamp, df
             combined_df = pd.concat([combined_df, df], axis=1)
 
     file_path = output_foldapath + "heat.xlsx"
-    _create_xlsx_with_multiple_charts(file_path, combined_df, "熱バランス", tgt_sections, filename_list)
+    _create_xlsx_with_multiple_charts(file_path, combined_df, "熱バランス", target_sections, filename_list)
 
 
 def _create_integrated_material_xlsx(
-    tgt_foldapath, tower_num, df_obs, timestamp, df_p_end, tgt_sections, output_foldapath
+    output_dir, tower_num, df_obs, timestamp, df_schedule, target_sections, output_foldapath
 ):
     """統合されたmaterial.xlsxファイルを作成する"""
     # CSVファイルからデータを読み込み
-    filename_list = glob.glob(tgt_foldapath + f"/csv/tower_{tower_num}/material/*.csv")
+    filename_list = glob.glob(output_dir + f"/csv/tower_{tower_num}/material/*.csv")
 
     if not filename_list:
         return
@@ -409,12 +409,12 @@ def _create_integrated_material_xlsx(
             combined_df = pd.concat([combined_df, df], axis=1)
 
     file_path = output_foldapath + "material.xlsx"
-    _create_xlsx_with_multiple_charts(file_path, combined_df, "マテリアルバランス", tgt_sections, filename_list)
+    _create_xlsx_with_multiple_charts(file_path, combined_df, "マテリアルバランス", target_sections, filename_list)
 
 
-def _create_integrated_heat_lid_xlsx(tgt_foldapath, tower_num, df_obs, timestamp, df_p_end, output_foldapath):
+def _create_integrated_heat_lid_xlsx(output_dir, tower_num, df_obs, timestamp, df_schedule, output_foldapath):
     """統合されたheat_lid.xlsxファイルを作成する"""
-    filename_list = glob.glob(tgt_foldapath + f"/csv/tower_{tower_num}/heat_lid/蓋温度.csv")
+    filename_list = glob.glob(output_dir + f"/csv/tower_{tower_num}/heat_lid/蓋温度.csv")
 
     if not filename_list:
         return
@@ -459,7 +459,7 @@ def _create_integrated_heat_lid_xlsx(tgt_foldapath, tower_num, df_obs, timestamp
 
 
 def _create_integrated_others_xlsx(
-    tgt_foldapath, tower_num, df_obs, timestamp, df_p_end, tgt_sections, output_foldapath
+    output_dir, tower_num, df_obs, timestamp, df_schedule, target_sections, output_foldapath
 ):
     """統合されたothers.xlsxファイルを作成する"""
     # 各othersファイルからデータを収集
@@ -475,7 +475,7 @@ def _create_integrated_others_xlsx(
     combined_df = pd.DataFrame()
 
     for filename in others_files:
-        filepath = tgt_foldapath + f"/csv/tower_{tower_num}/others/{filename}"
+        filepath = output_dir + f"/csv/tower_{tower_num}/others/{filename}"
         if os.path.exists(filepath):
             df = pd.read_csv(filepath, index_col="timestamp", encoding="shift-jis")
             if combined_df.empty:
@@ -485,10 +485,10 @@ def _create_integrated_others_xlsx(
 
     if not combined_df.empty:
         file_path = output_foldapath + "others.xlsx"
-        _create_xlsx_with_multiple_charts(file_path, combined_df, "その他データ", tgt_sections, others_files)
+        _create_xlsx_with_multiple_charts(file_path, combined_df, "その他データ", target_sections, others_files)
 
 
-def _create_xlsx_with_multiple_charts(file_path, df, title_prefix, tgt_sections, source_files):
+def _create_xlsx_with_multiple_charts(file_path, df, title_prefix, target_sections, source_files):
     """複数のチャートを含むXLSXファイルを作成する"""
     workbook = xlsxwriter.Workbook(file_path)
 
@@ -518,13 +518,13 @@ def _create_xlsx_with_multiple_charts(file_path, df, title_prefix, tgt_sections,
             continue
 
         # 可視化対象のカラムを絞り込み
-        if tgt_sections is not None:
+        if target_sections is not None:
             target_columns = []
             for col in related_columns:
                 try:
                     if "-" in col:
                         section = int(col.split("-")[-1])
-                        if section in tgt_sections:
+                        if section in target_sections:
                             target_columns.append(col)
                     else:
                         target_columns.append(col)

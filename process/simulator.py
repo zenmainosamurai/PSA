@@ -77,8 +77,8 @@ class GasAdsorptionBreakthroughSimulator:
         self.sim_conds = self._io.load_conditions(cond_id)
         self.num_tower = self.sim_conds.num_towers
         self.dt = self.sim_conds.get_tower(1).common.calculation_step_time
-        self.num_str = self.sim_conds.get_tower(1).common.num_streams
-        self.num_sec = self.sim_conds.get_tower(1).common.num_sections
+        self.num_streams = self.sim_conds.get_tower(1).common.num_streams
+        self.num_sections = self.sim_conds.get_tower(1).common.num_sections
         
         # 観測データ読み込み
         self.df_obs = self._io.load_observation_data(self.dt)
@@ -88,7 +88,7 @@ class GasAdsorptionBreakthroughSimulator:
         
         # 状態変数初期化
         self.state_manager = StateVariables(
-            self.num_tower, self.num_str, self.num_sec, self.sim_conds
+            self.num_tower, self.num_streams, self.num_sections, self.sim_conds
         )
         
         # 塔内の残留ガス情報（後方互換性のため）

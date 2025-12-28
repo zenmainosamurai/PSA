@@ -68,7 +68,7 @@ def _axial_flow_correction(
     Rep: float,
     epsilon: float,
     Lbed: float,
-    num_sec: int,
+    num_sections: int,
 ) -> Tuple[float, float, float, float]:
     """
     ke0 から流速補正を行い、
@@ -97,7 +97,7 @@ def _axial_flow_correction(
     Phi_b = 0.0775 * math.log(b0) + 0.028  # 代表長さ（セクション全長）6
     a12 = 0.9107 * math.log(b0) + 2.2395  # 代表長さ（セクション全長）7
 
-    Lp = Lbed / num_sec  # 代表長さ（セクション全長）8 [m]
+    Lp = Lbed / num_sections  # 代表長さ（セクション全長）8 [m]
     y0 = 4.0 * dp / d1 * Lp / d1 * ke_kf / (Pr * Rep)  # 粒子層-壁面伝熱ヌッセルト数 1
     Nupw = dp / d1 * ke_kf * (a12 + Phi_b / y0)  # 粒子層-壁面伝熱ヌッセルト数 1
 
@@ -159,7 +159,7 @@ def calc_heat_transfer_coef(
     epsilon_p = tower_conds.packed_bed.emissivity
     dp = tower_conds.packed_bed.average_particle_diameter
     Lbed = tower_conds.packed_bed.height
-    num_sec = tower_conds.common.num_sections
+    num_sections = tower_conds.common.num_sections
 
     # ---- ke0 (放射補正) --------------------------------------------
     ke0 = _yagi_kunii_radiation(T_K, kf, kp, epsilon, epsilon_p, dp)
@@ -193,7 +193,7 @@ def calc_heat_transfer_coef(
     Rep = 1.0 if vcol == 0 else vcol * dp / nu  # 粒子レイノルズ数
 
     # ---- ke, habs, dlat, hw1_raw -----------------------------------
-    ke, habs, dlat, hw1_raw = _axial_flow_correction(ke0, kf, dp, d1, Pr, Rep, epsilon, Lbed, num_sec)
+    ke, habs, dlat, hw1_raw = _axial_flow_correction(ke0, kf, dp, d1, Pr, Rep, epsilon, Lbed, num_sections)
 
     # ---- 壁-層伝熱係数補正 -----------------------------------------
     wall_to_bed_heat_transfer_coef = hw1_raw * tower_conds.vessel.wall_to_bed_htc_correction_factor

@@ -46,22 +46,22 @@ def _get_japanese_font():
 JAPANESE_FONT = _get_japanese_font()
 
 
-def plot_csv_outputs(tgt_foldapath, df_obs, tgt_sections, tower_num, timestamp, df_p_end):
+def plot_csv_outputs(output_dir, df_obs, target_sections, tower_num, timestamp, df_schedule):
     """熱バラ計算結果の可視化
 
     Args:
-        tgt_foldapath (str): 出力先フォルダパス
+        output_dir (str): 出力先フォルダパス
         df_obs (pd.DataFrame): 観測値のデータフレーム
-        tgt_sections (list): 可視化対象のセクション
+        target_sections (list): 可視化対象のセクション
         tower_num (int): 塔番号
-        df_p_end (pd.DataFrame): プロセス終了時刻を含むデータフレーム
+        df_schedule (pd.DataFrame): プロセス終了時刻を含むデータフレーム
     """
     ### パラメータ設定 --------------------------------------
 
     linestyle_dict = {  # section
-        tgt_sections[0]: "-",
-        tgt_sections[1]: "--",
-        tgt_sections[2]: ":",
+        target_sections[0]: "-",
+        target_sections[1]: "--",
+        target_sections[2]: ":",
     }
     color_dict = {  # stream
         1: "tab:red",
@@ -72,13 +72,13 @@ def plot_csv_outputs(tgt_foldapath, df_obs, tgt_sections, tower_num, timestamp, 
         1: "black",
         2: "dimgrey",
     }
-    output_foldapath = tgt_foldapath + f"/png/tower_{tower_num}/"
-    os.makedirs(output_foldapath, exist_ok=True)
+    png_output_dir = output_dir + f"/png/tower_{tower_num}/"
+    os.makedirs(png_output_dir, exist_ok=True)
 
     ### 可視化（熱バラ） -------------------------------------
 
     # csv読み込み
-    filename_list = glob.glob(tgt_foldapath + f"/csv/tower_{tower_num}/heat/*.csv")
+    filename_list = glob.glob(output_dir + f"/csv/tower_{tower_num}/heat/*.csv")
     df_dict = {}
     for filename in filename_list:
         # ファイル名（拡張子なし）を取得（クロスプラットフォーム対応）
@@ -96,9 +96,9 @@ def plot_csv_outputs(tgt_foldapath, df_obs, tgt_sections, tower_num, timestamp, 
         plt.rcParams["font.family"] = JAPANESE_FONT
         plt.subplot(num_row, 2, i + 1)
         # 可視化対象のcolumnsを抽出
-        plt_tgt_cols = [col for col in df.columns if int(col.split("-")[-1]) in tgt_sections]
+        plot_columns = [col for col in df.columns if int(col.split("-")[-1]) in target_sections]
         # 各項目のプロット
-        for col in plt_tgt_cols:
+        for col in plot_columns:
             stream = int(col.split("-")[-2])
             section = int(col.split("-")[-1])
             plt.plot(
@@ -121,30 +121,30 @@ def plot_csv_outputs(tgt_foldapath, df_obs, tgt_sections, tower_num, timestamp, 
                     if col_name in df_obs.columns:
                         plt.plot(
                             df_obs.loc[:timestamp, col_name],
-                            label=f"(str,sec) = (1, {tgt_sections[section-1]})",
-                            linestyle=linestyle_dict[tgt_sections[section - 1]],
+                            label=f"(str,sec) = (1, {target_sections[section-1]})",
+                            linestyle=linestyle_dict[target_sections[section - 1]],
                             c="black",
                         )
                 plt.legend(fontsize=12)
         # プロセス終了時刻の縦線をプロット
         ax = plt.gca()
         ymin, ymax = ax.get_ylim()
-        p_name_bfr = ""
-        for idx in df_p_end.index:
-            p_name = df_p_end.loc[idx, f"塔{tower_num}"]
-            if p_name == p_name_bfr:
+        prev_process_name = ""
+        for idx in df_schedule.index:
+            p_name = df_schedule.loc[idx, f"塔{tower_num}"]
+            if p_name == prev_process_name:
                 continue
-            tgt_timestamp = df_p_end.loc[idx, "終了時刻(min)"]
-            plt.vlines(tgt_timestamp, ymin=ymin, ymax=ymax, colors="tab:orange", alpha=1)
-            p_name_bfr = p_name
+            end_timestamp = df_schedule.loc[idx, "終了時刻(min)"]
+            plt.vlines(end_timestamp, ymin=ymin, ymax=ymax, colors="tab:orange", alpha=1)
+            prev_process_name = p_name
         plt.legend(fontsize=12, loc="upper left", bbox_to_anchor=(1, 1))
-    plt.savefig(os.path.join(output_foldapath, f"heat_tower{tower_num}.png"), dpi=100)
+    plt.savefig(os.path.join(png_output_dir, f"heat_tower{tower_num}.png"), dpi=100)
     plt.close()
 
     ### 可視化（マテバラ） -------------------------------------
 
     # csv読み込み
-    filename_list = glob.glob(tgt_foldapath + f"/csv/tower_{tower_num}/material/*.csv")
+    filename_list = glob.glob(output_dir + f"/csv/tower_{tower_num}/material/*.csv")
     df_dict = {}
     for filename in filename_list:
         # ファイル名（拡張子なし）を取得（クロスプラットフォーム対応）
@@ -162,9 +162,9 @@ def plot_csv_outputs(tgt_foldapath, df_obs, tgt_sections, tower_num, timestamp, 
         plt.rcParams["font.family"] = JAPANESE_FONT
         plt.subplot(num_row, 2, i + 1)
         # 可視化対象のcolumnsを抽出
-        plt_tgt_cols = [col for col in df.columns if int(col.split("-")[-1]) in tgt_sections]
+        plot_columns = [col for col in df.columns if int(col.split("-")[-1]) in target_sections]
         # 各項目のプロット
-        for col in plt_tgt_cols:
+        for col in plot_columns:
             stream = int(col.split("-")[-2])
             section = int(col.split("-")[-1])
             plt.plot(
@@ -182,21 +182,21 @@ def plot_csv_outputs(tgt_foldapath, df_obs, tgt_sections, tower_num, timestamp, 
         # プロセス終了時刻の縦線をプロット
         ax = plt.gca()
         ymin, ymax = ax.get_ylim()
-        p_name_bfr = ""
-        for idx in df_p_end.index:
-            p_name = df_p_end.loc[idx, f"塔{tower_num}"]
-            if p_name == p_name_bfr:
+        prev_process_name = ""
+        for idx in df_schedule.index:
+            p_name = df_schedule.loc[idx, f"塔{tower_num}"]
+            if p_name == prev_process_name:
                 continue
-            tgt_timestamp = df_p_end.loc[idx, "終了時刻(min)"]
-            plt.vlines(tgt_timestamp, ymin=ymin, ymax=ymax, colors="tab:orange", alpha=1)
-            p_name_bfr = p_name
-    plt.savefig(os.path.join(output_foldapath, f"material_tower{tower_num}.png"), dpi=100)
+            end_timestamp = df_schedule.loc[idx, "終了時刻(min)"]
+            plt.vlines(end_timestamp, ymin=ymin, ymax=ymax, colors="tab:orange", alpha=1)
+            prev_process_name = p_name
+    plt.savefig(os.path.join(png_output_dir, f"material_tower{tower_num}.png"), dpi=100)
     plt.close()
 
     ### 可視化（熱バラ(上下蓋)） -------------------------------------
 
     # csv読み込み
-    filename_list = glob.glob(tgt_foldapath + f"/csv/tower_{tower_num}/heat_lid/蓋温度.csv")
+    filename_list = glob.glob(output_dir + f"/csv/tower_{tower_num}/heat_lid/蓋温度.csv")
     df = pd.read_csv(filename_list[0], index_col="timestamp", encoding="shift_jis")
 
     num_row = math.ceil((len(df.columns)) / 2)
@@ -219,15 +219,15 @@ def plot_csv_outputs(tgt_foldapath, df_obs, tgt_sections, tower_num, timestamp, 
         # プロセス終了時刻の縦線をプロット
         ax = plt.gca()
         ymin, ymax = ax.get_ylim()
-        p_name_bfr = ""
-        for idx in df_p_end.index:
-            p_name = df_p_end.loc[idx, f"塔{tower_num}"]
-            if p_name == p_name_bfr:
+        prev_process_name = ""
+        for idx in df_schedule.index:
+            p_name = df_schedule.loc[idx, f"塔{tower_num}"]
+            if p_name == prev_process_name:
                 continue
-            tgt_timestamp = df_p_end.loc[idx, "終了時刻(min)"]
-            plt.vlines(tgt_timestamp, ymin=ymin, ymax=ymax, colors="tab:orange", alpha=1)
-            p_name_bfr = p_name
-    plt.savefig(os.path.join(output_foldapath, f"heat_lid_tower{tower_num}.png"), dpi=100)
+            end_timestamp = df_schedule.loc[idx, "終了時刻(min)"]
+            plt.vlines(end_timestamp, ymin=ymin, ymax=ymax, colors="tab:orange", alpha=1)
+            prev_process_name = p_name
+    plt.savefig(os.path.join(png_output_dir, f"heat_lid_tower{tower_num}.png"), dpi=100)
     plt.close()
 
     ### 可視化（others） -------------------------------------
@@ -239,7 +239,7 @@ def plot_csv_outputs(tgt_foldapath, df_obs, tgt_sections, tower_num, timestamp, 
     plt_cell = 1
 
     # 1. 全圧
-    filename = tgt_foldapath + f"/csv/tower_{tower_num}/others/全圧.csv"
+    filename = output_dir + f"/csv/tower_{tower_num}/others/全圧.csv"
     df = pd.read_csv(filename, index_col="timestamp", encoding="shift_jis")
     plt.subplot(3, 2, plt_cell)
     # CSVに保存されている実際のカラム名を使用
@@ -256,26 +256,26 @@ def plot_csv_outputs(tgt_foldapath, df_obs, tgt_sections, tower_num, timestamp, 
     # プロセス終了時刻の縦線をプロット
     ax = plt.gca()
     ymin, ymax = ax.get_ylim()
-    p_name_bfr = ""
-    for idx in df_p_end.index:
-        p_name = df_p_end.loc[idx, f"塔{tower_num}"]
-        if p_name == p_name_bfr:
+    prev_process_name = ""
+    for idx in df_schedule.index:
+        p_name = df_schedule.loc[idx, f"塔{tower_num}"]
+        if p_name == prev_process_name:
             continue
-        tgt_timestamp = df_p_end.loc[idx, "終了時刻(min)"]
-        plt.vlines(tgt_timestamp, ymin=ymin, ymax=ymax, colors="tab:orange", alpha=1)
-        p_name_bfr = p_name
+        end_timestamp = df_schedule.loc[idx, "終了時刻(min)"]
+        plt.vlines(end_timestamp, ymin=ymin, ymax=ymax, colors="tab:orange", alpha=1)
+        prev_process_name = p_name
     plt_cell += 1
 
     # 2. モル分率
-    for _tgt_name in ["co2_mole_fraction", "n2_mole_fraction"]:
-        japanese_name = const.TRANSLATION[_tgt_name] if _tgt_name in const.TRANSLATION else _tgt_name
-        filename = tgt_foldapath + f"/csv/tower_{tower_num}/others/{japanese_name}.csv"
+    for metric_name in ["co2_mole_fraction", "n2_mole_fraction"]:
+        japanese_name = const.TRANSLATION[metric_name] if metric_name in const.TRANSLATION else metric_name
+        filename = output_dir + f"/csv/tower_{tower_num}/others/{japanese_name}.csv"
         df = pd.read_csv(filename, index_col="timestamp", encoding="shift_jis")
         plt.subplot(3, 2, plt_cell)
         # 可視化対象のcolumnsを抽出
-        plt_tgt_cols = [col for col in df.columns if int(col.split("-")[-1]) in tgt_sections]
+        plot_columns = [col for col in df.columns if int(col.split("-")[-1]) in target_sections]
         # 各項目のプロット
-        for col in plt_tgt_cols:
+        for col in plot_columns:
             stream = int(col.split("-")[-2])
             section = int(col.split("-")[-1])
             plt.plot(
@@ -284,21 +284,21 @@ def plot_csv_outputs(tgt_foldapath, df_obs, tgt_sections, tower_num, timestamp, 
                 linestyle=linestyle_dict[section],
                 c=color_dict[stream],
             )
-        plt.title(_tgt_name.split("_")[0] + "モル分率 [-]")
+        plt.title(metric_name.split("_")[0] + "モル分率 [-]")
         plt.legend()
         plt.grid()
         plt.xlabel("timestamp")
         # プロセス終了時刻の縦線をプロット
         ax = plt.gca()
         ymin, ymax = ax.get_ylim()
-        p_name_bfr = ""
-        for idx in df_p_end.index:
-            p_name = df_p_end.loc[idx, f"塔{tower_num}"]
-            if p_name == p_name_bfr:
+        prev_process_name = ""
+        for idx in df_schedule.index:
+            p_name = df_schedule.loc[idx, f"塔{tower_num}"]
+            if p_name == prev_process_name:
                 continue
-            tgt_timestamp = df_p_end.loc[idx, "終了時刻(min)"]
-            plt.vlines(tgt_timestamp, ymin=ymin, ymax=ymax, colors="tab:orange", alpha=1)
-            p_name_bfr = p_name
+            end_timestamp = df_schedule.loc[idx, "終了時刻(min)"]
+            plt.vlines(end_timestamp, ymin=ymin, ymax=ymax, colors="tab:orange", alpha=1)
+            prev_process_name = p_name
         plt_cell += 1
 
     # 3. CO2,N2回収量
@@ -309,7 +309,7 @@ def plot_csv_outputs(tgt_foldapath, df_obs, tgt_sections, tower_num, timestamp, 
     ]
 
     for filename, title in file_info_list:
-        filepath = tgt_foldapath + f"/csv/tower_{tower_num}/others/{filename}"
+        filepath = output_dir + f"/csv/tower_{tower_num}/others/{filename}"
         df = pd.read_csv(filepath, index_col="timestamp", encoding="shift_jis")
 
         plt.subplot(3, 2, plt_cell)
@@ -321,17 +321,17 @@ def plot_csv_outputs(tgt_foldapath, df_obs, tgt_sections, tower_num, timestamp, 
         # プロセス終了時刻の縦線をプロット
         ax = plt.gca()
         ymin, ymax = ax.get_ylim()
-        p_name_bfr = ""
-        for idx in df_p_end.index:
-            p_name = df_p_end.loc[idx, f"塔{tower_num}"]
-            if p_name == p_name_bfr:
+        prev_process_name = ""
+        for idx in df_schedule.index:
+            p_name = df_schedule.loc[idx, f"塔{tower_num}"]
+            if p_name == prev_process_name:
                 continue
-            tgt_timestamp = df_p_end.loc[idx, "終了時刻(min)"]
-            plt.vlines(tgt_timestamp, ymin=ymin, ymax=ymax, colors="tab:orange", alpha=1)
-            p_name_bfr = p_name
+            end_timestamp = df_schedule.loc[idx, "終了時刻(min)"]
+            plt.vlines(end_timestamp, ymin=ymin, ymax=ymax, colors="tab:orange", alpha=1)
+            prev_process_name = p_name
         plt_cell += 1
 
-    plt.savefig(os.path.join(output_foldapath, f"others_tower{tower_num}.png"), dpi=100)
+    plt.savefig(os.path.join(png_output_dir, f"others_tower{tower_num}.png"), dpi=100)
     plt.close()
 
 
@@ -406,9 +406,9 @@ def _generate_heat_material_columns(record_data, common_conds):
     return columns
 
 
-def _save_heat_material_data(tgt_foldapath, tower_results, common_conds, data_type):
+def _save_heat_material_data(output_dir, tower_results, common_conds, data_type):
     """heat/materialデータをCSVに保存する"""
-    folder_path = os.path.join(tgt_foldapath, data_type)
+    folder_path = os.path.join(output_dir, data_type)
     os.makedirs(folder_path, exist_ok=True)
 
     record_data = getattr(tower_results.time_series_data, data_type)
@@ -428,9 +428,9 @@ def _save_heat_material_data(tgt_foldapath, tower_results, common_conds, data_ty
         )
 
 
-def _save_heat_lid_data(tgt_foldapath, tower_results):
+def _save_heat_lid_data(output_dir, tower_results):
     """heat_lidデータをCSVに保存する"""
-    folder_path = os.path.join(tgt_foldapath, "heat_lid")
+    folder_path = os.path.join(output_dir, "heat_lid")
     os.makedirs(folder_path, exist_ok=True)
 
     values = []
@@ -523,9 +523,9 @@ def _save_mole_fraction_data(folder_path, tower_results, common_conds, fraction_
     _create_dataframe_and_save(values, columns, tower_results.time_series_data.timestamps, file_path, add_units=True)
 
 
-def _save_others_data(tgt_foldapath, tower_results, common_conds):
+def _save_others_data(output_dir, tower_results, common_conds):
     """othersデータをCSVに保存する"""
-    folder_path = os.path.join(tgt_foldapath, "others")
+    folder_path = os.path.join(output_dir, "others")
     os.makedirs(folder_path, exist_ok=True)
 
     # 全圧
@@ -539,22 +539,22 @@ def _save_others_data(tgt_foldapath, tower_results, common_conds):
         _save_mole_fraction_data(folder_path, tower_results, common_conds, fraction_type)
 
 
-def outputs_to_csv(tgt_foldapath, tower_results, common_conds: CommonConditions):
+def outputs_to_csv(output_dir, tower_results, common_conds: CommonConditions):
     """計算結果をcsv出力する
 
     Args:
-        tgt_foldapath (str): 出力先フォルダパス
+        output_dir (str): 出力先フォルダパス
         tower_results (TowerSimulationResults): 計算結果
         common_conds (CommonConditions): 実験パラメータ
     """
     # heat, material データの保存
     for data_type in ["heat", "material"]:
-        _save_heat_material_data(tgt_foldapath, tower_results, common_conds, data_type)
+        _save_heat_material_data(output_dir, tower_results, common_conds, data_type)
 
     # heat_lid データの保存
-    _save_heat_lid_data(tgt_foldapath, tower_results)
+    _save_heat_lid_data(output_dir, tower_results)
 
     # others データの保存
-    _save_others_data(tgt_foldapath, tower_results, common_conds)
+    _save_others_data(output_dir, tower_results, common_conds)
 
     # heat_wall
