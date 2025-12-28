@@ -1,4 +1,5 @@
 import os
+import logging
 import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
@@ -8,6 +9,9 @@ import glob
 from utils import const
 
 from config.sim_conditions import CommonConditions
+
+# matplotlibのフォント関連警告を抑制
+logging.getLogger('matplotlib.font_manager').setLevel(logging.ERROR)
 
 
 def _get_japanese_font():
