@@ -30,6 +30,7 @@ PSA担当者向け説明:
 # モード定義
 from .mode_types import (
     OperationMode,
+    HeatCalculationMode,
     ADSORPTION_MODES,
     UPSTREAM_MODES,
     DOWNSTREAM_MODES,
@@ -98,6 +99,7 @@ from .initial_gas_introduction import (
 __all__ = [
     # モード定義
     "OperationMode",
+    "HeatCalculationMode",
     "ADSORPTION_MODES",
     "UPSTREAM_MODES",
     "DOWNSTREAM_MODES",

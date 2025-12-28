@@ -13,8 +13,21 @@ PSA担当者向け説明:
         ...
 """
 
-from enum import Enum
+from enum import Enum, IntEnum
 from typing import Set
+
+
+class HeatCalculationMode(IntEnum):
+    """
+    熱収支計算用のモード
+    
+    PSA担当者向け説明:
+    物理計算（熱収支）で使用する内部モード番号です。
+    運転モードとの対応は OperationMode.heat_mode プロパティで取得できます。
+    """
+    ADSORPTION = 0      # 吸着（ガス流通あり）
+    VALVE_CLOSED = 1    # 停止（弁閉止、ガス流通なし）
+    DESORPTION = 2      # 脱着（真空排気）
 
 
 class OperationMode(Enum):
@@ -87,6 +100,26 @@ class OperationMode(Enum):
     def requires_mole_fraction_update(self) -> bool:
         """モル分率更新が必要なモードかどうか"""
         return self in MOLE_FRACTION_UPDATE_MODES
+    
+    @property
+    def heat_mode(self) -> HeatCalculationMode:
+        """
+        熱収支計算用のモード番号を取得
+        
+        PSA担当者向け説明:
+        運転モードに対応する熱収支計算用のモード（整数）を返します。
+        - 停止モード: VALVE_CLOSED (1) - 弁閉止状態
+        - 真空脱着モード: DESORPTION (2) - 脱着計算
+        - その他: ADSORPTION (0) - 吸着計算
+        
+        Returns:
+            HeatCalculationMode: 熱収支計算用モード
+        """
+        if self == OperationMode.STOP:
+            return HeatCalculationMode.VALVE_CLOSED
+        elif self == OperationMode.VACUUM_DESORPTION:
+            return HeatCalculationMode.DESORPTION
+        return HeatCalculationMode.ADSORPTION
 
 
 # ============================================================

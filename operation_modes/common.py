@@ -13,7 +13,7 @@ PSA担当者向け説明:
 from typing import Dict, Optional
 from dataclasses import dataclass
 
-from operation_modes.mode_types import OperationMode
+from operation_modes.mode_types import OperationMode, HeatCalculationMode
 from config.sim_conditions import TowerConditions
 from state import (
     StateVariables,
@@ -33,11 +33,6 @@ from physics.heat_balance import (
     calculate_wall_heat_balance,
     calculate_lid_heat_balance,
 )
-
-# 熱収支計算のモード定数
-MODE_ADSORPTION = 0
-MODE_VALVE_CLOSED = 1
-MODE_DESORPTION = 2
 
 
 @dataclass
@@ -104,8 +99,8 @@ def calculate_all_cells(
     num_streams = tower_conds.common.num_streams
     num_sections = tower_conds.common.num_sections
     
-    # 熱収支計算用のモード番号に変換
-    heat_mode = _get_heat_mode(mode)
+    # 熱収支計算用のモード番号を取得
+    heat_mode = mode.heat_mode
     
     # 結果格納用
     mass_balance_results: Dict[int, Dict] = {}
@@ -382,16 +377,6 @@ def distribute_inflow_gas(
 # ============================================================
 # ヘルパー関数
 # ============================================================
-
-def _get_heat_mode(mode: OperationMode) -> int:
-    """運転モードを熱収支計算用のモード番号に変換"""
-    if mode == OperationMode.STOP:
-        return MODE_VALVE_CLOSED
-    elif mode == OperationMode.VACUUM_DESORPTION:
-        return MODE_DESORPTION
-    else:
-        return MODE_ADSORPTION
-
 
 def _get_inflow_gas(
     stream: int,

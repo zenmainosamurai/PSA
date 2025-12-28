@@ -17,7 +17,7 @@ from typing import Optional, Dict
 import numpy as np
 from scipy import optimize
 
-from operation_modes.mode_types import OperationMode
+from operation_modes.mode_types import OperationMode, HeatCalculationMode
 from common.constants import (
     CELSIUS_TO_KELVIN_OFFSET,
     STANDARD_MOLAR_VOLUME,
@@ -42,13 +42,10 @@ from state import (
 from physics.heat_transfer import calc_heat_transfer_coef as _heat_transfer_coef
 
 
-# ============================================================
-# 運転モード定数（内部使用）
-# ============================================================
-
-MODE_ADSORPTION = 0
-MODE_VALVE_CLOSED = 1
-MODE_DESORPTION = 2
+# 後方互換性のためのエイリアス（新規コードではHeatCalculationModeを直接使用推奨）
+MODE_ADSORPTION = HeatCalculationMode.ADSORPTION
+MODE_VALVE_CLOSED = HeatCalculationMode.VALVE_CLOSED
+MODE_DESORPTION = HeatCalculationMode.DESORPTION
 
 
 # ============================================================
@@ -61,7 +58,7 @@ def calculate_bed_heat_balance(
     section: int,
     state_manager: StateVariables,
     tower_num: int,
-    mode: int,
+    mode: HeatCalculationMode,
     material_output: Optional[MaterialBalanceResult] = None,
     heat_output: Optional[HeatBalanceResult] = None,
     vacuum_pumping_results: Optional[VacuumPumpingResult] = None,
@@ -83,7 +80,7 @@ def calculate_bed_heat_balance(
         section: セクション番号 (1-indexed)
         state_manager: 状態変数管理
         tower_num: 塔番号
-        mode: 運転モード (0:吸着, 1:停止, 2:脱着)
+        mode: 熱収支計算モード (ADSORPTION:吸着, VALVE_CLOSED:停止, DESORPTION:脱着)
         material_output: 物質収支計算結果
         heat_output: 上流セクションの熱収支結果
         vacuum_pumping_results: 真空排気結果（脱着時）
@@ -445,7 +442,7 @@ def calculate_lid_heat_balance(
 # ============================================================
 
 def _get_adsorption_heat(
-    mode: int,
+    mode: HeatCalculationMode,
     material_output: Optional[MaterialBalanceResult],
     tower_conds: TowerConditions,
 ) -> float:
@@ -473,7 +470,7 @@ def _get_adsorption_heat(
 
 
 def _get_inlet_gas_mass(
-    mode: int,
+    mode: HeatCalculationMode,
     material_output: Optional[MaterialBalanceResult],
     tower_conds: TowerConditions,
 ) -> float:
@@ -503,7 +500,7 @@ def _get_inlet_gas_mass(
 
 
 def _get_gas_specific_heat(
-    mode: int,
+    mode: HeatCalculationMode,
     material_output: Optional[MaterialBalanceResult],
 ) -> float:
     """
@@ -525,7 +522,7 @@ def _calculate_thermocouple_temperature(
     tower,
     stream: int,
     section: int,
-    mode: int,
+    mode: HeatCalculationMode,
     wall_to_bed_htc: float,
 ) -> float:
     """
