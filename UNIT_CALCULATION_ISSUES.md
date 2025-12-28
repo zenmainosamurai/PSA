@@ -179,7 +179,107 @@ upstream_heat_flux = (
 
 ---
 
-## 4. その他の確認結果
+## 4. `physics/heat_transfer.py` - 熱伝導率とPrandtl数のスケーリング誤り
+
+### 問題箇所
+`compute_gas_k` 関数（19-27行目）および `calc_heat_transfer_coef` 関数（180行目）
+
+### 問題の内容
+
+#### 4-1. `compute_gas_k` の `/1000` 問題
+CoolPropから取得した熱伝導率を誤って1000で除算している。
+
+**現在のコード（27行目）**:
+```python
+def compute_gas_k(T_K: float, co2_mole_fraction: float, n2_mole_fraction: float) -> float:
+    P_ATM = STANDARD_PRESSURE
+    k_co2 = CP.PropsSI("L", "T", T_K, "P", P_ATM, "co2")  # [W/(m·K)]
+    k_n2 = CP.PropsSI("L", "T", T_K, "P", P_ATM, "nitrogen")  # [W/(m·K)]
+    return (k_co2 * co2_mole_fraction + k_n2 * n2_mole_fraction) / 1000  # ← 誤り
+```
+
+**検証結果**（25℃、30% CO2 / 70% N2）:
+- `k_co2` (CoolProp) = 0.016633 W/(m·K)
+- `k_n2` (CoolProp) = 0.025835 W/(m·K)
+- `k_mix` (正しい値) = 0.023074 W/(m·K)
+- `k_mix` (現在のコード) = 0.000023 W/(m·K) ← **1000倍の差**
+
+#### 4-2. Prandtl数 (Pr) の計算誤り
+
+**現在のコード（180行目）**:
+```python
+Pr = viscosity * 1000.0 * material_output.gas_properties.specific_heat / kf
+```
+
+**Prandtl数の定義**（無次元）:
+$$Pr = \frac{\mu \cdot C_p}{k}$$
+
+- $\mu$: 粘度 [Pa·s]
+- $C_p$: 比熱 [J/(kg·K)]
+- $k$: 熱伝導率 [W/(m·K)]
+
+**問題点**:
+- `specific_heat` が [kJ/(kg·K)] 単位であるため `* 1000.0` で [J/(kg·K)] に変換
+- しかし `kf` が既に `/1000` されているため、変換が相殺されず **1000倍の誤差**
+
+**検証結果**:
+- `Pr` (正しい計算) = 0.72
+- `Pr` (現在のコード) = 722 ← **1000倍の差**
+- 典型的なガスのPr値: 0.7 ~ 0.8
+
+### 単位計算の詳細
+
+**正しいPr計算** (全SI単位):
+```
+Pr = viscosity [Pa·s] * cp [J/(kg·K)] / k [W/(m·K)]
+   = [kg/(m·s)] * [J/(kg·K)] / [J/(s·m·K)]
+   = [-] (無次元)
+```
+
+**現在のコードのPr計算**:
+```
+Pr = viscosity [Pa·s] * 1000 * specific_heat [kJ/(kg·K)] / kf [mW/(m·K)]
+   = [Pa·s] * 1000 * [kJ/(kg·K)] / [W/(m·K) / 1000]
+   = 正しいPr の約1000倍
+```
+
+### 影響範囲
+
+この誤りは以下の計算に波及:
+
+| 関数/変数 | 影響 |
+|-----------|------|
+| `kf` (`compute_gas_k`) | 1/1000 に |
+| `ke0` (`_yagi_kunii_radiation`) | 1/1000 に |
+| `Pr` (`calc_heat_transfer_coef`) | 1000倍に |
+| `ke`, `hw1_raw` (`_axial_flow_correction`) | 誤った値に |
+| `wall_to_bed_heat_transfer_coef` | 誤った値に |
+| `bed_heat_transfer_coef` | 誤った値に |
+
+### 修正案
+
+**compute_gas_k の修正**:
+```python
+def compute_gas_k(T_K: float, co2_mole_fraction: float, n2_mole_fraction: float) -> float:
+    P_ATM = STANDARD_PRESSURE
+    k_co2 = CP.PropsSI("L", "T", T_K, "P", P_ATM, "co2")
+    k_n2 = CP.PropsSI("L", "T", T_K, "P", P_ATM, "nitrogen")
+    return k_co2 * co2_mole_fraction + k_n2 * n2_mole_fraction  # /1000 を削除
+```
+
+**Pr 計算の修正**（specific_heatの単位確認が必要）:
+```python
+# specific_heat が [kJ/(kg·K)] の場合
+Pr = viscosity * 1000.0 * material_output.gas_properties.specific_heat / kf
+# specific_heat が [J/(kg·K)] の場合
+Pr = viscosity * material_output.gas_properties.specific_heat / kf
+```
+
+**注意**: 修正後はシミュレーション結果が変わる可能性があるため、全工程の検証が必要。
+
+---
+
+## 5. その他の確認結果
 
 ### `physics/adsorption_isotherm.py`
 - **問題なし**: 経験式のため係数で単位調整済み
@@ -191,10 +291,6 @@ upstream_heat_flux = (
 - 熱流束: [J] = [W/m²/K] * [m²] * [K] * [min] * [s/min]
 - 伝熱係数: [W/m²/K]
 - ※壁面熱伝導は上記の問題あり
-
-### `physics/heat_transfer.py`
-- **確認済み**: Yagi-Kuniiモデルに基づく計算
-- 出力: `wall_to_bed_heat_transfer_coef` [W/m²/K], `bed_heat_transfer_coef` [W/m²/K]
 
 ### `physics/pressure.py`
 - **確認済み**: 理想気体の状態方程式に基づく計算
@@ -209,9 +305,11 @@ upstream_heat_flux = (
 | 1. 脱着モードの単位不整合 | **高** | 明確なバグ。脱着量が大きい条件で結果が破綻する可能性 |
 | 2. LDFモデルの単位不明確 | 中 | 現状動作しているが、ドキュメント整備が必要 |
 | 3. 壁面熱伝導の距離項欠落 | **高** | フーリエの法則に反する。壁面温度計算に影響 |
+| 4. 熱伝導率/Prのスケーリング誤り | **高** | Prが1000倍誤り、熱伝達係数に影響 |
 
 ---
 
 ## 更新履歴
 
 - 2025-12-28: 初版作成
+- 2025-12-28: 熱伝導率とPrandtl数のスケーリング問題（4項）を追記
