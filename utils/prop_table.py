@@ -18,21 +18,27 @@ import CoolProp.CoolProp as _CP
 BASE_DIR = Path(__file__).resolve().parent.parent
 
 DATA_TABLE_FILE = BASE_DIR / "data" / "prop_table.npz"
+TABLE_FILE = None
 if DATA_TABLE_FILE.exists():
     TABLE_FILE = DATA_TABLE_FILE
 
-print(f"Loading prop_table from: {TABLE_FILE}")
+if TABLE_FILE is not None:
+    print(f"Loading prop_table from: {TABLE_FILE}")
 
-if not TABLE_FILE.exists():
-    raise FileNotFoundError("prop_table.npz が見つかりません。\n" "先に build_prop_table.py を実行してください。")
-
-_npz = np.load(TABLE_FILE, allow_pickle=False)
-_T = _npz["T"].astype(np.float32)  # 温度軸
-_P_FIXED = float(_npz["P_FIXED"])  # スカラー (Pa)
-
-_prop_arrays = {tuple(k.split("_", 1)): _npz[k].astype(np.float32) for k in _npz.files if k not in ("T", "P_FIXED")}
-
-_T_MIN, _T_MAX = float(_T[0]), float(_T[-1])
+# テーブルファイルが存在する場合のみ読み込み
+if TABLE_FILE is not None and TABLE_FILE.exists():
+    _npz = np.load(TABLE_FILE, allow_pickle=False)
+    _T = _npz["T"].astype(np.float32)  # 温度軸
+    _P_FIXED = float(_npz["P_FIXED"])  # スカラー (Pa)
+    _prop_arrays = {tuple(k.split("_", 1)): _npz[k].astype(np.float32) for k in _npz.files if k not in ("T", "P_FIXED")}
+    _T_MIN, _T_MAX = float(_T[0]), float(_T[-1])
+else:
+    # テーブルファイルがない場合はCoolPropを直接使用
+    print("[prop_table] prop_table.npz が見つかりません。CoolPropを直接使用します。")
+    _T = None
+    _P_FIXED = None
+    _prop_arrays = {}
+    _T_MIN, _T_MAX = 0.0, 0.0
 
 
 # -------------------------------------------------
@@ -41,6 +47,8 @@ _T_MIN, _T_MAX = float(_T[0]), float(_T[-1])
 @lru_cache(maxsize=32_768)
 def _interp(fluid: str, prop: str, T: float):
     """T が範囲内なら補間値、範囲外なら None"""
+    if _T is None:
+        return None
     if not (_T_MIN <= T <= _T_MAX):
         return None
     arr = _prop_arrays.get((fluid, prop))
@@ -74,7 +82,7 @@ def PropsSI(output_key: str, inp1: str, val1: float, inp2: str, val2: float, flu
     fluid_lc = fluid.lower()
 
     # (T, P) or (P, T) のみ対象
-    if {inp1, inp2} == {"T", "P"}:
+    if _P_FIXED is not None and {inp1, inp2} == {"T", "P"}:
         T = val1 if inp1 == "T" else val2
         P = val2 if inp2 == "P" else val1
         # 圧力が固定値と完全一致するときのみ補間

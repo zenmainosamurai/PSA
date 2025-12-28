@@ -72,15 +72,15 @@ def calculate_mass_balance(
     Args:
         mode: 運転モード（OperationMode Enum）
         tower_conds: 塔条件（sim_conds.xlsxから読み込んだパラメータ）
-        stream: ストリーム番号 (1-indexed)
-        section: セクション番号 (1-indexed)
+        stream: ストリーム番号 (0-indexed, 内部インデックス)
+        section: セクション番号 (0-indexed, 内部インデックス)
         state_manager: 状態変数管理オブジェクト
-        tower_num: 塔番号
+        tower_num: 塔番号 (1-indexed, I/O用)
         inflow_gas: 流入ガス情報（下流セクション・下流塔の場合）
         equalization_flow_rate: 均圧配管流量（均圧減圧モードの場合）[L/min]
         residual_gas_composition: 残留ガス組成（バッチ吸着下流の場合）
         vacuum_pumping_results: 真空排気結果（脱着モードの場合）
-        previous_result: 上流セクションの計算結果（セクション2以降）
+        previous_result: 上流セクションの計算結果（section >= 1 の場合）
     
     Returns:
         MassBalanceCalculationResult: 物質収支計算結果
@@ -89,8 +89,8 @@ def calculate_mass_balance(
     """
     # モードに応じて計算を分岐
     if mode in ADSORPTION_MODES:
-        # セクション2以降は上流結果から流入ガスを構築
-        if section > 1 and previous_result is not None:
+        # section >= 1（0オリジン）は上流結果から流入ガスを構築
+        if section > 0 and previous_result is not None:
             inflow_gas = GasFlow(
                 co2_volume=previous_result.outlet_gas.co2_volume,
                 n2_volume=previous_result.outlet_gas.n2_volume,
@@ -165,7 +165,8 @@ def _calculate_adsorption_mass_balance(
     stream_conds = tower_conds.stream_conditions
 
     # === セクション吸着材量 [g] ===
-    section_adsorbent_mass = stream_conds[stream].adsorbent_mass / tower_conds.common.num_sections
+    # stream_condsは1オリジンなので+1してアクセス
+    section_adsorbent_mass = stream_conds[stream + 1].adsorbent_mass / tower_conds.common.num_sections
 
     # === 流入ガス量の計算 [cm3] ===
     inlet_co2_volume, inlet_n2_volume = _calculate_inlet_gas_volumes(
@@ -177,12 +178,13 @@ def _calculate_adsorption_mass_balance(
     )
 
     # === 流入ガスモル分率の計算 ===
-    if residual_gas_composition is None or section != 1:
+    # section != 0 はセクション0以外（0オリジン）
+    if residual_gas_composition is None or section != 0:
         inlet_co2_mole_fraction = inlet_co2_volume / (inlet_co2_volume + inlet_n2_volume)
         inlet_n2_mole_fraction = inlet_n2_volume / (inlet_co2_volume + inlet_n2_volume)
     else:
-        inlet_co2_mole_fraction = residual_gas_composition.get_result(stream, 1).inlet_gas.co2_mole_fraction
-        inlet_n2_mole_fraction = residual_gas_composition.get_result(stream, 1).inlet_gas.n2_mole_fraction
+        inlet_co2_mole_fraction = residual_gas_composition.get_result(stream, 0).inlet_gas.co2_mole_fraction
+        inlet_n2_mole_fraction = residual_gas_composition.get_result(stream, 0).inlet_gas.n2_mole_fraction
 
     # === 現在の状態変数を取得 ===
     total_press = tower.total_press  # 全圧 [MPaA]
@@ -303,8 +305,9 @@ def _calculate_desorption_mass_balance(
 
     # === 現在気相モル量の計算 ===
     # セクション空間割合
+    # stream_condsは1オリジンなので+1してアクセス
     space_ratio_section = (
-        stream_conds[stream].area_fraction
+        stream_conds[stream + 1].area_fraction
         / tower_conds.common.num_sections
         * tower_conds.packed_bed.void_volume
         / tower_conds.vacuum_piping.space_volume
@@ -332,7 +335,8 @@ def _calculate_desorption_mass_balance(
     )
     
     # セクション吸着材量 [g]
-    section_adsorbent_mass = stream_conds[stream].adsorbent_mass / tower_conds.common.num_sections
+    # stream_condsは1オリジンなので+1してアクセス
+    section_adsorbent_mass = stream_conds[stream + 1].adsorbent_mass / tower_conds.common.num_sections
     
     # 平衡吸着量 [cm3/g-abs]
     P_KPA = co2_partial_pressure * MPA_TO_KPA
@@ -482,38 +486,45 @@ def _calculate_inlet_gas_volumes(
     inflow_gas: Optional[GasFlow],
     equalization_flow_rate: Optional[float],
 ) -> Tuple[float, float]:
-    """流入ガス量を計算 [cm3]"""
-    stream_conds = tower_conds.stream_conditions
+    """流入ガス量を計算 [cm3]
     
-    if section == 1 and inflow_gas is None and equalization_flow_rate is None:
+    Args:
+        stream: ストリームインデックス (0オリジン)
+        section: セクションインデックス (0オリジン)
+    """
+    stream_conds = tower_conds.stream_conditions
+    # stream_condsは1オリジンなので+1してアクセス
+    stream_1indexed = stream + 1
+    
+    if section == 0 and inflow_gas is None and equalization_flow_rate is None:
         # 最上流セル: 導入ガスから計算
         inlet_co2_volume = (
             tower_conds.feed_gas.co2_flow_rate
             * tower_conds.common.calculation_step_time
-            * stream_conds[stream].area_fraction
+            * stream_conds[stream_1indexed].area_fraction
             * L_TO_CM3
         )
         inlet_n2_volume = (
             tower_conds.feed_gas.n2_flow_rate
             * tower_conds.common.calculation_step_time
-            * stream_conds[stream].area_fraction
+            * stream_conds[stream_1indexed].area_fraction
             * L_TO_CM3
         )
-    elif section == 1 and equalization_flow_rate is not None:
+    elif section == 0 and equalization_flow_rate is not None:
         # 均圧減圧時の最上流セル
         inlet_co2_volume = (
             tower_conds.feed_gas.co2_mole_fraction
             * equalization_flow_rate
             * L_TO_CM3
             * tower_conds.common.calculation_step_time
-            * stream_conds[stream].area_fraction
+            * stream_conds[stream_1indexed].area_fraction
         )
         inlet_n2_volume = (
             tower_conds.feed_gas.n2_mole_fraction
             * equalization_flow_rate
             * L_TO_CM3
             * tower_conds.common.calculation_step_time
-            * stream_conds[stream].area_fraction
+            * stream_conds[stream_1indexed].area_fraction
         )
     elif inflow_gas is not None:
         # 下流セクションまたは下流塔

@@ -123,22 +123,25 @@ def calc_heat_transfer_coef(
     """層伝熱係数、壁-層伝熱係数を算出する
 
     Args:
-        tower_conds(dict):
-        stream_conds(dict):
-        stream(int):
-        section(int):
-        temp_now(float):
-        mode(int):
-        material_output(dict):
-        vacuum_pumping_results(dict | None):
+        tower_conds: 塔条件
+        stream: ストリーム番号 (0-indexed, 内部インデックス)
+        section: セクション番号 (0-indexed, 内部インデックス)
+        temp_now: 現在温度 [℃]
+        mode: 熱収支計算モード (0:吸着, 1:停止, 2:脱着)
+        state_manager: 状態変数管理
+        tower_num: 塔番号 (1-indexed, I/O用)
+        material_output: 物質収支計算結果
+        vacuum_pumping_results: 真空排気結果（脱着時）
 
     Returns:
         tuple[float, float]:
             wall_to_bed_heat_transfer_coef (float): 壁-層伝熱係数 [W/m2/K]
-            bed_heat_transfer_coef (float): 層伝熱係数 [W/m2/K
+            bed_heat_transfer_coef (float): 層伝熱係数 [W/m2/K]
     """
     tower = state_manager.towers[tower_num]
     stream_conds = tower_conds.stream_conditions
+    # stream_condsは1オリジンなので変換
+    stream_1indexed = stream + 1
     T_K = temp_now + CELSIUS_TO_KELVIN_OFFSET
 
     if mode == 0:  # 吸着
@@ -166,7 +169,7 @@ def calc_heat_transfer_coef(
 
     # ---- 流量関係 ---------------------------------------------------
     # ストリーム換算直径 d1
-    d1 = 2.0 * (stream_conds[stream].cross_section / math.pi) ** 0.5
+    d1 = 2.0 * (stream_conds[stream_1indexed].cross_section / math.pi) ** 0.5
 
     # NOTE: 気体粘度 μ, 比熱 cp は大気圧を仮定
     P_ATM = STANDARD_PRESSURE
@@ -184,11 +187,11 @@ def calc_heat_transfer_coef(
             / (tower_conds.common.calculation_step_time * 60.0)
         )
     elif mode == 2:  # 脱着時は排気ガス体積流量 [m3/s]
-        f0 = vacuum_pumping_results.volumetric_flow_rate / 60.0 * stream_conds[stream].area_fraction
+        f0 = vacuum_pumping_results.volumetric_flow_rate / 60.0 * stream_conds[stream_1indexed].area_fraction
     else:
         f0 = 0.0  # NOTE: この処理で正しいか確認
 
-    vcol = f0 / stream_conds[stream].cross_section  # 空塔速度[m/s]
+    vcol = f0 / stream_conds[stream_1indexed].cross_section  # 空塔速度[m/s]
     nu = viscosity / material_output.gas_properties.density  # 気体動粘度[m2/s]
     Rep = 1.0 if vcol == 0 else vcol * dp / nu  # 粒子レイノルズ数
 

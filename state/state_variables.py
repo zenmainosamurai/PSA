@@ -16,14 +16,19 @@ class CellAccessor:
     """セルアクセス用のヘルパークラス
 
     tower.cell(stream, section).temp のような自然な記法でアクセス可能
+    
+    PSA担当者向け説明:
+    内部的には0オリジンのインデックスを使用します。
+    stream=0, section=0 が最初のセルです。
     """
 
     def __init__(self, tower_state: "TowerStateArrays", stream: int, section: int):
         self._tower_state = tower_state
         self._stream = stream
         self._section = section
-        self._stream_idx = stream - 1  # 0-indexedに変換
-        self._section_idx = section - 1  # 0-indexedに変換
+        # 0オリジンをそのまま使用（内部処理は全て0オリジン）
+        self._stream_idx = stream
+        self._section_idx = section
 
     @property
     def temp(self) -> float:
@@ -145,12 +150,12 @@ class TowerStateArrays:
         """指定されたstream, sectionのセルアクセッサーを取得
 
         Usage:
-            tower.cell(1, 1).temp  # stream=1, section=1の温度を取得
-            tower.cell(2, 3).loading = 0.5  # stream=2, section=3の吸着量を設定
+            tower.cell(0, 0).temp  # stream=0, section=0の温度を取得
+            tower.cell(1, 2).loading = 0.5  # stream=1, section=2の吸着量を設定
 
         Args:
-            stream: ストリーム番号 (1-indexed)
-            section: セクション番号 (1-indexed)
+            stream: ストリームインデックス (0オリジン)
+            section: セクションインデックス (0オリジン)
 
         Returns:
             CellAccessor: セルアクセッサー
@@ -236,9 +241,9 @@ class StateVariables:
         heat_results: HeatBalanceResults = calc_output.heat  # HeatBalanceResults
         material_results: MassBalanceResults = calc_output.material  # MassBalanceResults
 
-        # 各セル(stream, section)の結果を状態変数に反映
-        for stream in range(1, self.num_streams + 1):
-            for section in range(1, self.num_sections + 1):
+        # 各セル(stream, section)の結果を状態変数に反映（0オリジン）
+        for stream in range(self.num_streams):
+            for section in range(self.num_sections):
                 # マテリアルバランス結果の更新
                 material_result = material_results.get_result(stream, section)
                 tower.cell(stream, section).loading = material_result.adsorption_state.updated_loading
@@ -257,10 +262,10 @@ class StateVariables:
                 )
                 tower.cell(stream, section).bed_heat_transfer_coef = heat_result.heat_transfer_coefficients.bed_to_bed
 
-        # 壁面温度の更新
+        # 壁面温度の更新（0オリジン）
         heat_wall_results: Dict[int, WallHeatBalanceResult] = calc_output.heat_wall  # Dict[int, WallHeatBalanceResult]
         tower.temp_wall[:] = np.array(
-            [heat_wall_results[section].temperature for section in range(1, self.num_sections + 1)],
+            [heat_wall_results[section].temperature for section in range(self.num_sections)],
             dtype=np.float64,
         )
 
@@ -283,16 +288,16 @@ class StateVariables:
             "流通吸着_下流（圧調弁あり）",
             "流通吸着_下流",
         ]:
-            for stream in range(1, self.num_streams + 1):
-                for section in range(1, self.num_sections + 1):
+            for stream in range(self.num_streams):
+                for section in range(self.num_sections):
                     material_result = material_results.get_result(stream, section)
                     tower.cell(stream, section).co2_mole_fraction = material_result.outlet_gas.co2_mole_fraction
                     tower.cell(stream, section).n2_mole_fraction = material_result.outlet_gas.n2_mole_fraction
         elif mode == "真空脱着":
             mol_frac_results: MoleFractionResults = calc_output.mol_fraction  # MoleFractionResults
             if mol_frac_results:  # mol_fractionがNoneでない場合のみ処理
-                for stream in range(1, self.num_streams + 1):
-                    for section in range(1, self.num_sections + 1):
+                for stream in range(self.num_streams):
+                    for section in range(self.num_sections):
                         mol_frac_result = mol_frac_results.get_result(stream, section)
                         tower.cell(stream, section).co2_mole_fraction = (
                             mol_frac_result.co2_mole_fraction_after_desorption

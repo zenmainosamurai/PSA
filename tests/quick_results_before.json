@@ -1,0 +1,35 @@
+{
+  "1": {
+    "total_pressure": 0.099,
+    "temp_shape": [
+      2,
+      20
+    ],
+    "temp_0_0": 18.0,
+    "temp_1_17": 18.0,
+    "loading_0_0": 29.369587644028165,
+    "lid_temperature": 18.0
+  },
+  "2": {
+    "total_pressure": 0.004,
+    "temp_shape": [
+      2,
+      20
+    ],
+    "temp_0_0": 16.0,
+    "temp_1_17": 16.0,
+    "loading_0_0": 31.294590005165745,
+    "lid_temperature": 16.0
+  },
+  "3": {
+    "total_pressure": 0.004,
+    "temp_shape": [
+      2,
+      20
+    ],
+    "temp_0_0": 15.0,
+    "temp_1_17": 15.0,
+    "loading_0_0": 32.29620234074372,
+    "lid_temperature": 15.0
+  }
+}

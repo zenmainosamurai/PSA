@@ -76,13 +76,13 @@ def calculate_bed_heat_balance(
     
     Args:
         tower_conds: 塔条件
-        stream: ストリーム番号 (1-indexed)
-        section: セクション番号 (1-indexed)
+        stream: ストリーム番号 (0-indexed, 内部インデックス)
+        section: セクション番号 (0-indexed, 内部インデックス)
         state_manager: 状態変数管理
-        tower_num: 塔番号
+        tower_num: 塔番号 (1-indexed, I/O用)
         mode: 熱収支計算モード (ADSORPTION:吸着, VALVE_CLOSED:停止, DESORPTION:脱着)
         material_output: 物質収支計算結果
-        heat_output: 上流セクションの熱収支結果
+        heat_output: 上流セクションの熱収支結果 (section >= 1 の場合)
         vacuum_pumping_results: 真空排気結果（脱着時）
     
     Returns:
@@ -90,24 +90,26 @@ def calculate_bed_heat_balance(
     """
     tower = state_manager.towers[tower_num]
     stream_conds = tower_conds.stream_conditions
+    # stream_condsは1オリジンなので+1してアクセス
+    stream_1indexed = stream + 1
 
     # === 現在温度の取得 ===
     temp_now = tower.cell(stream, section).temp
     
-    # 内側セル温度 [℃]
-    if stream == 1:
+    # 内側セル温度 [℃] （stream=0は最内側）
+    if stream == 0:
         temp_inside_cell = 18  # 中心部の想定温度
     else:
         temp_inside_cell = tower.cell(stream - 1, section).temp
     
-    # 外側セル温度 [℃]
-    if stream != tower_conds.common.num_streams:
+    # 外側セル温度 [℃] （stream=num_streams-1は最外側）
+    if stream != tower_conds.common.num_streams - 1:
         temp_outside_cell = tower.cell(stream + 1, section).temp
     else:
-        temp_outside_cell = tower.temp_wall[section - 1]
+        temp_outside_cell = tower.temp_wall[section]
     
-    # 下流セル温度 [℃]
-    if section != tower_conds.common.num_sections:
+    # 下流セル温度 [℃] （section=num_sections-1は最下流）
+    if section != tower_conds.common.num_sections - 1:
         temp_below_cell = tower.cell(stream, section + 1).temp
 
     # === 物理量の計算（モード依存）===
@@ -116,9 +118,9 @@ def calculate_bed_heat_balance(
     gas_specific_heat = _get_gas_specific_heat(mode, material_output)
 
     # === 境界面積 ===
-    section_inner_boundary_area = stream_conds[stream].inner_boundary_area / tower_conds.common.num_sections
-    section_outer_boundary_area = stream_conds[stream].outer_boundary_area / tower_conds.common.num_sections
-    cross_section_area = stream_conds[stream].cross_section
+    section_inner_boundary_area = stream_conds[stream_1indexed].inner_boundary_area / tower_conds.common.num_sections
+    section_outer_boundary_area = stream_conds[stream_1indexed].outer_boundary_area / tower_conds.common.num_sections
+    cross_section_area = stream_conds[stream_1indexed].cross_section
 
     # === 伝熱係数の計算 ===
     if mode == MODE_ADSORPTION:
@@ -140,8 +142,8 @@ def calculate_bed_heat_balance(
 
     # === 熱流束の計算 [J] ===
     
-    # 内側境界からの熱流束
-    if stream == 1:
+    # 内側境界からの熱流束（stream=0は最内側）
+    if stream == 0:
         heat_flux_from_inner = 0
     else:
         heat_flux_from_inner = (
@@ -152,8 +154,8 @@ def calculate_bed_heat_balance(
             * MINUTE_TO_SECOND
         )
     
-    # 外側境界への熱流束
-    if stream == tower_conds.common.num_streams:
+    # 外側境界への熱流束（stream=num_streams-1は最外側）
+    if stream == tower_conds.common.num_streams - 1:
         heat_flux_to_outer = (
             wall_to_bed_htc
             * section_outer_boundary_area
@@ -170,8 +172,8 @@ def calculate_bed_heat_balance(
             * MINUTE_TO_SECOND
         )
     
-    # 下流セルへの熱流束
-    if section == tower_conds.common.num_sections:
+    # 下流セルへの熱流束（section=num_sections-1は最下流）
+    if section == tower_conds.common.num_sections - 1:
         # 下蓋への熱流束
         downstream_heat_flux = (
             wall_to_bed_htc
@@ -189,8 +191,8 @@ def calculate_bed_heat_balance(
             * MINUTE_TO_SECOND
         )
     
-    # 上流セルへの熱流束
-    if section == 1:
+    # 上流セルへの熱流束（section=0は最上流）
+    if section == 0:
         # 上蓋への熱流束
         upstream_heat_flux = (
             wall_to_bed_htc
@@ -204,6 +206,7 @@ def calculate_bed_heat_balance(
         upstream_heat_flux = -heat_output.heat_flux.downstream
 
     # === 到達温度の計算（Newton法）===
+    # _optimize_bed_temperatureには1オリジンのストリーム番号を渡す
     args = (
         tower_conds,
         gas_specific_heat,
@@ -214,7 +217,7 @@ def calculate_bed_heat_balance(
         heat_flux_to_outer,
         downstream_heat_flux,
         upstream_heat_flux,
-        stream,
+        stream_1indexed,
     )
     temp_reached = optimize.newton(_optimize_bed_temperature, temp_now, args=args)
 
@@ -264,38 +267,42 @@ def calculate_wall_heat_balance(
     
     Args:
         tower_conds: 塔条件
-        section: セクション番号 (1-indexed)
+        section: セクション番号 (0-indexed, 内部インデックス)
         state_manager: 状態変数管理
-        tower_num: 塔番号
+        tower_num: 塔番号 (1-indexed, I/O用)
         heat_output: 隣接セル（最外ストリーム）の熱収支結果
-        heat_wall_output: 上流セクションの壁面熱収支結果
+        heat_wall_output: 上流セクションの壁面熱収支結果 (section >= 1 の場合)
     
     Returns:
         WallHeatBalanceResult: 壁面熱収支結果
     """
     tower = state_manager.towers[tower_num]
     stream_conds = tower_conds.stream_conditions
+    num_streams = tower_conds.common.num_streams
+    num_sections = tower_conds.common.num_sections
+    # stream_condsは1オリジン、壁面はnum_streams+1
+    wall_stream_1indexed = num_streams + 1
     
-    # 現在温度
-    temp_now = tower.temp_wall[section - 1]
+    # 現在温度（temp_wallは0オリジンの配列）
+    temp_now = tower.temp_wall[section]
     
-    # 内側セル温度（最外ストリーム）
-    temp_inside_cell = tower.cell(tower_conds.common.num_streams, section).temp
+    # 内側セル温度（最外ストリーム、num_streams-1が0オリジンの最外側）
+    temp_inside_cell = tower.cell(num_streams - 1, section).temp
     
     # 外側温度（外気）
     temp_outside = tower_conds.vessel.ambient_temperature
     
-    # 下流壁温度
-    if section != tower_conds.common.num_sections:
-        temp_below = tower.temp_wall[section]
+    # 下流壁温度（section=num_sections-1は最下流）
+    if section != num_sections - 1:
+        temp_below = tower.temp_wall[section + 1]
 
     # === 熱流束の計算 [J] ===
     
-    # 上流壁への熱流束
-    if section == 1:
+    # 上流壁への熱流束（section=0は最上流）
+    if section == 0:
         upstream_heat_flux = (
             tower_conds.vessel.wall_thermal_conductivity
-            * stream_conds[3].cross_section
+            * stream_conds[wall_stream_1indexed].cross_section
             * (temp_now - tower.lid_temperature)
             * tower_conds.common.calculation_step_time
             * MINUTE_TO_SECOND
@@ -306,8 +313,8 @@ def calculate_wall_heat_balance(
     # 内側境界からの熱流束
     heat_flux_from_inner = (
         heat_output.heat_transfer_coefficients.wall_to_bed
-        * stream_conds[3].inner_boundary_area
-        / tower_conds.common.num_sections
+        * stream_conds[wall_stream_1indexed].inner_boundary_area
+        / num_sections
         * (temp_inside_cell - temp_now)
         * tower_conds.common.calculation_step_time
         * MINUTE_TO_SECOND
@@ -316,18 +323,18 @@ def calculate_wall_heat_balance(
     # 外側境界への熱流束（外気への放熱）
     heat_flux_to_outer = (
         tower_conds.vessel.external_heat_transfer_coef
-        * stream_conds[3].outer_boundary_area
-        / tower_conds.common.num_sections
+        * stream_conds[wall_stream_1indexed].outer_boundary_area
+        / num_sections
         * (temp_now - temp_outside)
         * tower_conds.common.calculation_step_time
         * MINUTE_TO_SECOND
     )
     
-    # 下流壁への熱流束
-    if section == tower_conds.common.num_sections:
+    # 下流壁への熱流束（section=num_sections-1は最下流）
+    if section == num_sections - 1:
         downstream_heat_flux = (
             tower_conds.vessel.wall_thermal_conductivity
-            * stream_conds[3].cross_section
+            * stream_conds[wall_stream_1indexed].cross_section
             * (temp_now - tower.bottom_temperature)
             * tower_conds.common.calculation_step_time
             * MINUTE_TO_SECOND
@@ -335,8 +342,8 @@ def calculate_wall_heat_balance(
     else:
         downstream_heat_flux = (
             tower_conds.vessel.wall_thermal_conductivity
-            * stream_conds[3].cross_section
-            * (temp_now - tower.temp_wall[section])
+            * stream_conds[wall_stream_1indexed].cross_section
+            * (temp_now - tower.temp_wall[section + 1])
         )
 
     # === 到達温度の計算 ===
@@ -408,11 +415,13 @@ def calculate_lid_heat_balance(
     else:
         heat_flux_to_ambient *= tower_conds.lid.outer_flange_area
 
-    # 正味の熱流入
+    # 正味の熱流入（0オリジンでアクセス）
+    num_sections = tower_conds.common.num_sections
     if position == "up":
-        stream2_section1_upstream = heat_output.get_result(2, 1).heat_flux.upstream
-        stream1_section1_upstream = heat_output.get_result(1, 1).heat_flux.upstream
-        wall_section1_upstream = heat_wall_output[1].heat_flux.upstream
+        # stream=1, section=0（最上流）
+        stream2_section1_upstream = heat_output.get_result(1, 0).heat_flux.upstream
+        stream1_section1_upstream = heat_output.get_result(0, 0).heat_flux.upstream
+        wall_section1_upstream = heat_wall_output[0].heat_flux.upstream
         net_heat_input = (
             stream2_section1_upstream
             - stream1_section1_upstream
@@ -420,9 +429,10 @@ def calculate_lid_heat_balance(
             - wall_section1_upstream
         )
     else:
-        last_section = tower_conds.common.num_sections
-        stream2_lastsection_upstream = heat_output.get_result(2, last_section).heat_flux.upstream
-        stream1_lastsection_upstream = heat_output.get_result(1, last_section).heat_flux.upstream
+        # stream=1, section=num_sections-1（最下流）
+        last_section = num_sections - 1
+        stream2_lastsection_upstream = heat_output.get_result(1, last_section).heat_flux.upstream
+        stream1_lastsection_upstream = heat_output.get_result(0, last_section).heat_flux.upstream
         net_heat_input = (
             stream2_lastsection_upstream
             - stream1_lastsection_upstream
