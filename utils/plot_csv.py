@@ -1,4 +1,5 @@
 import os
+import warnings
 import logging
 import pandas as pd
 import numpy as np
@@ -12,6 +13,8 @@ from config.sim_conditions import CommonConditions
 
 # matplotlibのフォント関連警告を抑制
 logging.getLogger('matplotlib.font_manager').setLevel(logging.ERROR)
+warnings.filterwarnings('ignore', message='Glyph .* missing from font')
+warnings.filterwarnings('ignore', category=UserWarning, module='matplotlib')
 
 
 def _get_japanese_font():
