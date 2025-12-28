@@ -11,6 +11,7 @@ sys.path.insert(0, "/home/user/webapp")
 os.chdir("/home/user/webapp")
 
 # モンキーパッチを有効化（CoolProp高速化）
+import utils.prop_table
 
 from config.sim_conditions import SimulationConditions
 from state import StateVariables

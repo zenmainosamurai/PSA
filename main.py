@@ -2,6 +2,7 @@ import yaml
 import time
 
 from process import GasAdsorptionBreakthroughSimulator
+import utils.prop_table  # CoolProp高速化（モンキーパッチ）
 import logger as log
 
 logger = log.logger

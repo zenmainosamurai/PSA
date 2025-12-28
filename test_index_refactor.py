@@ -6,6 +6,7 @@
 
 import json
 import numpy as np
+import utils.prop_table  # CoolProp高速化
 from state import StateVariables
 from process import SimulationRunner
 from process.simulation_io import SimulationIO
