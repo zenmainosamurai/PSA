@@ -45,7 +45,7 @@ psa_simulator/
 │   ├── mass_balance.py                  # 物質収支計算
 │   ├── heat_balance.py                  # 熱収支計算（層・壁・蓋）
 │   ├── pressure.py                      # 圧力計算（真空排気・均圧・バッチ後）
-│   ├── adsorption_isotherm.py           # 吸着等温線（平衡吸着量）
+│   ├── adsorption_isotherm.py           # 吸着平衡線（平衡吸着量）
 │   └── heat_transfer_coefficient.py     # 伝熱係数計算
 │
 ├── state/                               # 塔の状態管理
