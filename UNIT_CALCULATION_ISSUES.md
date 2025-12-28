@@ -108,17 +108,89 @@ theoretical_loading_delta = (
 
 ---
 
-## 3. その他の確認結果
+## 3. `physics/heat_balance.py` - 壁面熱伝導の距離項欠落
+
+### 問題箇所
+`calculate_wall_heat_balance` 関数（300-306行目、332-344行目）
+
+### 問題の内容
+フーリエの法則（熱伝導）において、伝熱距離 L での除算が抜けている。
+
+**フーリエの法則**:
+$$Q = k \cdot A \cdot \frac{\Delta T}{L} \cdot \Delta t$$
+
+- $Q$: 熱量 [J]
+- $k$: 熱伝導率 [W/(m·K)]
+- $A$: 断面積 [m²]
+- $\Delta T$: 温度差 [K]
+- $L$: 伝熱距離 [m]
+- $\Delta t$: 時間 [s]
+
+**現在のコード（300-306行目）**:
+```python
+upstream_heat_flux = (
+    tower_conds.vessel.wall_thermal_conductivity  # k [W/(m·K)]
+    * stream_conds[wall_stream_1indexed].cross_section  # A [m²]
+    * (temp_now - tower.lid_temperature)  # ΔT [K]
+    * tower_conds.common.calculation_step_time  # dt [min]
+    * MINUTE_TO_SECOND  # [s/min]
+    # ← L での除算が抜けている
+)
+```
+
+### 単位計算
+現在のコード:
+$$[W/(m \cdot K)] \cdot [m^2] \cdot [K] \cdot [s] = [J \cdot m]$$
+
+期待される単位: $[J]$
+
+**結果**: $[J \cdot m]$ となり、単位が整合しない。
+
+### 追加の問題（340-344行目）
+中間セクション間の下流熱流束計算では、Lでの除算に加えて時間項も抜けている:
+```python
+downstream_heat_flux = (
+    tower_conds.vessel.wall_thermal_conductivity
+    * stream_conds[wall_stream_1indexed].cross_section
+    * (temp_now - tower.temp_wall[section + 1])
+    # ← L での除算なし
+    # ← dt * MINUTE_TO_SECOND もなし
+)
+```
+
+### 修正案
+伝熱距離 L（セクション長さ）を追加:
+```python
+section_length = tower_conds.packed_bed.height / tower_conds.common.num_sections  # [m]
+
+upstream_heat_flux = (
+    tower_conds.vessel.wall_thermal_conductivity
+    * stream_conds[wall_stream_1indexed].cross_section
+    * (temp_now - tower.lid_temperature)
+    / section_length  # ← 追加
+    * tower_conds.common.calculation_step_time
+    * MINUTE_TO_SECOND
+)
+```
+
+### 影響範囲
+- 壁面の温度変化計算
+- 全運転モードに影響
+
+---
+
+## 4. その他の確認結果
 
 ### `physics/adsorption_isotherm.py`
 - **問題なし**: 経験式のため係数で単位調整済み
 - 入力: `pressure_kpa` [kPaA], `temperature_k` [K]
 - 出力: `equilibrium_loading` [cm³/g-abs]
 
-### `physics/heat_balance.py`
-- **確認済み**: 主要な熱流束計算の単位は整合
+### `physics/heat_balance.py` - 充填層熱収支
+- **確認済み**: 主要な熱流束計算（対流伝熱）の単位は整合
 - 熱流束: [J] = [W/m²/K] * [m²] * [K] * [min] * [s/min]
 - 伝熱係数: [W/m²/K]
+- ※壁面熱伝導は上記の問題あり
 
 ### `physics/heat_transfer.py`
 - **確認済み**: Yagi-Kuniiモデルに基づく計算
@@ -136,6 +208,7 @@ theoretical_loading_delta = (
 |------|--------|------|
 | 1. 脱着モードの単位不整合 | **高** | 明確なバグ。脱着量が大きい条件で結果が破綻する可能性 |
 | 2. LDFモデルの単位不明確 | 中 | 現状動作しているが、ドキュメント整備が必要 |
+| 3. 壁面熱伝導の距離項欠落 | **高** | フーリエの法則に反する。壁面温度計算に影響 |
 
 ---
 
