@@ -17,7 +17,7 @@ PSA担当部署の技術者がコードを読んで理解しやすい構造に�
 psa_simulator/
 │
 ├── main.py                              # エントリーポイント
-├── main_cond.yml                        # 実行条件設定
+├── settings.yml                        # 実行条件設定
 │
 ├── config/                              # 設定読込
 │   ├── __init__.py

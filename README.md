@@ -17,7 +17,7 @@ python main.py
 ```
 PSA/
 ├── main.py              # エントリーポイント
-├── main_cond.yml        # 実行条件設定ファイル
+├── settings.yml        # 実行条件設定ファイル
 │
 ├── common/              # 共通定義
 │   ├── constants.py     # 物理定数
@@ -80,7 +80,7 @@ PSA/
 
 ## 設定ファイル
 
-### main_cond.yml
+### settings.yml
 
 実行モードと対象条件を指定します。
 
