@@ -388,7 +388,10 @@ def _extract_heat_material_values(record_data, common_conds):
         values_tmp = []
         for stream in range(1, 1 + common_conds.num_streams):
             for section in range(1, 1 + common_conds.num_sections):
-                result_data = record.get_result(stream, section).to_dict()
+                result = record.get_result(stream, section)
+                if result is None:
+                    continue
+                result_data = result.to_dict()
                 values_tmp.extend(result_data.values())
         values.append(values_tmp)
     return values
@@ -399,7 +402,10 @@ def _generate_heat_material_columns(record_data, common_conds):
     columns = []
     for stream in range(1, 1 + common_conds.num_streams):
         for section in range(1, 1 + common_conds.num_sections):
-            result_data = record_data[0].get_result(stream, section).to_dict()
+            result = record_data[0].get_result(stream, section)
+            if result is None:
+                continue
+            result_data = result.to_dict()
             for key in result_data.keys():
                 columns.append(f"{key}-{stream:03d}-{section:03d}")
     return columns

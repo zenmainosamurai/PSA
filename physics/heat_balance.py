@@ -113,16 +113,16 @@ def calculate_bed_heat_balance(
     cross_section_area = stream_conds[stream_1indexed].cross_section
 
     # === 伝熱係数の計算 ===
-    if mode == MODE_ADSORPTION:
+    if mode == HeatCalculationMode.ADSORPTION:
         wall_to_bed_htc, bed_htc = _heat_transfer_coef(
             tower_conds, stream, section, temp_now, mode,
             state_manager, tower_num, material_output,
         )
-    elif mode == MODE_VALVE_CLOSED:
+    elif mode == HeatCalculationMode.VALVE_CLOSED:
         # 停止モードでは直前値を使用
         wall_to_bed_htc = tower.cell(stream, section).wall_to_bed_heat_transfer_coef
         bed_htc = tower.cell(stream, section).bed_heat_transfer_coef
-    elif mode == MODE_DESORPTION:
+    elif mode == HeatCalculationMode.DESORPTION:
         wall_to_bed_htc, bed_htc = _heat_transfer_coef(
             tower_conds, stream, section, temp_now, mode,
             state_manager, tower_num, material_output, vacuum_pumping_results,
@@ -450,7 +450,7 @@ def _get_adsorption_heat(
     CO2が吸着材に吸着される際に発生する熱を計算します。
     停止モードでは吸着が起きないため0です。
     """
-    if mode == MODE_VALVE_CLOSED:
+    if mode == HeatCalculationMode.VALVE_CLOSED:
         return 0.0
     
     if material_output is None:
@@ -477,7 +477,7 @@ def _get_inlet_gas_mass(
     セルに流入するガスの質量を計算します。
     停止・脱着モードではガス流入がないため0です。
     """
-    if mode in (MODE_VALVE_CLOSED, MODE_DESORPTION):
+    if mode in (HeatCalculationMode.VALVE_CLOSED, HeatCalculationMode.DESORPTION):
         return 0.0
     
     if material_output is None:
@@ -504,7 +504,7 @@ def _get_gas_specific_heat(
     
     停止モードでは0を返します。
     """
-    if mode == MODE_VALVE_CLOSED:
+    if mode == HeatCalculationMode.VALVE_CLOSED:
         return 0.0
     
     if material_output is None:
@@ -537,7 +537,7 @@ def _calculate_thermocouple_temperature(
     thermocouple_htc = wall_to_bed_htc
     
     # 補正係数（脱着モードでは異なる）
-    if mode != MODE_DESORPTION:
+    if mode != HeatCalculationMode.DESORPTION:
         correction_factor = tower_conds.thermocouple.heat_transfer_correction_factor
     else:
         correction_factor = 100

@@ -225,6 +225,9 @@ class ResultExporter:
                         heat_result = time_series_data.heat[i].get_result(
                             stream_id, section_id
                         )
+                        if heat_result is None or heat_result.cell_temperatures is None:
+                            # 熱収支結果がない場合はスキップ
+                            continue
                         temperature = heat_result.cell_temperatures.bed_temperature
                         
                         # 流入ガス
