@@ -1,12 +1,49 @@
 import os
+import platform
 import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
+import matplotlib.font_manager as fm
 import math
 import glob
 from utils import const
 
 from config.sim_conditions import CommonConditions
+
+
+def _get_japanese_font():
+    """日本語フォントを取得（クロスプラットフォーム対応）
+    
+    Returns:
+        str: 利用可能な日本語フォント名
+    """
+    # 優先順位でフォントを試行
+    font_candidates = [
+        "Meiryo",           # Windows
+        "Yu Gothic",        # Windows
+        "MS Gothic",        # Windows
+        "Hiragino Sans",    # macOS
+        "Noto Sans CJK JP", # Linux (noto-fonts-cjk)
+        "IPAGothic",        # Linux (ipa-fonts)
+        "IPAPGothic",       # Linux
+        "TakaoPGothic",     # Linux (Ubuntuなど)
+        "VL Gothic",        # Linux
+        "DejaVu Sans",      # フォールバック（日本語非対応）
+    ]
+    
+    # 利用可能なフォント一覧を取得
+    available_fonts = {f.name for f in fm.fontManager.ttflist}
+    
+    for font in font_candidates:
+        if font in available_fonts:
+            return font
+    
+    # 見つからない場合はデフォルト
+    return "sans-serif"
+
+
+# モジュール読み込み時にフォントを決定
+JAPANESE_FONT = _get_japanese_font()
 
 
 def plot_csv_outputs(tgt_foldapath, df_obs, tgt_sections, tower_num, timestamp, df_p_end):
@@ -56,7 +93,7 @@ def plot_csv_outputs(tgt_foldapath, df_obs, tgt_sections, tower_num, timestamp, 
 
     for i, (key, df) in enumerate(df_dict.items()):
         plt.rcParams["font.size"] = 20
-        plt.rcParams["font.family"] = "Meiryo"
+        plt.rcParams["font.family"] = JAPANESE_FONT
         plt.subplot(num_row, 2, i + 1)
         # 可視化対象のcolumnsを抽出
         plt_tgt_cols = [col for col in df.columns if int(col.split("-")[-1]) in tgt_sections]
@@ -122,7 +159,7 @@ def plot_csv_outputs(tgt_foldapath, df_obs, tgt_sections, tower_num, timestamp, 
 
     for i, (key, df) in enumerate(df_dict.items()):
         plt.rcParams["font.size"] = 20
-        plt.rcParams["font.family"] = "Meiryo"
+        plt.rcParams["font.family"] = JAPANESE_FONT
         plt.subplot(num_row, 2, i + 1)
         # 可視化対象のcolumnsを抽出
         plt_tgt_cols = [col for col in df.columns if int(col.split("-")[-1]) in tgt_sections]
@@ -168,7 +205,7 @@ def plot_csv_outputs(tgt_foldapath, df_obs, tgt_sections, tower_num, timestamp, 
 
     for i, col in enumerate(df.columns):
         plt.rcParams["font.size"] = 20
-        plt.rcParams["font.family"] = "Meiryo"
+        plt.rcParams["font.family"] = JAPANESE_FONT
         plt.subplot(num_row, 2, i + 1)
         plt.plot(df[col])
         # カラム名から上蓋/下蓋を判定してタイトルを設定
@@ -198,7 +235,7 @@ def plot_csv_outputs(tgt_foldapath, df_obs, tgt_sections, tower_num, timestamp, 
     fig = plt.figure(figsize=(16 * 2, 5.5 * 3), tight_layout=True)
     fig.patch.set_facecolor("white")
     plt.rcParams["font.size"] = 20
-    plt.rcParams["font.family"] = "Meiryo"
+    plt.rcParams["font.family"] = JAPANESE_FONT
     plt_cell = 1
 
     # 1. 全圧
