@@ -1,13 +1,12 @@
 """物理計算モジュール
 
-PSA担当者向け説明:
 PSAプロセスで使用する物理計算を提供します。
 
 主要なモジュール:
 - mass_balance.py: 物質収支計算（吸着・脱着・停止モード）
 - heat_balance.py: 熱収支計算（層・壁・蓋）
 - pressure.py: 圧力計算（真空排気・均圧・バッチ後）
-- adsorption_isotherm.py: 吸着等温線（平衡吸着量）
+- adsorption_isotherm.py: 吸着平衡線（平衡吸着量）
 
 使用例:
     # 物質収支計算
@@ -22,12 +21,12 @@ PSAプロセスで使用する物理計算を提供します。
     from physics.pressure import calculate_vacuum_pumping
     result = calculate_vacuum_pumping(tower_conds, state_manager, tower_num)
     
-    # 吸着等温線
+    # 吸着平衡線
     from physics.adsorption_isotherm import calculate_equilibrium_loading
     q_eq = calculate_equilibrium_loading(pressure_kpa, temperature_k)
 """
 
-# 吸着等温線（外部依存なし、常にインポート可能）
+# 吸着平衡線（外部依存なし、常にインポート可能）
 from .adsorption_isotherm import (
     calculate_equilibrium_loading,
     calculate_loading_at_conditions,
@@ -79,7 +78,7 @@ __all__ = [
     "calculate_pressure_after_vacuum_desorption",
     "calculate_pressure_after_batch_adsorption",
     
-    # 吸着等温線
+    # 吸着平衡線
     "calculate_loading_at_conditions",
     "calculate_driving_force",
     "get_isotherm_parameters",

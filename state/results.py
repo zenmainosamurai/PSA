@@ -365,7 +365,6 @@ class MassBalanceCalculationResult:
     """
     物質収支計算の結果
     
-    PSA担当者向け説明:
     1セルの物質収支計算結果です。
     脱着モードの場合はモル分率データも含まれます。
     

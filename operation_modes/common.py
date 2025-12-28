@@ -1,6 +1,5 @@
 """運転モード共通処理
 
-PSA担当者向け説明:
 各運転モードで共通して使用する計算処理を提供します。
 
 主要な関数:
@@ -39,7 +38,6 @@ from physics.heat_balance import (
 class CellCalculationResults:
     """全セル計算結果
     
-    PSA担当者向け説明:
     全ストリーム×全セクションの物質収支・熱収支計算結果をまとめたものです。
     """
     mass_balance: MassBalanceResults
@@ -51,7 +49,6 @@ class CellCalculationResults:
 class FullTowerResults:
     """塔全体の計算結果
     
-    PSA担当者向け説明:
     1つの塔の全計算結果（セル・壁・蓋）をまとめたものです。
     """
     mass_balance: MassBalanceResults
@@ -74,7 +71,6 @@ def calculate_all_cells(
     """
     全セルの物質収支・熱収支を計算
     
-    PSA担当者向け説明:
     塔内の全セル（ストリーム×セクション）について、
     物質収支と熱収支を順番に計算します。
     
@@ -181,7 +177,6 @@ def calculate_wall_heat(
     """
     壁面の熱収支を計算
     
-    PSA担当者向け説明:
     容器壁の各セクションの温度変化を計算します。
     セクション1から順に計算し、上流セクションの結果を使用します。
     
@@ -234,7 +229,6 @@ def calculate_lid_heat(
     """
     蓋の熱収支を計算
     
-    PSA担当者向け説明:
     上蓋・下蓋の温度変化を計算します。
     
     Args:
@@ -275,7 +269,6 @@ def calculate_full_tower(
     """
     塔全体（セル・壁・蓋）の計算を実行
     
-    PSA担当者向け説明:
     1つの塔の全計算（物質収支、熱収支、壁、蓋）を一括で実行します。
     各運転モードで共通して使用する処理です。
     
@@ -337,7 +330,6 @@ def distribute_inflow_gas(
     """
     上流からの流入ガスを各ストリームに分配
     
-    PSA担当者向け説明:
     上流塔から流出したガスを、面積比率に応じて各ストリームに分配します。
     下流塔での吸着計算で使用します。
     

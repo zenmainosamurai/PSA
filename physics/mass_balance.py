@@ -1,6 +1,5 @@
 """物質収支計算モジュール
 
-PSA担当者向け説明:
 このモジュールはPSAプロセスにおける物質収支（マテリアルバランス）を計算します。
 
 - 吸着モード: CO2が吸着材に吸着される際の物質収支
@@ -9,7 +8,7 @@ PSA担当者向け説明:
 
 主要な関数:
 - calculate_mass_balance(): モードに応じた物質収支計算の統一インターフェース
-- calculate_equilibrium_loading(): 平衡吸着量の計算（吸着等温線）
+- calculate_equilibrium_loading(): 平衡吸着量の計算（吸着平衡線）
 """
 
 from typing import Optional, Tuple
@@ -66,7 +65,6 @@ def calculate_mass_balance(
     """
     物質収支を計算する（統一インターフェース）
     
-    PSA担当者向け説明:
     運転モードに応じて適切な物質収支計算を実行します。
     
     Args:
@@ -157,7 +155,6 @@ def _calculate_adsorption_mass_balance(
     """
     吸着モードの物質収支計算
     
-    PSA担当者向け説明:
     ガスが充填層を通過する際のCO2吸着を計算します。
     流入ガス中のCO2が吸着材に吸着され、残りが下流へ流出します。
     """
@@ -296,7 +293,6 @@ def _calculate_desorption_mass_balance(
     """
     脱着モードの物質収支計算
     
-    PSA担当者向け説明:
     真空ポンプで減圧することで吸着材からCO2が脱着する過程を計算します。
     脱着したCO2は気相に放出され、真空ポンプで排気されます。
     """
@@ -425,7 +421,6 @@ def _calculate_valve_closed_mass_balance(
     """
     停止モードの物質収支計算
     
-    PSA担当者向け説明:
     バルブが閉じている状態では、ガスの流入・流出がないため
     吸着量は変化しません。現在の状態を維持します。
     """
@@ -454,9 +449,8 @@ def _calculate_valve_closed_mass_balance(
 
 def calculate_equilibrium_loading(pressure_kpa: float, temperature_k: float) -> float:
     """
-    平衡吸着量を計算（吸着等温線）
+    平衡吸着量を計算（吸着平衡線）
     
-    PSA担当者向け説明:
     与えられたCO2分圧と温度における平衡吸着量を計算します。
     シンボリック回帰による近似式を使用しています。
     
@@ -546,7 +540,6 @@ def _calculate_theoretical_uptake(
     """
     理論新規吸着量を計算
     
-    PSA担当者向け説明:
     平衡吸着量と現在吸着量の差から、理論的な新規吸着量を計算します。
     物質移動係数（LDF: Linear Driving Force）モデルを使用しています。
     
@@ -608,7 +601,6 @@ def _adjust_outlet_pressure(
     """
     流出CO2分圧の整合性調整
     
-    PSA担当者向け説明:
     流出CO2分圧が直前値より低くなる場合、物理的に不自然なため
     吸着量を逆算して調整します。
     """

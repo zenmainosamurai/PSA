@@ -17,7 +17,6 @@ class CellAccessor:
 
     tower.cell(stream, section).temp のような自然な記法でアクセス可能
     
-    PSA担当者向け説明:
     内部的には0オリジンのインデックスを使用します。
     stream=0, section=0 が最初のセルです。
     """

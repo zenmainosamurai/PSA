@@ -1,6 +1,5 @@
 """バッチ吸着モード
 
-PSA担当者向け説明:
 密閉状態でガスを導入しながら吸着を行うモードの計算を行います。
 
 バッチ吸着とは:
@@ -41,7 +40,6 @@ class BatchAdsorptionResult:
     """
     バッチ吸着モードの計算結果
     
-    PSA担当者向け説明:
     バッチ吸着では圧力が変化するため、
     pressure_after_batch_adsorption に吸着後の圧力が入ります。
     """
@@ -66,7 +64,6 @@ def execute_batch_adsorption_upstream(
     """
     バッチ吸着（上流）の計算を実行
     
-    PSA担当者向け説明:
     導入ガスを直接受け取る塔でのバッチ吸着を計算します。
     密閉状態でガスを導入するため、圧力が上昇します。
     
@@ -113,7 +110,6 @@ def execute_batch_adsorption_upstream_with_valve(
     """
     バッチ吸着（上流・圧調弁あり）の計算を実行
     
-    PSA担当者向け説明:
     圧力調整弁がある場合のバッチ吸着を計算します。
     圧調弁により圧力は導入ガス圧力に維持されます。
     
@@ -156,7 +152,6 @@ def execute_batch_adsorption_downstream(
     """
     バッチ吸着（下流）の計算を実行
     
-    PSA担当者向け説明:
     直列運転において、上流塔から流出したガスを受け取る
     下流塔でのバッチ吸着を計算します。
     
@@ -212,7 +207,6 @@ def execute_batch_adsorption_downstream_with_valve(
     """
     バッチ吸着（下流・圧調弁あり）の計算を実行
     
-    PSA担当者向け説明:
     圧力調整弁がある場合の下流塔でのバッチ吸着を計算します。
     
     Args:

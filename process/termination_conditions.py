@@ -1,6 +1,5 @@
 """終了条件判定
 
-PSA担当者向け説明:
 工程の終了条件を判定するモジュールです。
 稼働工程表の「終了条件」列に記載された条件を解析し、
 シミュレーションの各ステップで終了判定を行います。
@@ -39,7 +38,6 @@ class TerminationCondition:
     """
     終了条件のデータクラス
     
-    PSA担当者向け説明:
     稼働工程表の「終了条件」列を解析した結果を保持します。
     """
     condition_type: TerminationConditionType
@@ -52,7 +50,6 @@ def parse_termination_condition(condition_str: str) -> TerminationCondition:
     """
     終了条件文字列を解析
     
-    PSA担当者向け説明:
     稼働工程表に記載された終了条件文字列を解析します。
     
     Args:
@@ -121,7 +118,6 @@ def check_termination_condition(
     """
     終了条件を判定
     
-    PSA担当者向け説明:
     現在の状態が終了条件を満たしているか判定します。
     Falseが返ると工程が終了、Trueが返ると継続します。
     
@@ -180,7 +176,6 @@ def should_continue_process(
     """
     工程を継続すべきか判定（簡易インターフェース）
     
-    PSA担当者向け説明:
     稼働工程表の終了条件文字列から直接判定を行う簡易関数です。
     
     Args:
