@@ -19,12 +19,12 @@ TRANSLATION = {
     "wall_to_bed_heat_transfer_coef": "壁-層伝熱係数",
     "bed_heat_transfer_coef": "層伝熱係数",
     
-    # 熱流束
-    "downstream_heat_flux": "下流セルへの熱流束",
-    "upstream_heat_flux": "上流セルへの放熱",
-    "heat_flux_from_inner_boundary": "内側境界からの熱流束",
-    "heat_flux_to_outer_boundary": "外側境界への熱流束",
-    "adsorption_heat": "発生する吸着熱",
+    # 熱量 [J]
+    "downstream_heat_j": "下流セルへの熱量",
+    "upstream_heat_j": "上流セルへの熱量",
+    "from_inner_heat_j": "内側境界からの熱量",
+    "to_outer_heat_j": "外側境界への熱量",
+    "adsorption_heat_j": "吸着熱",
     "Hgas": "流入ガスが受け取る熱",
     
     # 流量（入口）

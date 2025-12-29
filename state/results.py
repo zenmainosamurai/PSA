@@ -76,12 +76,13 @@ class MaterialBalanceResult:
 
 
 @dataclass
-class HeatFlux:
-    adsorption: float
-    from_inner_boundary: float
-    to_outer_boundary: float
-    downstream: float
-    upstream: float
+class HeatTransfer:
+    """1タイムステップで移動した熱量 [J]"""
+    adsorption_j: float
+    from_inner_j: float
+    to_outer_j: float
+    downstream_j: float
+    upstream_j: float
 
 
 @dataclass
@@ -102,18 +103,18 @@ class HeatBalanceResult:
 
     cell_temperatures: CellTemperatures
     heat_transfer_coefficients: HeatTransferCoefficients
-    heat_flux: HeatFlux
+    heat_transfer: HeatTransfer
 
     def to_dict(self) -> dict:
         return {
             "temp_reached": self.cell_temperatures.bed_temperature,
             "temp_thermocouple_reached": self.cell_temperatures.thermocouple_temperature,
             "wall_to_bed_heat_transfer_coef": self.heat_transfer_coefficients.wall_to_bed,
-            "upstream_heat_flux": self.heat_flux.upstream,
-            "downstream_heat_flux": self.heat_flux.downstream,
-            "adsorption_heat": self.heat_flux.adsorption,
-            "heat_flux_from_inner_boundary": self.heat_flux.from_inner_boundary,
-            "heat_flux_to_outer_boundary": self.heat_flux.to_outer_boundary,
+            "upstream_heat_j": self.heat_transfer.upstream_j,
+            "downstream_heat_j": self.heat_transfer.downstream_j,
+            "adsorption_heat_j": self.heat_transfer.adsorption_j,
+            "from_inner_heat_j": self.heat_transfer.from_inner_j,
+            "to_outer_heat_j": self.heat_transfer.to_outer_j,
             "bed_heat_transfer_coef": self.heat_transfer_coefficients.bed_to_bed,
         }
 
@@ -297,27 +298,27 @@ class MassAndHeatBalanceResults:
 
 
 @dataclass
-class WallHeatFlux:
-    """壁面熱流束計算結果"""
+class WallHeatTransfer:
+    """1タイムステップで壁面を移動した熱量 [J]"""
 
-    from_inner_boundary: float
-    to_outer_boundary: float
-    downstream: float
-    upstream: float
+    from_inner_j: float
+    to_outer_j: float
+    downstream_j: float
+    upstream_j: float
 
 
 @dataclass
 class WallHeatBalanceResult:
     temperature: float
-    heat_flux: WallHeatFlux
+    heat_transfer: WallHeatTransfer
 
     def to_dict(self) -> dict:
         return {
             "temp_reached": self.temperature,
-            "downstream_heat_flux": self.heat_flux.downstream,
-            "upstream_heat_flux": self.heat_flux.upstream,
-            "heat_flux_from_inner_boundary": self.heat_flux.from_inner_boundary,
-            "heat_flux_to_outer_boundary": self.heat_flux.to_outer_boundary,
+            "downstream_heat_j": self.heat_transfer.downstream_j,
+            "upstream_heat_j": self.heat_transfer.upstream_j,
+            "from_inner_heat_j": self.heat_transfer.from_inner_j,
+            "to_outer_heat_j": self.heat_transfer.to_outer_j,
         }
 
 

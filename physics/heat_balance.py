@@ -31,9 +31,9 @@ from state import (
     HeatBalanceResults,
     VacuumPumpingResult,
     HeatTransferCoefficients,
-    HeatFlux,
+    HeatTransfer,
     CellTemperatures,
-    WallHeatFlux,
+    WallHeatTransfer,
     WallHeatBalanceResult,
     LidHeatBalanceResult,
 )
@@ -129,13 +129,13 @@ def calculate_bed_heat_balance(
     else:
         raise ValueError(f"未対応のモード: {mode}")
 
-    # === 熱流束の計算 [J] ===
+    # === 熱量の計算 [J] ===
     
-    # 内側境界からの熱流束（stream=0は最内側）
+    # 内側境界からの熱量（stream=0は最内側）
     if stream == 0:
-        heat_flux_from_inner = 0
+        from_inner_j = 0
     else:
-        heat_flux_from_inner = (
+        from_inner_j = (
             bed_htc
             * section_inner_boundary_area
             * (temp_inside_cell - temp_now)
@@ -143,9 +143,9 @@ def calculate_bed_heat_balance(
             * MINUTE_TO_SECOND
         )
     
-    # 外側境界への熱流束（stream=num_streams-1は最外側）
+    # 外側境界への熱量（stream=num_streams-1は最外側）
     if stream == tower_conds.common.num_streams - 1:
-        heat_flux_to_outer = (
+        to_outer_j = (
             wall_to_bed_htc
             * section_outer_boundary_area
             * (temp_now - temp_outside_cell)
@@ -153,7 +153,7 @@ def calculate_bed_heat_balance(
             * MINUTE_TO_SECOND
         )
     else:
-        heat_flux_to_outer = (
+        to_outer_j = (
             bed_htc
             * section_outer_boundary_area
             * (temp_now - temp_outside_cell)
@@ -161,10 +161,10 @@ def calculate_bed_heat_balance(
             * MINUTE_TO_SECOND
         )
     
-    # 下流セルへの熱流束（section=num_sections-1は最下流）
+    # 下流セルへの熱量（section=num_sections-1は最下流）
     if section == tower_conds.common.num_sections - 1:
-        # 下蓋への熱流束
-        downstream_heat_flux = (
+        # 下蓋への熱量
+        downstream_j = (
             wall_to_bed_htc
             * cross_section_area
             * (temp_now - tower.bottom_temperature)
@@ -172,7 +172,7 @@ def calculate_bed_heat_balance(
             * MINUTE_TO_SECOND
         )
     else:
-        downstream_heat_flux = (
+        downstream_j = (
             bed_htc
             * cross_section_area
             * (temp_now - temp_below_cell)
@@ -180,10 +180,10 @@ def calculate_bed_heat_balance(
             * MINUTE_TO_SECOND
         )
     
-    # 上流セルへの熱流束（section=0は最上流）
+    # 上流セルへの熱量（section=0は最上流）
     if section == 0:
-        # 上蓋への熱流束
-        upstream_heat_flux = (
+        # 上蓋への熱量
+        upstream_j = (
             wall_to_bed_htc
             * cross_section_area
             * (temp_now - tower.top_temperature)
@@ -191,8 +191,8 @@ def calculate_bed_heat_balance(
             * MINUTE_TO_SECOND
         )
     else:
-        # 上流セルの下流熱流束の負値
-        upstream_heat_flux = -heat_output.heat_flux.downstream
+        # 上流セルの下流熱量の負値
+        upstream_j = -heat_output.heat_transfer.downstream_j
 
     # === 到達温度の計算（Newton法）===
     args = (
@@ -201,10 +201,10 @@ def calculate_bed_heat_balance(
         inlet_gas_mass,
         temp_now,
         adsorption_heat,
-        heat_flux_from_inner,
-        heat_flux_to_outer,
-        downstream_heat_flux,
-        upstream_heat_flux,
+        from_inner_j,
+        to_outer_j,
+        downstream_j,
+        upstream_j,
         stream,
     )
     temp_reached = optimize.newton(_optimize_bed_temperature, temp_now, args=args)
@@ -224,12 +224,12 @@ def calculate_bed_heat_balance(
             wall_to_bed=wall_to_bed_htc,
             bed_to_bed=bed_htc,
         ),
-        heat_flux=HeatFlux(
-            adsorption=adsorption_heat,
-            from_inner_boundary=heat_flux_from_inner,
-            to_outer_boundary=heat_flux_to_outer,
-            downstream=downstream_heat_flux,
-            upstream=upstream_heat_flux,
+        heat_transfer=HeatTransfer(
+            adsorption_j=adsorption_heat,
+            from_inner_j=from_inner_j,
+            to_outer_j=to_outer_j,
+            downstream_j=downstream_j,
+            upstream_j=upstream_j,
         ),
     )
 
@@ -281,11 +281,11 @@ def calculate_wall_heat_balance(
     if section != num_sections - 1:
         temp_below = tower.temp_wall[section + 1]
 
-    # === 熱流束の計算 [J] ===
+    # === 熱量の計算 [J] ===
     
-    # 上流壁への熱流束（section=0は最上流）
+    # 上流壁への熱量（section=0は最上流）
     if section == 0:
-        upstream_heat_flux = (
+        upstream_j = (
             tower_conds.vessel.wall_thermal_conductivity
             * stream_conds[wall_stream_idx].cross_section
             * (temp_now - tower.top_temperature)
@@ -293,10 +293,10 @@ def calculate_wall_heat_balance(
             * MINUTE_TO_SECOND
         )
     else:
-        upstream_heat_flux = heat_wall_output.heat_flux.downstream
+        upstream_j = heat_wall_output.heat_transfer.downstream_j
     
-    # 内側境界からの熱流束
-    heat_flux_from_inner = (
+    # 内側境界からの熱量
+    from_inner_j = (
         heat_output.heat_transfer_coefficients.wall_to_bed
         * stream_conds[wall_stream_idx].inner_boundary_area
         / num_sections
@@ -305,8 +305,8 @@ def calculate_wall_heat_balance(
         * MINUTE_TO_SECOND
     )
     
-    # 外側境界への熱流束（外気への放熱）
-    heat_flux_to_outer = (
+    # 外側境界への熱量（外気への放熱）
+    to_outer_j = (
         tower_conds.vessel.external_heat_transfer_coef
         * stream_conds[wall_stream_idx].outer_boundary_area
         / num_sections
@@ -315,9 +315,9 @@ def calculate_wall_heat_balance(
         * MINUTE_TO_SECOND
     )
     
-    # 下流壁への熱流束（section=num_sections-1は最下流）
+    # 下流壁への熱量（section=num_sections-1は最下流）
     if section == num_sections - 1:
-        downstream_heat_flux = (
+        downstream_j = (
             tower_conds.vessel.wall_thermal_conductivity
             * stream_conds[wall_stream_idx].cross_section
             * (temp_now - tower.bottom_temperature)
@@ -325,7 +325,7 @@ def calculate_wall_heat_balance(
             * MINUTE_TO_SECOND
         )
     else:
-        downstream_heat_flux = (
+        downstream_j = (
             tower_conds.vessel.wall_thermal_conductivity
             * stream_conds[wall_stream_idx].cross_section
             * (temp_now - tower.temp_wall[section + 1])
@@ -335,20 +335,20 @@ def calculate_wall_heat_balance(
     args = (
         tower_conds,
         temp_now,
-        heat_flux_from_inner,
-        heat_flux_to_outer,
-        downstream_heat_flux,
-        upstream_heat_flux,
+        from_inner_j,
+        to_outer_j,
+        downstream_j,
+        upstream_j,
     )
     temp_reached = optimize.newton(_optimize_wall_temperature, temp_now, args=args)
 
     return WallHeatBalanceResult(
         temperature=temp_reached,
-        heat_flux=WallHeatFlux(
-            from_inner_boundary=heat_flux_from_inner,
-            to_outer_boundary=heat_flux_to_outer,
-            downstream=downstream_heat_flux,
-            upstream=upstream_heat_flux,
+        heat_transfer=WallHeatTransfer(
+            from_inner_j=from_inner_j,
+            to_outer_j=to_outer_j,
+            downstream_j=downstream_j,
+            upstream_j=upstream_j,
         ),
     )
 
@@ -387,8 +387,8 @@ def calculate_lid_heat_balance(
     # 現在温度
     temp_now = tower.top_temperature if is_top else tower.bottom_temperature
     
-    # 外気への熱流束
-    heat_flux_to_ambient = (
+    # 外気への熱量 [J]
+    heat_to_ambient_j = (
         tower_conds.vessel.external_heat_transfer_coef
         * (temp_now - tower_conds.vessel.ambient_temperature)
         * tower_conds.common.calculation_step_time
@@ -396,36 +396,36 @@ def calculate_lid_heat_balance(
     )
     
     if is_top:
-        heat_flux_to_ambient *= tower_conds.top.outer_flange_area
+        heat_to_ambient_j *= tower_conds.top.outer_flange_area
     else:
-        heat_flux_to_ambient *= tower_conds.bottom.outer_flange_area
+        heat_to_ambient_j *= tower_conds.bottom.outer_flange_area
 
     num_sections = tower_conds.common.num_sections
     if is_top:
         # stream=1, section=0（最上流）
-        stream2_section1_upstream = heat_output.get_result(1, 0).heat_flux.upstream
-        stream1_section1_upstream = heat_output.get_result(0, 0).heat_flux.upstream
-        wall_section1_upstream = heat_wall_output[0].heat_flux.upstream
-        net_heat_input = (
-            stream2_section1_upstream
-            - stream1_section1_upstream
-            - heat_flux_to_ambient
-            - wall_section1_upstream
+        stream2_section1_upstream_j = heat_output.get_result(1, 0).heat_transfer.upstream_j
+        stream1_section1_upstream_j = heat_output.get_result(0, 0).heat_transfer.upstream_j
+        wall_section1_upstream_j = heat_wall_output[0].heat_transfer.upstream_j
+        net_heat_input_j = (
+            stream2_section1_upstream_j
+            - stream1_section1_upstream_j
+            - heat_to_ambient_j
+            - wall_section1_upstream_j
         )
     else:
         # stream=1, section=num_sections-1（最下流）
         last_section = num_sections - 1
-        stream2_lastsection_upstream = heat_output.get_result(1, last_section).heat_flux.upstream
-        stream1_lastsection_upstream = heat_output.get_result(0, last_section).heat_flux.upstream
-        net_heat_input = (
-            stream2_lastsection_upstream
-            - stream1_lastsection_upstream
-            - heat_flux_to_ambient
-            - heat_wall_output[last_section].heat_flux.downstream
+        stream2_lastsection_upstream_j = heat_output.get_result(1, last_section).heat_transfer.upstream_j
+        stream1_lastsection_upstream_j = heat_output.get_result(0, last_section).heat_transfer.upstream_j
+        net_heat_input_j = (
+            stream2_lastsection_upstream_j
+            - stream1_lastsection_upstream_j
+            - heat_to_ambient_j
+            - heat_wall_output[last_section].heat_transfer.downstream_j
         )
 
     # 到達温度の計算
-    args = (tower_conds, temp_now, net_heat_input, position)
+    args = (tower_conds, temp_now, net_heat_input_j, position)
     temp_reached = optimize.newton(_optimize_top_bottom_temperature, temp_now, args=args)
 
     return LidHeatBalanceResult(temperature=temp_reached)
@@ -538,8 +538,8 @@ def _calculate_thermocouple_temperature(
     else:
         correction_factor = 100
     
-    # 熱流束 [W]
-    heat_flux = (
+    # 熱流束 [W]（時間あたりの熱量）
+    heat_flux_w = (
         thermocouple_htc
         * correction_factor
         * S_side
@@ -548,7 +548,7 @@ def _calculate_thermocouple_temperature(
     
     # 温度上昇 [℃]
     temp_increase = (
-        heat_flux
+        heat_flux_w
         * tower_conds.common.calculation_step_time
         * MINUTE_TO_SECOND
         / heat_capacity
@@ -567,11 +567,11 @@ def _optimize_bed_temperature(
     gas_specific_heat: float,
     inlet_gas_mass: float,
     temp_now: float,
-    adsorption_heat: float,
-    heat_flux_from_inner: float,
-    heat_flux_to_outer: float,
-    downstream_heat_flux: float,
-    upstream_heat_flux: float,
+    adsorption_heat_j: float,
+    from_inner_j: float,
+    to_outer_j: float,
+    downstream_j: float,
+    upstream_j: float,
     stream: int,
 ) -> float:
     """
@@ -582,10 +582,10 @@ def _optimize_bed_temperature(
     stream_conds = tower_conds.stream_conditions
     
     # 流入ガスが受け取る熱 [J]
-    H_gas = gas_specific_heat * inlet_gas_mass * (temp_reached - temp_now)
+    H_gas_j = gas_specific_heat * inlet_gas_mass * (temp_reached - temp_now)
     
     # 充填層が受け取る熱（時間基準）[J]
-    H_bed_time = (
+    H_bed_time_j = (
         tower_conds.packed_bed.heat_capacity
         * stream_conds[stream].area_fraction
         / tower_conds.common.num_sections
@@ -593,26 +593,26 @@ def _optimize_bed_temperature(
     )
     
     # 充填層が受け取る熱（熱収支基準）[J]
-    H_bed_balance = (
-        adsorption_heat
-        - H_gas
-        + heat_flux_from_inner
-        - heat_flux_to_outer
-        - downstream_heat_flux
-        - upstream_heat_flux
+    H_bed_balance_j = (
+        adsorption_heat_j
+        - H_gas_j
+        + from_inner_j
+        - to_outer_j
+        - downstream_j
+        - upstream_j
     )
     
-    return H_bed_balance - H_bed_time
+    return H_bed_balance_j - H_bed_time_j
 
 
 def _optimize_wall_temperature(
     temp_reached: float,
     tower_conds: TowerConditions,
     temp_now: float,
-    heat_flux_from_inner: float,
-    heat_flux_to_outer: float,
-    downstream_heat_flux: float,
-    upstream_heat_flux: float,
+    from_inner_j: float,
+    to_outer_j: float,
+    downstream_j: float,
+    upstream_j: float,
 ) -> float:
     """
     壁面到達温度のソルバー用関数
@@ -620,39 +620,39 @@ def _optimize_wall_temperature(
     stream_conds = tower_conds.stream_conditions
     
     # 壁が受け取る熱（熱収支基準）[J]
-    H_wall_balance = (
-        heat_flux_from_inner
-        - upstream_heat_flux
-        - heat_flux_to_outer
-        - downstream_heat_flux
+    H_wall_balance_j = (
+        from_inner_j
+        - upstream_j
+        - to_outer_j
+        - downstream_j
     )
     
     # 壁が受け取る熱（時間基準）[J]
-    H_wall_time = (
+    H_wall_time_j = (
         tower_conds.vessel.wall_specific_heat_capacity
         * stream_conds[tower_conds.common.num_streams].wall_weight
         * (temp_reached - temp_now)
     )
     
-    return H_wall_balance - H_wall_time
+    return H_wall_balance_j - H_wall_time_j
 
 
 def _optimize_top_bottom_temperature(
     temp_reached: float,
     tower_conds: TowerConditions,
     temp_now: float,
-    net_heat_input: float,
+    net_heat_input_j: float,
     position: LidPosition,
 ) -> float:
     """
     蓋到達温度のソルバー用関数
     """
     # 蓋が受け取る熱（時間基準）[J]
-    H_lid_time = tower_conds.vessel.wall_specific_heat_capacity * (temp_reached - temp_now)
+    H_lid_time_j = tower_conds.vessel.wall_specific_heat_capacity * (temp_reached - temp_now)
     
     if position == LidPosition.TOP:
-        H_lid_time *= tower_conds.top.flange_total_weight
+        H_lid_time_j *= tower_conds.top.flange_total_weight
     else:
-        H_lid_time *= tower_conds.bottom.flange_total_weight
+        H_lid_time_j *= tower_conds.bottom.flange_total_weight
     
-    return net_heat_input - H_lid_time
+    return net_heat_input_j - H_lid_time_j

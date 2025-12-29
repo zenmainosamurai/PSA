@@ -21,9 +21,9 @@ from .results import (
     AdsorptionState,
     PressureState,
     CellTemperatures,
-    HeatFlux,
+    HeatTransfer,
     HeatTransferCoefficients,
-    WallHeatFlux,
+    WallHeatTransfer,
     # Main result classes
     MaterialBalanceResult,
     HeatBalanceResult,
@@ -53,9 +53,9 @@ __all__ = [
     "AdsorptionState",
     "PressureState",
     "CellTemperatures",
-    "HeatFlux",
+    "HeatTransfer",
     "HeatTransferCoefficients",
-    "WallHeatFlux",
+    "WallHeatTransfer",
     # Main result classes
     "MaterialBalanceResult",
     "HeatBalanceResult",
