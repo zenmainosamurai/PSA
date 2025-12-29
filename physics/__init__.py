@@ -27,11 +27,7 @@ PSAプロセスで使用する物理計算を提供します。
 """
 
 # 吸着平衡線（外部依存なし、常にインポート可能）
-from .adsorption_isotherm import (
-    calculate_equilibrium_loading,
-    calculate_loading_at_conditions,
-    calculate_driving_force,
-)
+from .adsorption_isotherm import calculate_equilibrium_loading
 
 # 以下のモジュールは CoolProp 等の外部依存があるため、
 # インポートエラーを許容する（実際の使用時にインポート）
@@ -76,7 +72,4 @@ __all__ = [
     "calculate_pressure_after_vacuum_desorption",
     "calculate_pressure_after_batch_adsorption",
     
-    # 吸着平衡線
-    "calculate_loading_at_conditions",
-    "calculate_driving_force",
 ]
