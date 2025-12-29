@@ -194,8 +194,10 @@ def calculate_bed_heat_balance(
         # 上流セルの下流熱量の負値
         upstream_j = -heat_output.heat_transfer.downstream_j
 
-    # === 到達温度の計算（Newton法）===
-    args = (
+    # === 到達温度の計算 ===
+    # 線形方程式なので解析解を使用（高速）
+    # 非線形方程式を導入する場合はNewton法（_optimize_bed_temperature）を使用
+    temp_reached = _solve_bed_temperature_analytical(
         tower_conds,
         gas_specific_heat,
         inlet_gas_mass,
@@ -207,7 +209,6 @@ def calculate_bed_heat_balance(
         upstream_j,
         stream,
     )
-    temp_reached = optimize.newton(_optimize_bed_temperature, temp_now, args=args)
 
     # === 熱電対温度の計算 ===
     thermocouple_temp = _calculate_thermocouple_temperature(
@@ -332,7 +333,9 @@ def calculate_wall_heat_balance(
         )
 
     # === 到達温度の計算 ===
-    args = (
+    # 線形方程式なので解析解を使用（高速）
+    # 非線形方程式を導入する場合はNewton法（_optimize_wall_temperature）を使用
+    temp_reached = _solve_wall_temperature_analytical(
         tower_conds,
         temp_now,
         from_inner_j,
@@ -340,7 +343,6 @@ def calculate_wall_heat_balance(
         downstream_j,
         upstream_j,
     )
-    temp_reached = optimize.newton(_optimize_wall_temperature, temp_now, args=args)
 
     return WallHeatBalanceResult(
         temperature=temp_reached,
@@ -422,8 +424,11 @@ def calculate_lid_heat_balance(
         )
 
     # 到達温度の計算
-    args = (tower_conds, temp_now, net_heat_input_j, position)
-    temp_reached = optimize.newton(_optimize_top_bottom_temperature, temp_now, args=args)
+    # 線形方程式なので解析解を使用（高速）
+    # 非線形方程式を導入する場合はNewton法（_optimize_top_bottom_temperature）を使用
+    temp_reached = _solve_lid_temperature_analytical(
+        tower_conds, temp_now, net_heat_input_j, position
+    )
 
     return LidHeatBalanceResult(temperature=temp_reached)
 
@@ -555,7 +560,108 @@ def _calculate_thermocouple_temperature(
 
 
 # ============================================================
-# Newton法用の最適化関数
+# 解析解による温度計算（線形の場合に使用）
+# ============================================================
+
+def _solve_bed_temperature_analytical(
+    tower_conds: TowerConditions,
+    gas_specific_heat: float,
+    inlet_gas_mass: float,
+    temp_now: float,
+    adsorption_heat_j: float,
+    from_inner_j: float,
+    to_outer_j: float,
+    downstream_j: float,
+    upstream_j: float,
+    stream: int,
+) -> float:
+    """
+    充填層到達温度の解析解
+    
+    熱収支方程式が線形の場合、Newton法を使わずに直接解けます。
+    
+    導出:
+        H_bed_balance - H_bed_time = 0
+        (Q_ads + Q_in - Q_out - Q_down - Q_up) - (c_gas*m_gas + C_bed)*(T - T0) = 0
+        T = T0 + (Q_ads + Q_in - Q_out - Q_down - Q_up) / (c_gas*m_gas + C_bed)
+    """
+    stream_conds = tower_conds.stream_conditions
+    
+    # 熱容量係数 [J/K]
+    bed_heat_capacity = (
+        tower_conds.packed_bed.heat_capacity
+        * stream_conds[stream].area_fraction
+        / tower_conds.common.num_sections
+    )
+    total_heat_capacity = gas_specific_heat * inlet_gas_mass + bed_heat_capacity
+    
+    # 正味の熱入力 [J]
+    net_heat_j = adsorption_heat_j + from_inner_j - to_outer_j - downstream_j - upstream_j
+    
+    return temp_now + net_heat_j / total_heat_capacity
+
+
+def _solve_wall_temperature_analytical(
+    tower_conds: TowerConditions,
+    temp_now: float,
+    from_inner_j: float,
+    to_outer_j: float,
+    downstream_j: float,
+    upstream_j: float,
+) -> float:
+    """
+    壁面到達温度の解析解
+    
+    導出:
+        H_wall_balance - H_wall_time = 0
+        (Q_in - Q_up - Q_out - Q_down) - C_wall*(T - T0) = 0
+        T = T0 + (Q_in - Q_up - Q_out - Q_down) / C_wall
+    """
+    stream_conds = tower_conds.stream_conditions
+    
+    # 壁の熱容量 [J/K]
+    wall_heat_capacity = (
+        tower_conds.vessel.wall_specific_heat_capacity
+        * stream_conds[tower_conds.common.num_streams].wall_weight
+    )
+    
+    # 正味の熱入力 [J]
+    net_heat_j = from_inner_j - upstream_j - to_outer_j - downstream_j
+    
+    return temp_now + net_heat_j / wall_heat_capacity
+
+
+def _solve_lid_temperature_analytical(
+    tower_conds: TowerConditions,
+    temp_now: float,
+    net_heat_input_j: float,
+    position: LidPosition,
+) -> float:
+    """
+    蓋到達温度の解析解
+    
+    導出:
+        Q_net - H_lid_time = 0
+        Q_net - C_lid*(T - T0) = 0
+        T = T0 + Q_net / C_lid
+    """
+    # 蓋の熱容量 [J/K]
+    if position == LidPosition.TOP:
+        lid_heat_capacity = (
+            tower_conds.vessel.wall_specific_heat_capacity
+            * tower_conds.top.flange_total_weight
+        )
+    else:
+        lid_heat_capacity = (
+            tower_conds.vessel.wall_specific_heat_capacity
+            * tower_conds.bottom.flange_total_weight
+        )
+    
+    return temp_now + net_heat_input_j / lid_heat_capacity
+
+
+# ============================================================
+# Newton法用の最適化関数（非線形方程式用に残す）
 # ============================================================
 
 def _optimize_bed_temperature(
