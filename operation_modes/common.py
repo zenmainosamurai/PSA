@@ -357,11 +357,9 @@ def distribute_inflow_gas(
     total_outflow = total_outflow_co2 + total_outflow_n2
     
     for stream in range(num_streams):
-        # stream_condsは1始まり
-        stream_1indexed = stream + 1
         distributed[stream] = GasFlow(
-            co2_volume=total_outflow_co2 * stream_conds[stream_1indexed].area_fraction,
-            n2_volume=total_outflow_n2 * stream_conds[stream_1indexed].area_fraction,
+            co2_volume=total_outflow_co2 * stream_conds[stream].area_fraction,
+            n2_volume=total_outflow_n2 * stream_conds[stream].area_fraction,
             co2_mole_fraction=(total_outflow_co2 / total_outflow) if total_outflow > 0 else 0,
             n2_mole_fraction=(total_outflow_n2 / total_outflow) if total_outflow > 0 else 0,
         )

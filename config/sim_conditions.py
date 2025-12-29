@@ -243,9 +243,9 @@ class TowerConditions:
     def initialize_stream_conditions(self):
         num_streams = self.common.num_streams
         dr = self.packed_bed.radius / num_streams
-        for stream in range(1, num_streams + 1):
-            inner_radius = (stream - 1) * dr
-            outer_radius = stream * dr
+        for stream in range(num_streams):
+            inner_radius = stream * dr
+            outer_radius = (stream + 1) * dr
             cross_section = math.pi * (outer_radius**2 - inner_radius**2)
             self.stream_conditions[stream] = StreamConditions(
                 inner_radius=inner_radius,
@@ -259,20 +259,20 @@ class TowerConditions:
                 adsorbent_mass=self.packed_bed.adsorbent_mass * (cross_section / self.packed_bed.cross_section),
             )
         # 壁面条件
-        outermost_stream = self.stream_conditions[num_streams]
+        outermost_stream = self.stream_conditions[num_streams - 1]
         inner_radius = outermost_stream.outer_radius
         outer_radius = self.vessel.radius
         cross_section = math.pi * (outer_radius**2 - inner_radius**2)
-        self.stream_conditions[num_streams + 1] = StreamConditions(
+        self.stream_conditions[num_streams] = StreamConditions(
             inner_radius=inner_radius,
             outer_radius=outer_radius,
             cross_section=cross_section,
-            area_fraction=0,  # 壁面は面積分率なし
+            area_fraction=0,
             innter_perimeter=2 * math.pi * inner_radius,
             inner_boundary_area=2 * math.pi * inner_radius * self.packed_bed.height,
             outer_perimeter=2 * math.pi * outer_radius,
             outer_boundary_area=2 * math.pi * outer_radius * self.packed_bed.height,
-            adsorbent_mass=0,  # 壁面には吸着材なし
+            adsorbent_mass=0,
             wall_weight=self.vessel.wall_total_weight,
         )
 

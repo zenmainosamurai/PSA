@@ -140,8 +140,6 @@ def calc_heat_transfer_coef(
     """
     tower = state_manager.towers[tower_num]
     stream_conds = tower_conds.stream_conditions
-    # stream_condsは1始まり
-    stream_1indexed = stream + 1
     T_K = temp_now + CELSIUS_TO_KELVIN_OFFSET
 
     if mode == 0:  # 吸着
@@ -169,7 +167,7 @@ def calc_heat_transfer_coef(
 
     # ---- 流量関係 ---------------------------------------------------
     # ストリーム換算直径 d1
-    d1 = 2.0 * (stream_conds[stream_1indexed].cross_section / math.pi) ** 0.5
+    d1 = 2.0 * (stream_conds[stream].cross_section / math.pi) ** 0.5
 
     # NOTE: 気体粘度 μ, 比熱 cp は大気圧を仮定
     P_ATM = STANDARD_PRESSURE
@@ -187,11 +185,11 @@ def calc_heat_transfer_coef(
             / (tower_conds.common.calculation_step_time * 60.0)
         )
     elif mode == 2:  # 脱着時は排気ガス体積流量 [m3/s]
-        f0 = vacuum_pumping_results.volumetric_flow_rate / 60.0 * stream_conds[stream_1indexed].area_fraction
+        f0 = vacuum_pumping_results.volumetric_flow_rate / 60.0 * stream_conds[stream].area_fraction
     else:
         f0 = 0.0  # NOTE: この処理で正しいか確認
 
-    vcol = f0 / stream_conds[stream_1indexed].cross_section  # 空塔速度[m/s]
+    vcol = f0 / stream_conds[stream].cross_section  # 空塔速度[m/s]
     nu = viscosity / material_output.gas_properties.density  # 気体動粘度[m2/s]
     Rep = 1.0 if vcol == 0 else vcol * dp / nu  # 粒子レイノルズ数
 

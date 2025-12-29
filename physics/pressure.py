@@ -292,11 +292,9 @@ def calculate_downstream_flow(
     
     outlet_flows: Dict[int, GasFlow] = {}
     for stream in range(tower_conds.common.num_streams):
-        # stream_condsは1始まり
-        stream_1indexed = stream + 1
         outlet_flows[stream] = GasFlow(
-            co2_volume=sum_outflow_co2 * stream_conds[stream_1indexed].area_fraction,
-            n2_volume=sum_outflow_n2 * stream_conds[stream_1indexed].area_fraction,
+            co2_volume=sum_outflow_co2 * stream_conds[stream].area_fraction,
+            n2_volume=sum_outflow_n2 * stream_conds[stream].area_fraction,
             co2_mole_fraction=0,
             n2_mole_fraction=0,
         )
@@ -624,9 +622,8 @@ def _calculate_recovery_amounts(
         for section in range(tower_conds.common.num_sections):
             current_loading = tower.cell(stream, section).loading
             previous_loading = tower.cell(stream, section).previous_loading
-            # stream_condsは1始まり
             section_adsorbent_mass = (
-                stream_conds[stream + 1].adsorbent_mass
+                stream_conds[stream].adsorbent_mass
                 / tower_conds.common.num_sections
             )
             

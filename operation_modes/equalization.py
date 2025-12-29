@@ -255,8 +255,7 @@ def _distribute_equalization_inflow(
     distributed: Dict[int, GasFlow] = {}
     
     for stream in range(num_streams):
-        # stream_condsは1始まり
-        area_frac = stream_conds[stream + 1].area_fraction
+        area_frac = stream_conds[stream].area_fraction
         distributed[stream] = GasFlow(
             co2_volume=inflow_gas.co2_volume * area_frac,
             n2_volume=inflow_gas.n2_volume * area_frac,

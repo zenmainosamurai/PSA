@@ -81,8 +81,6 @@ def calculate_bed_heat_balance(
     """
     tower = state_manager.towers[tower_num]
     stream_conds = tower_conds.stream_conditions
-    # stream_condsは1始まり
-    stream_1indexed = stream + 1
 
     # === 現在温度の取得 ===
     temp_now = tower.cell(stream, section).temp
@@ -109,9 +107,9 @@ def calculate_bed_heat_balance(
     gas_specific_heat = _get_gas_specific_heat(mode, material_output)
 
     # === 境界面積 ===
-    section_inner_boundary_area = stream_conds[stream_1indexed].inner_boundary_area / tower_conds.common.num_sections
-    section_outer_boundary_area = stream_conds[stream_1indexed].outer_boundary_area / tower_conds.common.num_sections
-    cross_section_area = stream_conds[stream_1indexed].cross_section
+    section_inner_boundary_area = stream_conds[stream].inner_boundary_area / tower_conds.common.num_sections
+    section_outer_boundary_area = stream_conds[stream].outer_boundary_area / tower_conds.common.num_sections
+    cross_section_area = stream_conds[stream].cross_section
 
     # === 伝熱係数の計算 ===
     if mode == HeatCalculationMode.ADSORPTION:
@@ -197,7 +195,6 @@ def calculate_bed_heat_balance(
         upstream_heat_flux = -heat_output.heat_flux.downstream
 
     # === 到達温度の計算（Newton法）===
-    # _optimize_bed_temperatureにはストリーム番号(1始まり)を渡す
     args = (
         tower_conds,
         gas_specific_heat,
@@ -208,7 +205,7 @@ def calculate_bed_heat_balance(
         heat_flux_to_outer,
         downstream_heat_flux,
         upstream_heat_flux,
-        stream_1indexed,
+        stream,
     )
     temp_reached = optimize.newton(_optimize_bed_temperature, temp_now, args=args)
 
@@ -270,8 +267,7 @@ def calculate_wall_heat_balance(
     stream_conds = tower_conds.stream_conditions
     num_streams = tower_conds.common.num_streams
     num_sections = tower_conds.common.num_sections
-    # stream_condsは1始まり
-    wall_stream_1indexed = num_streams + 1
+    wall_stream_idx = num_streams
     
     temp_now = tower.temp_wall[section]
     
@@ -291,7 +287,7 @@ def calculate_wall_heat_balance(
     if section == 0:
         upstream_heat_flux = (
             tower_conds.vessel.wall_thermal_conductivity
-            * stream_conds[wall_stream_1indexed].cross_section
+            * stream_conds[wall_stream_idx].cross_section
             * (temp_now - tower.top_temperature)
             * tower_conds.common.calculation_step_time
             * MINUTE_TO_SECOND
@@ -302,7 +298,7 @@ def calculate_wall_heat_balance(
     # 内側境界からの熱流束
     heat_flux_from_inner = (
         heat_output.heat_transfer_coefficients.wall_to_bed
-        * stream_conds[wall_stream_1indexed].inner_boundary_area
+        * stream_conds[wall_stream_idx].inner_boundary_area
         / num_sections
         * (temp_inside_cell - temp_now)
         * tower_conds.common.calculation_step_time
@@ -312,7 +308,7 @@ def calculate_wall_heat_balance(
     # 外側境界への熱流束（外気への放熱）
     heat_flux_to_outer = (
         tower_conds.vessel.external_heat_transfer_coef
-        * stream_conds[wall_stream_1indexed].outer_boundary_area
+        * stream_conds[wall_stream_idx].outer_boundary_area
         / num_sections
         * (temp_now - temp_outside)
         * tower_conds.common.calculation_step_time
@@ -323,7 +319,7 @@ def calculate_wall_heat_balance(
     if section == num_sections - 1:
         downstream_heat_flux = (
             tower_conds.vessel.wall_thermal_conductivity
-            * stream_conds[wall_stream_1indexed].cross_section
+            * stream_conds[wall_stream_idx].cross_section
             * (temp_now - tower.bottom_temperature)
             * tower_conds.common.calculation_step_time
             * MINUTE_TO_SECOND
@@ -331,7 +327,7 @@ def calculate_wall_heat_balance(
     else:
         downstream_heat_flux = (
             tower_conds.vessel.wall_thermal_conductivity
-            * stream_conds[wall_stream_1indexed].cross_section
+            * stream_conds[wall_stream_idx].cross_section
             * (temp_now - tower.temp_wall[section + 1])
         )
 
@@ -634,7 +630,7 @@ def _optimize_wall_temperature(
     # 壁が受け取る熱（時間基準）[J]
     H_wall_time = (
         tower_conds.vessel.wall_specific_heat_capacity
-        * stream_conds[1 + tower_conds.common.num_streams].wall_weight
+        * stream_conds[tower_conds.common.num_streams].wall_weight
         * (temp_reached - temp_now)
     )
     
