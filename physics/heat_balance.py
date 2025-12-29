@@ -188,7 +188,7 @@ def calculate_bed_heat_balance(
         upstream_heat_flux = (
             wall_to_bed_htc
             * cross_section_area
-            * (temp_now - tower.lid_temperature)
+            * (temp_now - tower.top_temperature)
             * tower_conds.common.calculation_step_time
             * MINUTE_TO_SECOND
         )
@@ -293,7 +293,7 @@ def calculate_wall_heat_balance(
         upstream_heat_flux = (
             tower_conds.vessel.wall_thermal_conductivity
             * stream_conds[wall_stream_1indexed].cross_section
-            * (temp_now - tower.lid_temperature)
+            * (temp_now - tower.top_temperature)
             * tower_conds.common.calculation_step_time
             * MINUTE_TO_SECOND
         )
@@ -390,7 +390,7 @@ def calculate_lid_heat_balance(
     is_top = (position == LidPosition.TOP)
     
     # 現在温度
-    temp_now = tower.lid_temperature if is_top else tower.bottom_temperature
+    temp_now = tower.top_temperature if is_top else tower.bottom_temperature
     
     # 外気への熱流束
     heat_flux_to_ambient = (
@@ -401,9 +401,9 @@ def calculate_lid_heat_balance(
     )
     
     if is_top:
-        heat_flux_to_ambient *= tower_conds.bottom.outer_flange_area
+        heat_flux_to_ambient *= tower_conds.top.outer_flange_area
     else:
-        heat_flux_to_ambient *= tower_conds.lid.outer_flange_area
+        heat_flux_to_ambient *= tower_conds.bottom.outer_flange_area
 
     # 正味の熱流入（0オリジンでアクセス）
     num_sections = tower_conds.common.num_sections
@@ -432,7 +432,7 @@ def calculate_lid_heat_balance(
 
     # 到達温度の計算
     args = (tower_conds, temp_now, net_heat_input, position)
-    temp_reached = optimize.newton(_optimize_lid_temperature, temp_now, args=args)
+    temp_reached = optimize.newton(_optimize_top_bottom_temperature, temp_now, args=args)
 
     return LidHeatBalanceResult(temperature=temp_reached)
 
@@ -643,7 +643,7 @@ def _optimize_wall_temperature(
     return H_wall_balance - H_wall_time
 
 
-def _optimize_lid_temperature(
+def _optimize_top_bottom_temperature(
     temp_reached: float,
     tower_conds: TowerConditions,
     temp_now: float,
@@ -657,7 +657,7 @@ def _optimize_lid_temperature(
     H_lid_time = tower_conds.vessel.wall_specific_heat_capacity * (temp_reached - temp_now)
     
     if position == LidPosition.TOP:
-        H_lid_time *= tower_conds.lid.flange_total_weight
+        H_lid_time *= tower_conds.top.flange_total_weight
     else:
         H_lid_time *= tower_conds.bottom.flange_total_weight
     

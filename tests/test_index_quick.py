@@ -47,7 +47,7 @@ def run_single_mode_test():
         tower_results['temp_0_0'] = float(tower_state.temp[0, 0])
         tower_results['temp_1_17'] = float(tower_state.temp[1, 17])  # 2ストリームなので1が最大
         tower_results['loading_0_0'] = float(tower_state.loading[0, 0])
-        tower_results['lid_temperature'] = tower_state.lid_temperature
+        tower_results['top_temperature'] = tower_state.top_temperature
         
         results[tower_num] = tower_results
     

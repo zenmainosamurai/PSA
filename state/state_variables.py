@@ -140,7 +140,7 @@ class TowerStateArrays:
     temp_wall: np.ndarray  # 壁面温度
 
     # Scalars
-    lid_temperature: float  # 上蓋温度
+    top_temperature: float  # 上蓋温度
     bottom_temperature: float  # 下蓋温度
     total_press: float  # 全圧
     cumulative_co2_recovered: float  # 積算CO2回収量[Nm3]
@@ -220,7 +220,7 @@ class StateVariables:
             bed_heat_transfer_coef=heat_coef_wall_2d.copy(),
             outlet_co2_partial_pressure=outflow_pco2_2d.copy(),
             temp_wall=temp_wall_1d.copy(),
-            lid_temperature=ambient_temperature,
+            top_temperature=ambient_temperature,
             bottom_temperature=ambient_temperature,
             total_press=tower_cond.packed_bed.initial_internal_pressure,
             cumulative_co2_recovered=0.0,
@@ -271,7 +271,7 @@ class StateVariables:
 
         # 蓋温度の更新
         heat_lid_results: Dict[LidPosition, LidHeatBalanceResult] = calc_output.heat_lid
-        tower.lid_temperature = heat_lid_results[LidPosition.TOP].temperature
+        tower.top_temperature = heat_lid_results[LidPosition.TOP].temperature
         tower.bottom_temperature = heat_lid_results[LidPosition.BOTTOM].temperature
 
         # モル分率の更新

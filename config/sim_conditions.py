@@ -232,8 +232,8 @@ class TowerConditions:
     packed_bed: PackedBedConditions
     feed_gas: FeedGasConditions
     vessel: VesselConditions
-    lid: EndCoverConditions
-    bottom: EndCoverConditions
+    top: EndCoverConditions      # 上蓋条件（Excelシート「蓋条件」）
+    bottom: EndCoverConditions   # 下蓋条件（Excelシート「底条件」）
     equalizing_piping: EqualizingPipingConditions
     vacuum_piping: VacuumPipingConditions
     thermocouple: ThermocoupleConditions
@@ -634,7 +634,7 @@ class SimulationConditions:
             packed_bed=PackedBedConditions(**extracted_data["触媒充填層条件"]),
             feed_gas=FeedGasConditions(**extracted_data["導入ガス条件"]),
             vessel=VesselConditions(**extracted_data["容器壁条件"]),
-            lid=EndCoverConditions(**extracted_data["蓋条件"]),
+            top=EndCoverConditions(**extracted_data["蓋条件"]),
             bottom=EndCoverConditions(**extracted_data["底条件"]),
             equalizing_piping=EqualizingPipingConditions(**extracted_data["均圧配管条件"]),
             vacuum_piping=VacuumPipingConditions(**extracted_data["真空引き配管条件"]),

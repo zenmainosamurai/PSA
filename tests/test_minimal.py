@@ -30,7 +30,7 @@ def test_cell_accessor():
         bed_heat_transfer_coef=np.zeros((num_streams, num_sections), dtype=np.float64),
         outlet_co2_partial_pressure=np.zeros((num_streams, num_sections), dtype=np.float64),
         temp_wall=np.zeros(num_sections, dtype=np.float64),
-        lid_temperature=25.0,
+        top_temperature=25.0,
         bottom_temperature=25.0,
         total_press=0.1,
         cumulative_co2_recovered=0.0,

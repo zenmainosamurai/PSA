@@ -63,7 +63,7 @@ def run_all_mode_tests():
             tower_results['co2_mole_fraction'] = tower_state.co2_mole_fraction.tolist()
             tower_results['n2_mole_fraction'] = tower_state.n2_mole_fraction.tolist()
             tower_results['temp_wall'] = tower_state.temp_wall.tolist()
-            tower_results['lid_temperature'] = tower_state.lid_temperature
+            tower_results['top_temperature'] = tower_state.top_temperature
             tower_results['bottom_temperature'] = tower_state.bottom_temperature
             
             # 物質収支結果 - 代表セル (stream=1, section=1) と (stream=3, section=18)

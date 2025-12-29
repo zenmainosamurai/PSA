@@ -12,5 +12,5 @@ class LidPosition(Enum):
     
     容器の上蓋・下蓋を区別するために使用します。
     """
-    TOP = "top"         # 上蓋（lid_temperature）
+    TOP = "top"         # 上蓋（top_temperature）
     BOTTOM = "bottom"   # 下蓋（bottom_temperature）

@@ -24,7 +24,7 @@ def extract_state_snapshot(state_manager: StateVariables, num_towers: int) -> di
             "n2_mole_fraction": tower.n2_mole_fraction.tolist(),
             "total_press": tower.total_press,
             "temp_wall": tower.temp_wall.tolist(),
-            "lid_temperature": tower.lid_temperature,
+            "top_temperature": tower.top_temperature,
             "bottom_temperature": tower.bottom_temperature,
             "cumulative_co2_recovered": tower.cumulative_co2_recovered,
             "cumulative_n2_recovered": tower.cumulative_n2_recovered,
