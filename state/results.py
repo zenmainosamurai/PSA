@@ -1,4 +1,17 @@
-# calculation_results.py (新規ファイル)
+"""計算結果のデータクラス定義
+
+各計算ステップで生成される結果を格納するデータクラスを定義します。
+
+主なクラス:
+    GasFlow: ガス流量（CO2/N2の体積とモル分率）
+    MaterialBalanceResult: 物質収支計算の結果
+    HeatBalanceResult: 熱収支計算の結果
+    WallHeatBalanceResult: 壁面熱収支の結果
+    VacuumPumpingResult: 真空排気計算の結果
+
+これらの結果は、各セル（ストリーム×セクション）ごとに生成され、
+MassBalanceResults/HeatBalanceResultsコンテナで管理されます。
+"""
 from dataclasses import dataclass
 from typing import Dict, Optional, Any
 

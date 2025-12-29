@@ -1,3 +1,20 @@
+"""シミュレーション条件のデータクラス定義
+
+Excelファイル（conditions/{cond_id}/sim_conds.xlsx）から読み込んだ
+塔の物理条件をデータクラスとして保持します。
+
+主なクラス:
+    CommonConditions: 計算ステップ時間、ストリーム数、セクション数
+    PackedBedConditions: 充填層の物理条件（高さ、空隙率、吸着材量など）
+    VesselConditions: 容器壁の条件（熱伝導率、比熱など）
+    TowerConditions: 1塔分の全条件を集約
+    SimulationConditions: 全塔の条件を管理するエントリーポイント
+
+使用例:
+    sim_conds = SimulationConditions('5_08_mod_logging2')
+    tower1 = sim_conds.get_tower(1)
+    print(tower1.packed_bed.height)  # 充填層高さ
+"""
 from dataclasses import dataclass, field
 from typing import Dict, List, Optional
 import pandas as pd

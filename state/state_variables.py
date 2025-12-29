@@ -1,3 +1,18 @@
+"""状態変数の管理モジュール
+
+シミュレーション中の塔の状態（温度、吸着量、圧力など）を管理します。
+
+主なクラス:
+    TowerStateArrays: 1塔分の状態変数（2次元配列で管理）
+    StateVariables: 全塔の状態を管理するエントリーポイント
+    CellAccessor: セルへのアクセスを簡潔にするヘルパー
+
+使用例:
+    state = StateVariables(num_towers=3, num_streams=3, num_sections=20, sim_conds)
+    tower = state.get_tower(1)
+    temp = tower.cell(0, 0).temp  # ストリーム0、セクション0の温度
+    tower.cell(0, 0).loading = 5.0  # 吸着量を設定
+"""
 from dataclasses import dataclass
 from typing import Dict
 import numpy as np

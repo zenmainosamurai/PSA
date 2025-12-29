@@ -1,3 +1,21 @@
+"""Excel形式での結果出力モジュール
+
+シミュレーション結果をExcelファイル（グラフ付き）として出力します。
+
+出力先: output/{cond_id}/tower{N}/
+出力内容:
+    - 温度分布（temp/）
+    - 吸着量分布（loading/）
+    - モル分率（mole_fraction/）
+    - 圧力履歴（pressure/）
+    - 熱収支（heat_balance/）
+
+各Excelファイルには時系列グラフが埋め込まれます。
+
+使用例:
+    from utils.plot_xlsx import save_results
+    save_results(output_dir, tower_results, common_conditions)
+"""
 import os
 import pandas as pd
 import numpy as np

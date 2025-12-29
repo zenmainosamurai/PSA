@@ -1,3 +1,10 @@
+"""データ処理ユーティリティ
+
+観測データの前処理やリサンプリングを行う関数群です。
+
+主な関数:
+    resample_obs_data: 観測値をシミュレーション時間刻みにリサンプリング
+"""
 import numpy as np
 import pandas as pd
 

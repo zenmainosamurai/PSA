@@ -1,3 +1,14 @@
+"""カスタムUnscentedカルマンフィルター
+
+データ同化用のカルマンフィルター実装です。
+filterpy.kalman.UnscentedKalmanFilterを拡張し、
+PSAシミュレーション向けの機能を追加しています。
+
+主な拡張:
+    - 状態変数、中間変数、観測変数の分離
+    - 1次元観測変数への対応
+    - 並列処理のサポート
+"""
 from copy import deepcopy
 from concurrent.futures import ThreadPoolExecutor
 

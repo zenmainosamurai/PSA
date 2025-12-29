@@ -1,3 +1,16 @@
+"""CSV比較ツール
+
+2つのディレクトリ配下のCSVファイルを比較し、
+数値の差異を検出します。
+
+使用例:
+    python csv_diff_checker.py output/before output/after
+
+主な機能:
+    - ファイル構成の一致確認
+    - 数値データの差分計算
+    - 許容誤差を超える差異の検出
+"""
 import pandas as pd
 import numpy as np
 from pathlib import Path

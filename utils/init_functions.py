@@ -1,3 +1,13 @@
+"""旧形式の初期化関数（互換性のため残存）
+
+注意: このモジュールは現在使用されていません。
+新しいコードでは config.sim_conditions.SimulationConditions を使用してください。
+
+含まれる関数:
+    read_sim_conds: Excelを辞書形式に変換（旧形式）
+    init_stream_conds: ストリーム条件の初期化（旧形式）
+    init_drum_wall_conds: 壁面条件の初期化（旧形式）
+"""
 import math
 
 

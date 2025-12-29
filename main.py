@@ -1,3 +1,18 @@
+"""PSAシミュレーションのメインエントリーポイント
+
+settings.ymlの設定に基づいてシミュレーションを実行します。
+
+実行方法:
+    python main.py
+
+設定ファイル（settings.yml）の例:
+    mode: simulation
+    cond_list:
+      - 5_08_mod_logging2
+
+出力:
+    output/{cond_id}/ 配下にCSV/XLSXファイルが生成されます。
+"""
 import yaml
 import time
 
