@@ -31,7 +31,7 @@ from state import (
     LidHeatBalanceResult,
     GasFlow,
 )
-from physics.pressure import (
+from physics.equalization import (
     calculate_depressurization,
     calculate_downstream_flow,
 )

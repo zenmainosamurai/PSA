@@ -5,7 +5,9 @@ PSAプロセスで使用する物理計算を提供します。
 主要なモジュール:
 - mass_balance.py: 物質収支計算（吸着・脱着・停止モード）
 - heat_balance.py: 熱収支計算（層・壁・蓋）
-- pressure.py: 圧力計算（真空排気・均圧・バッチ後）
+- pressure.py: 純粋な圧力計算（真空脱着後・バッチ後）
+- vacuum_pumping.py: 真空排気計算（CO2回収量含む）
+- equalization.py: 均圧計算（塔間ガス移動）
 - adsorption_isotherm.py: 吸着平衡線（平衡吸着量）
 
 使用例:
@@ -17,9 +19,17 @@ PSAプロセスで使用する物理計算を提供します。
     from physics.heat_balance import calculate_bed_heat_balance
     result = calculate_bed_heat_balance(tower_conds, stream, section, ...)
     
-    # 圧力計算
-    from physics.pressure import calculate_vacuum_pumping
+    # 真空排気計算
+    from physics.vacuum_pumping import calculate_vacuum_pumping
     result = calculate_vacuum_pumping(tower_conds, state_manager, tower_num)
+    
+    # 均圧計算
+    from physics.equalization import calculate_depressurization
+    result = calculate_depressurization(tower_conds, state_manager, tower_num, downstream_pressure)
+    
+    # 圧力計算
+    from physics.pressure import calculate_pressure_after_batch_adsorption
+    pressure = calculate_pressure_after_batch_adsorption(tower_conds, state_manager, tower_num, ...)
     
     # 吸着平衡線
     from physics.adsorption_isotherm import calculate_equilibrium_loading
@@ -42,13 +52,19 @@ try:
         calculate_lid_heat_balance,
     )
     
-    # 圧力計算
+    # 純粋な圧力計算
     from .pressure import (
-        calculate_vacuum_pumping,
-        calculate_depressurization,
-        calculate_downstream_flow,
         calculate_pressure_after_vacuum_desorption,
         calculate_pressure_after_batch_adsorption,
+    )
+    
+    # 真空排気計算
+    from .vacuum_pumping import calculate_vacuum_pumping
+    
+    # 均圧計算
+    from .equalization import (
+        calculate_depressurization,
+        calculate_downstream_flow,
     )
 except ImportError as e:
     # CoolProp等がインストールされていない環境向け
@@ -65,11 +81,14 @@ __all__ = [
     "calculate_wall_heat_balance",
     "calculate_lid_heat_balance",
     
-    # 圧力
-    "calculate_vacuum_pumping",
-    "calculate_depressurization",
-    "calculate_downstream_flow",
+    # 圧力計算（純粋）
     "calculate_pressure_after_vacuum_desorption",
     "calculate_pressure_after_batch_adsorption",
     
+    # 真空排気
+    "calculate_vacuum_pumping",
+    
+    # 均圧
+    "calculate_depressurization",
+    "calculate_downstream_flow",
 ]

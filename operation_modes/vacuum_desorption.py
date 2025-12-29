@@ -33,10 +33,8 @@ from state import (
     LidHeatBalanceResult,
     VacuumPumpingResult,
 )
-from physics.pressure import (
-    calculate_vacuum_pumping,
-    calculate_pressure_after_vacuum_desorption,
-)
+from physics.vacuum_pumping import calculate_vacuum_pumping
+from physics.pressure import calculate_pressure_after_vacuum_desorption
 
 
 @dataclass
