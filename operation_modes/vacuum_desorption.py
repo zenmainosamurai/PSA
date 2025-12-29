@@ -21,6 +21,8 @@
 from dataclasses import dataclass
 from typing import Dict
 
+from common.constants import CELSIUS_TO_KELVIN_OFFSET, MPA_TO_PA
+
 from operation_modes.mode_types import OperationMode
 from operation_modes.common import calculate_full_tower
 from config.sim_conditions import TowerConditions
@@ -33,8 +35,23 @@ from state import (
     LidHeatBalanceResult,
     VacuumPumpingResult,
 )
-from physics.vacuum_pumping import calculate_vacuum_pumping
-from physics.pressure import calculate_pressure_after_vacuum_desorption
+from physics.pressure import (
+    calculate_pressure_after_vacuum_desorption,
+    _calculate_average_temperature,
+    _calculate_average_mole_fractions,
+)
+from physics.gas_properties import (
+    calculate_mixed_gas_viscosity,
+    calculate_mixed_gas_density,
+)
+from physics.pipe_flow import (
+    calculate_vacuum_pump_flow,
+    calculate_pressure_from_moles,
+)
+from physics.recovery import (
+    calculate_desorption_amount,
+    calculate_co2_recovery_concentration,
+)
 
 
 @dataclass
@@ -101,8 +118,8 @@ def execute_vacuum_desorption(
         # 累積排気量を確認
         print(f"累積排気量: {result.accumulative_vacuum_amount} Nm3")
     """
-    # 真空排気結果の計算
-    vacuum_pumping_results = calculate_vacuum_pumping(
+    # 真空排気結果の計算（物理計算の組み合わせ）
+    vacuum_pumping_results = _calculate_vacuum_pumping(
         tower_conds=tower_conds,
         state_manager=state_manager,
         tower_num=tower_num,
@@ -147,4 +164,90 @@ def execute_vacuum_desorption(
         accumulative_vacuum_amount=accumulative,
         pressure_after_vacuum_desorption=pressure_after,
         accum_vacuum_amt=vacuum_pumping_results,  # 互換性のため
+    )
+
+
+# ============================================================
+# ヘルパー関数（物理計算のオーケストレーション）
+# ============================================================
+
+def _calculate_vacuum_pumping(
+    tower_conds: TowerConditions,
+    state_manager: StateVariables,
+    tower_num: int,
+) -> VacuumPumpingResult:
+    """
+    真空排気計算（物理計算の組み合わせ）
+    
+    純粋な物理計算を組み合わせて真空排気の結果を計算します。
+    
+    Args:
+        tower_conds: 塔条件
+        state_manager: 状態変数管理
+        tower_num: 塔番号
+    
+    Returns:
+        VacuumPumpingResult: 真空排気計算結果
+    """
+    tower = state_manager.towers[tower_num]
+    
+    # === 1. 状態量の取得 ===
+    T_K = _calculate_average_temperature(tower, tower_conds) + CELSIUS_TO_KELVIN_OFFSET
+    P_Pa = tower.total_press * MPA_TO_PA
+    avg_co2_mf, avg_n2_mf = _calculate_average_mole_fractions(tower, tower_conds)
+    
+    # === 2. ガス物性計算 ===
+    viscosity = calculate_mixed_gas_viscosity(T_K, avg_co2_mf, avg_n2_mf)
+    density = calculate_mixed_gas_density(T_K, P_Pa, avg_co2_mf, avg_n2_mf)
+    
+    # === 3. 配管流量・圧力損失計算 ===
+    flow_result = calculate_vacuum_pump_flow(
+        tower_conds=tower_conds,
+        current_pressure=tower.total_press,
+        T_K=T_K,
+        viscosity=viscosity,
+        density=density,
+    )
+    
+    # === 4. 回収量計算 ===
+    cumulative_co2, cumulative_n2 = calculate_desorption_amount(
+        tower_conds=tower_conds,
+        tower=tower,
+        avg_co2_mole_fraction=avg_co2_mf,
+        avg_n2_mole_fraction=avg_n2_mf,
+    )
+    
+    co2_concentration = calculate_co2_recovery_concentration(cumulative_co2, cumulative_n2)
+    
+    # === 5. 排気後圧力計算 ===
+    # 排気量 [mol]
+    moles_pumped = flow_result.molar_flow_rate * tower_conds.common.calculation_step_time
+    
+    # 排気前の物質量 [mol]
+    P_PUMP = max(0, (tower.total_press - flow_result.pressure_loss) * MPA_TO_PA)
+    from common.constants import GAS_CONSTANT
+    case_inner_mol_amt = (
+        (P_PUMP + flow_result.pressure_loss * MPA_TO_PA)
+        * tower_conds.vacuum_piping.space_volume
+        / (GAS_CONSTANT * T_K)
+    )
+    
+    # 排気後の物質量 [mol]
+    remaining_moles = max(0, case_inner_mol_amt - moles_pumped)
+    
+    # 排気後の圧力 [MPaA]
+    final_pressure = calculate_pressure_from_moles(
+        total_moles=remaining_moles,
+        T_K=T_K,
+        volume=tower_conds.vacuum_piping.space_volume,
+    )
+    
+    return VacuumPumpingResult(
+        pressure_loss=flow_result.pressure_loss,
+        cumulative_co2_recovered=cumulative_co2,
+        cumulative_n2_recovered=cumulative_n2,
+        co2_recovery_concentration=co2_concentration,
+        volumetric_flow_rate=flow_result.volumetric_flow_rate,
+        remaining_moles=remaining_moles,
+        final_pressure=final_pressure,
     )

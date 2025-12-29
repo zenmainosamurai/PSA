@@ -20,6 +20,15 @@
 from dataclasses import dataclass
 from typing import Dict
 
+from common.constants import (
+    CELSIUS_TO_KELVIN_OFFSET,
+    MPA_TO_PA,
+    PA_TO_MPA,
+    GAS_CONSTANT,
+    STANDARD_MOLAR_VOLUME,
+    M3_TO_L,
+)
+
 from operation_modes.mode_types import OperationMode
 from operation_modes.common import calculate_full_tower
 from config.sim_conditions import TowerConditions
@@ -30,12 +39,21 @@ from state import (
     WallHeatBalanceResult,
     LidHeatBalanceResult,
     GasFlow,
-)
-from physics.equalization import (
-    calculate_depressurization,
-    calculate_downstream_flow,
+    DepressurizationResult,
 )
 from state.results import DownstreamFlowResult
+from physics.pressure import (
+    _calculate_average_temperature,
+    _calculate_average_mole_fractions,
+)
+from physics.gas_properties import (
+    calculate_mixed_gas_viscosity,
+    calculate_mixed_gas_density,
+)
+from physics.pipe_flow import (
+    calculate_equalization_flow,
+    calculate_pressure_change_from_moles,
+)
 
 
 @dataclass
@@ -117,11 +135,11 @@ def execute_equalization_depressurization(
     current_pressure = state_manager.towers[tower_num].total_press
     
     # 減圧結果の計算（圧力差と均圧流量）
-    depressurization_result = calculate_depressurization(
+    depressurization_result = _calculate_depressurization(
         tower_conds=tower_conds,
         state_manager=state_manager,
         tower_num=tower_num,
-        downstream_tower_pressure=target_tower_pressure,  # target_tower_pressureをdownstream_tower_pressureとして渡す
+        downstream_tower_pressure=target_tower_pressure,
     )
     
     equalization_flow_rate = depressurization_result.flow_rate
@@ -136,7 +154,7 @@ def execute_equalization_depressurization(
     )
     
     # 下流への流出ガス量計算
-    downstream_flow_result = calculate_downstream_flow(
+    downstream_flow_result = _calculate_downstream_flow(
         tower_conds=tower_conds,
         state_manager=state_manager,
         tower_num=tower_num,
@@ -225,8 +243,156 @@ def execute_equalization_pressurization(
 
 
 # ============================================================
-# ヘルパー関数
+# ヘルパー関数（物理計算のオーケストレーション）
 # ============================================================
+
+def _calculate_depressurization(
+    tower_conds: TowerConditions,
+    state_manager: StateVariables,
+    tower_num: int,
+    downstream_tower_pressure: float,
+) -> DepressurizationResult:
+    """
+    均圧減圧計算（物理計算の組み合わせ）
+    
+    Args:
+        tower_conds: 塔条件
+        state_manager: 状態変数管理
+        tower_num: 塔番号（上流側）
+        downstream_tower_pressure: 下流塔の現在圧力 [MPaA]
+    
+    Returns:
+        DepressurizationResult: 減圧計算結果
+    """
+    tower = state_manager.towers[tower_num]
+    
+    # === 1. 状態量の取得 ===
+    T_K = _calculate_average_temperature(tower, tower_conds) + CELSIUS_TO_KELVIN_OFFSET
+    P_Pa = tower.total_press * MPA_TO_PA
+    avg_co2_mf, avg_n2_mf = _calculate_average_mole_fractions(tower, tower_conds)
+    
+    # === 2. ガス物性計算 ===
+    viscosity = calculate_mixed_gas_viscosity(T_K, avg_co2_mf, avg_n2_mf)
+    density = calculate_mixed_gas_density(T_K, P_Pa, avg_co2_mf, avg_n2_mf)
+    
+    # === 3. 配管流量・圧力損失計算 ===
+    flow_result = calculate_equalization_flow(
+        tower_conds=tower_conds,
+        upstream_pressure=tower.total_press,
+        downstream_pressure=downstream_tower_pressure,
+        viscosity=viscosity,
+        density=density,
+    )
+    
+    # === 4. 次時刻の圧力計算 ===
+    # 移動物質量 [mol]
+    standard_flow_rate = flow_result.volumetric_flow_rate / M3_TO_L  # L/min -> m³/min
+    mw_upper_space = (
+        standard_flow_rate * M3_TO_L
+        * tower_conds.common.calculation_step_time
+        / STANDARD_MOLAR_VOLUME
+    )
+    
+    # 上流側の合計体積 [m³]
+    V_upper = (
+        tower_conds.packed_bed.vessel_internal_void_volume
+        + tower_conds.packed_bed.void_volume
+    )
+    
+    # 圧力変化 [MPaA]
+    dP_upper = calculate_pressure_change_from_moles(
+        moles_transferred=mw_upper_space,
+        T_K=T_K,
+        volume=V_upper,
+    )
+    
+    # 次時刻の圧力 [MPaA]
+    final_pressure = tower.total_press - dP_upper
+    
+    return DepressurizationResult(
+        final_pressure=final_pressure,
+        flow_rate=flow_result.volumetric_flow_rate,
+        pressure_differential=flow_result.pressure_differential,
+    )
+
+
+def _calculate_downstream_flow(
+    tower_conds: TowerConditions,
+    state_manager: StateVariables,
+    tower_num: int,
+    mass_balance_results: MassBalanceResults,
+    downstream_tower_pressure: float,
+) -> DownstreamFlowResult:
+    """
+    下流塔への流入計算（物理計算の組み合わせ）
+    
+    Args:
+        tower_conds: 塔条件
+        state_manager: 状態変数管理
+        tower_num: 塔番号
+        mass_balance_results: 物質収支計算結果
+        downstream_tower_pressure: 下流塔の現在圧力 [MPaA]
+    
+    Returns:
+        DownstreamFlowResult: 下流塔流入結果
+    """
+    tower = state_manager.towers[tower_num]
+    stream_conds = tower_conds.stream_conditions
+    
+    # 平均温度 [K]
+    T_K = _calculate_average_temperature(tower, tower_conds) + CELSIUS_TO_KELVIN_OFFSET
+    
+    last_section = tower_conds.common.num_sections - 1
+    sum_outflow = sum(
+        mass_balance_results.get_result(stream, last_section).outlet_gas.co2_volume
+        + mass_balance_results.get_result(stream, last_section).outlet_gas.n2_volume
+        for stream in range(tower_conds.common.num_streams)
+    ) / 1e3  # cm³ -> L
+    
+    # 流出物質量 [mol]
+    sum_outflow_mol = sum_outflow / STANDARD_MOLAR_VOLUME
+    
+    # 下流側空間体積 [m³]
+    V_downflow = (
+        tower_conds.equalizing_piping.volume
+        + tower_conds.packed_bed.void_volume
+        + tower_conds.packed_bed.vessel_internal_void_volume
+    )
+    
+    # 圧力変化 [MPaA]
+    dP = calculate_pressure_change_from_moles(
+        moles_transferred=sum_outflow_mol,
+        T_K=T_K,
+        volume=V_downflow,
+    )
+    
+    # 次時刻の下流塔圧力 [MPaA]
+    final_pressure = downstream_tower_pressure + dP
+    
+    # 各ストリームへの流出量
+    sum_outflow_co2 = sum(
+        mass_balance_results.get_result(stream, last_section).outlet_gas.co2_volume
+        for stream in range(tower_conds.common.num_streams)
+    )
+    sum_outflow_n2 = sum(
+        mass_balance_results.get_result(stream, last_section).outlet_gas.n2_volume
+        for stream in range(tower_conds.common.num_streams)
+    )
+    
+    outlet_flows: Dict[int, GasFlow] = {}
+    for stream in range(tower_conds.common.num_streams):
+        outlet_flows[stream] = GasFlow(
+            co2_volume=sum_outflow_co2 * stream_conds[stream].area_fraction,
+            n2_volume=sum_outflow_n2 * stream_conds[stream].area_fraction,
+            co2_mole_fraction=0,
+            n2_mole_fraction=0,
+        )
+    
+    return DownstreamFlowResult(
+        final_pressure=final_pressure,
+        outlet_flows=outlet_flows,
+    )
+
 
 def _create_equalization_inflow(
     depressurization_result: EqualizationDepressurizationResult,
