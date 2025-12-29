@@ -388,17 +388,14 @@ def calculate_lid_heat_balance(
     temp_now = tower.top_temperature if is_top else tower.bottom_temperature
     
     # 外気への熱量 [J]
+    flange_area = tower_conds.top.outer_flange_area if is_top else tower_conds.bottom.outer_flange_area
     heat_to_ambient_j = (
         tower_conds.vessel.external_heat_transfer_coef
+        * flange_area
         * (temp_now - tower_conds.vessel.ambient_temperature)
         * tower_conds.common.calculation_step_time
         * MINUTE_TO_SECOND
     )
-    
-    if is_top:
-        heat_to_ambient_j *= tower_conds.top.outer_flange_area
-    else:
-        heat_to_ambient_j *= tower_conds.bottom.outer_flange_area
 
     num_sections = tower_conds.common.num_sections
     if is_top:
