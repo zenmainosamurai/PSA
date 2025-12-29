@@ -12,17 +12,6 @@
 """
 
 import numpy as np
-from typing import Tuple
-
-
-# 吸着平衡式のパラメータ（モジュールレベルで定義）
-_ISOTHERM_PARAMS = {
-    "a1": 252.0724,
-    "a2": 0.50989705,
-    "b1": 3554.54819062669,
-    "b2": 0.0655247236249063,
-    "b3": 1.7354268,
-}
 
 
 def calculate_equilibrium_loading(pressure_kpa: float, temperature_k: float) -> float:
@@ -35,35 +24,26 @@ def calculate_equilibrium_loading(pressure_kpa: float, temperature_k: float) -> 
     - 圧力が高いほど、平衡吸着量は大きくなる（より多く吸着できる）
     - 温度が高いほど、平衡吸着量は小さくなる（吸着が弱まる）
     
+    吸着平衡式（シンボリック回帰で導出）:
+        q = P * (a1 - a2*T) / (P - b1*(1 - b2*sqrt(T))^3 + b3)
+        係数: a1=252.0724, a2=0.50989705, b1=3554.548, b2=0.06552, b3=1.7354
+        有効範囲: P=0.1-100 kPaA, T=273-373 K
+    
     Args:
         pressure_kpa: CO2分圧 [kPaA]
         temperature_k: 温度 [K]
     
     Returns:
         平衡吸着量 [cm3/g-abs]（標準状態換算）
-    
-    使用例:
-        >>> from physics.adsorption_isotherm import calculate_equilibrium_loading
-        >>> # 25℃、CO2分圧10kPaでの平衡吸着量
-        >>> q_eq = calculate_equilibrium_loading(10.0, 298.15)
-        >>> print(f"平衡吸着量: {q_eq:.2f} cm3/g-abs")
     """
     P = pressure_kpa
     T = temperature_k
     
-    # パラメータを参照（get_isotherm_parameters()と一貫性を保つ）
-    a1 = _ISOTHERM_PARAMS["a1"]
-    a2 = _ISOTHERM_PARAMS["a2"]
-    b1 = _ISOTHERM_PARAMS["b1"]
-    b2 = _ISOTHERM_PARAMS["b2"]
-    b3 = _ISOTHERM_PARAMS["b3"]
-    
-    # シンボリック回帰による近似式
-    # q = P * (a1 - a2*T) / (P - b1*(1 - b2*sqrt(T))^3 + b3)
+    # シンボリック回帰による近似式（実験データから導出）
     equilibrium_loading = (
         P
-        * (a1 - a2 * T)
-        / (P - b1 * (1 - b2 * np.sqrt(T)) ** 3 + b3)
+        * (252.0724 - 0.50989705 * T)
+        / (P - 3554.54819062669 * (1 - 0.0655247236249063 * np.sqrt(T)) ** 3 + 1.7354268)
     )
     
     return equilibrium_loading
@@ -95,7 +75,7 @@ def calculate_loading_at_conditions(
 def calculate_driving_force(
     equilibrium_loading: float,
     current_loading: float,
-) -> Tuple[float, str]:
+) -> tuple[float, str]:
     """
     吸着・脱着の駆動力を計算
     
@@ -118,64 +98,3 @@ def calculate_driving_force(
         mode = "desorption"
     
     return driving_force, mode
-
-
-def get_isotherm_parameters() -> dict:
-    """
-    使用している吸着平衡式のパラメータを取得
-    
-    現在使用している吸着平衡式の係数を返します。
-    これらの係数は実験データからシンボリック回帰で求めました。
-    
-    Note:
-        calculate_equilibrium_loading()と同じパラメータ(_ISOTHERM_PARAMS)を参照します。
-    
-    Returns:
-        dict: 吸着平衡式のパラメータ
-    """
-    return {
-        "model_type": "Symbolic Regression",
-        "description": "実験データからシンボリック回帰で導出した経験式",
-        "coefficients": _ISOTHERM_PARAMS.copy(),
-        "equation": "q = P * (a1 - a2*T) / (P - b1*(1 - b2*sqrt(T))^3 + b3)",
-        "units": {
-            "P": "kPaA",
-            "T": "K",
-            "q": "cm3/g-abs (STP)",
-        },
-        "valid_range": {
-            "pressure": "0.1 - 100 kPaA",
-            "temperature": "273 - 373 K",
-        },
-    }
-
-
-# ============================================================
-# 吸着平衡線の可視化用（オプション）
-# ============================================================
-
-def generate_isotherm_data(
-    temperature_k: float,
-    pressure_range_kpa: Tuple[float, float] = (0.1, 100),
-    num_points: int = 100,
-) -> Tuple[np.ndarray, np.ndarray]:
-    """
-    指定温度での吸着平衡線データを生成
-    
-    グラフ作成用に、指定温度における吸着平衡線のデータを生成します。
-    
-    Args:
-        temperature_k: 温度 [K]
-        pressure_range_kpa: 圧力範囲 (min, max) [kPaA]
-        num_points: データ点数
-    
-    Returns:
-        (pressures, loadings): 圧力と吸着量の配列
-    """
-    pressures = np.linspace(pressure_range_kpa[0], pressure_range_kpa[1], num_points)
-    loadings = np.array([
-        calculate_equilibrium_loading(p, temperature_k)
-        for p in pressures
-    ])
-    
-    return pressures, loadings

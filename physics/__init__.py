@@ -31,8 +31,6 @@ from .adsorption_isotherm import (
     calculate_equilibrium_loading,
     calculate_loading_at_conditions,
     calculate_driving_force,
-    get_isotherm_parameters,
-    generate_isotherm_data,
 )
 
 # 以下のモジュールは CoolProp 等の外部依存があるため、
@@ -81,6 +79,4 @@ __all__ = [
     # 吸着平衡線
     "calculate_loading_at_conditions",
     "calculate_driving_force",
-    "get_isotherm_parameters",
-    "generate_isotherm_data",
 ]
