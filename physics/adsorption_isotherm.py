@@ -15,6 +15,16 @@ import numpy as np
 from typing import Tuple
 
 
+# 吸着平衡式のパラメータ（モジュールレベルで定義）
+_ISOTHERM_PARAMS = {
+    "a1": 252.0724,
+    "a2": 0.50989705,
+    "b1": 3554.54819062669,
+    "b2": 0.0655247236249063,
+    "b3": 1.7354268,
+}
+
+
 def calculate_equilibrium_loading(pressure_kpa: float, temperature_k: float) -> float:
     """
     平衡吸着量を計算
@@ -41,12 +51,19 @@ def calculate_equilibrium_loading(pressure_kpa: float, temperature_k: float) -> 
     P = pressure_kpa
     T = temperature_k
     
+    # パラメータを参照（get_isotherm_parameters()と一貫性を保つ）
+    a1 = _ISOTHERM_PARAMS["a1"]
+    a2 = _ISOTHERM_PARAMS["a2"]
+    b1 = _ISOTHERM_PARAMS["b1"]
+    b2 = _ISOTHERM_PARAMS["b2"]
+    b3 = _ISOTHERM_PARAMS["b3"]
+    
     # シンボリック回帰による近似式
-    # 実験データから導出した経験式
+    # q = P * (a1 - a2*T) / (P - b1*(1 - b2*sqrt(T))^3 + b3)
     equilibrium_loading = (
         P
-        * (252.0724 - 0.50989705 * T)
-        / (P - 3554.54819062669 * (1 - 0.0655247236249063 * np.sqrt(T)) ** 3 + 1.7354268)
+        * (a1 - a2 * T)
+        / (P - b1 * (1 - b2 * np.sqrt(T)) ** 3 + b3)
     )
     
     return equilibrium_loading
@@ -110,19 +127,16 @@ def get_isotherm_parameters() -> dict:
     現在使用している吸着平衡式の係数を返します。
     これらの係数は実験データからシンボリック回帰で求めました。
     
+    Note:
+        calculate_equilibrium_loading()と同じパラメータ(_ISOTHERM_PARAMS)を参照します。
+    
     Returns:
         dict: 吸着平衡式のパラメータ
     """
     return {
         "model_type": "Symbolic Regression",
         "description": "実験データからシンボリック回帰で導出した経験式",
-        "coefficients": {
-            "a1": 252.0724,
-            "a2": 0.50989705,
-            "b1": 3554.54819062669,
-            "b2": 0.0655247236249063,
-            "b3": 1.7354268,
-        },
+        "coefficients": _ISOTHERM_PARAMS.copy(),
         "equation": "q = P * (a1 - a2*T) / (P - b1*(1 - b2*sqrt(T))^3 + b3)",
         "units": {
             "P": "kPaA",
