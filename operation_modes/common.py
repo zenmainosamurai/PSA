@@ -80,8 +80,6 @@ def calculate_all_cells(
     2. ストリーム1のセクション0→1→...→N-1
     3. ...
     
-    注意: 内部的には0オリジンのインデックスを使用します。
-    
     Args:
         mode: 運転モード
         tower_conds: 塔条件
@@ -106,7 +104,6 @@ def calculate_all_cells(
     heat_balance_results: Dict[int, Dict] = {}
     mole_fraction_results: Dict[int, Dict] = {} if mode == OperationMode.VACUUM_DESORPTION else None
     
-    # 全セルを計算（0オリジン）
     for stream in range(num_streams):
         mass_balance_results[stream] = {}
         heat_balance_results[stream] = {}
@@ -195,8 +192,7 @@ def calculate_wall_heat(
     
     wall_results: Dict[int, WallHeatBalanceResult] = {}
     
-    # セクション0（最初のセクション、0オリジン）
-    # heat_balance_results.get_resultは0オリジンで、num_streams-1が最外側ストリーム
+    # 最初のセクション
     wall_results[0] = calculate_wall_heat_balance(
         tower_conds=tower_conds,
         section=0,
@@ -336,19 +332,18 @@ def distribute_inflow_gas(
     
     Args:
         tower_conds: 塔条件
-        inflow_gas: 上流塔の物質収支結果 (0オリジンのインデックス)
+        inflow_gas: 上流塔の物質収支結果
     
     Returns:
-        Dict[int, GasFlow]: ストリーム番号 (0オリジン) -> 流入ガス
+        Dict[int, GasFlow]: ストリーム番号 -> 流入ガス
     """
     stream_conds = tower_conds.stream_conditions
     num_sections = tower_conds.common.num_sections
     num_streams = tower_conds.common.num_streams
     
-    # 最下流セクション (0オリジン: num_sections - 1)
     most_down_section = num_sections - 1
     
-    # 最下流セクションからの流出量合計（0オリジンでループ）
+    # 最下流セクションからの流出量合計
     total_outflow_co2 = sum(
         inflow_gas.get_result(stream, most_down_section).outlet_gas.co2_volume
         for stream in range(num_streams)
@@ -358,12 +353,11 @@ def distribute_inflow_gas(
         for stream in range(num_streams)
     )
     
-    # 各ストリームに分配（0オリジン）
     distributed: Dict[int, GasFlow] = {}
     total_outflow = total_outflow_co2 + total_outflow_n2
     
     for stream in range(num_streams):
-        # stream_condsは1オリジンなので+1してアクセス
+        # stream_condsは1始まり
         stream_1indexed = stream + 1
         distributed[stream] = GasFlow(
             co2_volume=total_outflow_co2 * stream_conds[stream_1indexed].area_fraction,
@@ -385,12 +379,7 @@ def _get_inflow_gas(
     external_inflow_gas: Optional[Dict[int, GasFlow]],
     mass_balance_results: Dict[int, Dict],
 ) -> Optional[GasFlow]:
-    """セルへの流入ガスを決定
-    
-    Args:
-        stream: ストリームインデックス (0オリジン)
-        section: セクションインデックス (0オリジン)
-    """
+    """セルへの流入ガスを決定"""
     if section == 0:
         # 最上流セクション: 外部流入ガスを使用（あれば）
         # Noneを返すとcalculate_mass_balanceでフィードガスから計算される

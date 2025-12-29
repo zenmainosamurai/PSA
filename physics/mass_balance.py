@@ -85,7 +85,6 @@ def calculate_mass_balance(
     """
     # モードに応じて計算を分岐
     if mode in ADSORPTION_MODES:
-        # section >= 1（0オリジン）は上流結果から流入ガスを構築
         if section > 0 and previous_result is not None:
             inflow_gas = GasFlow(
                 co2_volume=previous_result.outlet_gas.co2_volume,
@@ -160,7 +159,7 @@ def _calculate_adsorption_mass_balance(
     stream_conds = tower_conds.stream_conditions
 
     # === セクション吸着材量 [g] ===
-    # stream_condsは1オリジンなので+1してアクセス
+    # stream_condsは1始まり
     section_adsorbent_mass = stream_conds[stream + 1].adsorbent_mass / tower_conds.common.num_sections
 
     # === 流入ガス量の計算 [cm3] ===
@@ -173,7 +172,6 @@ def _calculate_adsorption_mass_balance(
     )
 
     # === 流入ガスモル分率の計算 ===
-    # section != 0 はセクション0以外（0オリジン）
     if residual_gas_composition is None or section != 0:
         inlet_co2_mole_fraction = inlet_co2_volume / (inlet_co2_volume + inlet_n2_volume)
         inlet_n2_mole_fraction = inlet_n2_volume / (inlet_co2_volume + inlet_n2_volume)
@@ -299,7 +297,7 @@ def _calculate_desorption_mass_balance(
 
     # === 現在気相モル量の計算 ===
     # セクション空間割合
-    # stream_condsは1オリジンなので+1してアクセス
+    # stream_condsは1始まり
     space_ratio_section = (
         stream_conds[stream + 1].area_fraction
         / tower_conds.common.num_sections
@@ -329,7 +327,7 @@ def _calculate_desorption_mass_balance(
     )
     
     # セクション吸着材量 [g]
-    # stream_condsは1オリジンなので+1してアクセス
+    # stream_condsは1始まり
     section_adsorbent_mass = stream_conds[stream + 1].adsorbent_mass / tower_conds.common.num_sections
     
     # 平衡吸着量 [cm3/g-abs]
@@ -478,14 +476,9 @@ def _calculate_inlet_gas_volumes(
     inflow_gas: Optional[GasFlow],
     equalization_flow_rate: Optional[float],
 ) -> Tuple[float, float]:
-    """流入ガス量を計算 [cm3]
-    
-    Args:
-        stream: ストリームインデックス (0オリジン)
-        section: セクションインデックス (0オリジン)
-    """
+    """流入ガス量を計算 [cm3]"""
     stream_conds = tower_conds.stream_conditions
-    # stream_condsは1オリジンなので+1してアクセス
+    # stream_condsは1始まり
     stream_1indexed = stream + 1
     
     if section == 0 and inflow_gas is None and equalization_flow_rate is None:

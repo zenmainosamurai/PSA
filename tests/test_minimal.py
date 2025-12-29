@@ -44,8 +44,8 @@ def test_cell_accessor():
     print(f"  temp[1, 0] = {tower_state.temp[1, 0]}")  # 20
     print(f"  temp[2, 19] = {tower_state.temp[2, 19]}")  # 59
     
-    # 0オリジンのAPIでアクセス（内部インデックス）
-    print("\n0オリジンAPIでアクセス:")
+    # APIでアクセス
+    print("\nAPIでアクセス:")
     cell_0_0 = tower_state.cell(0, 0)  # stream=0, section=0 -> 配列[0, 0]
     cell_0_1 = tower_state.cell(0, 1)  # stream=0, section=1 -> 配列[0, 1]
     cell_1_0 = tower_state.cell(1, 0)  # stream=1, section=0 -> 配列[1, 0]

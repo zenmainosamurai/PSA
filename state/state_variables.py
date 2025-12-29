@@ -17,16 +17,12 @@ class CellAccessor:
     """セルアクセス用のヘルパークラス
 
     tower.cell(stream, section).temp のような自然な記法でアクセス可能
-    
-    内部的には0オリジンのインデックスを使用します。
-    stream=0, section=0 が最初のセルです。
     """
 
     def __init__(self, tower_state: "TowerStateArrays", stream: int, section: int):
         self._tower_state = tower_state
         self._stream = stream
         self._section = section
-        # 0オリジンをそのまま使用（内部処理は全て0オリジン）
         self._stream_idx = stream
         self._section_idx = section
 
@@ -154,8 +150,8 @@ class TowerStateArrays:
             tower.cell(1, 2).loading = 0.5  # stream=1, section=2の吸着量を設定
 
         Args:
-            stream: ストリームインデックス (0オリジン)
-            section: セクションインデックス (0オリジン)
+            stream: ストリームインデックス
+            section: セクションインデックス
 
         Returns:
             CellAccessor: セルアクセッサー
@@ -241,7 +237,6 @@ class StateVariables:
         heat_results: HeatBalanceResults = calc_output.heat  # HeatBalanceResults
         material_results: MassBalanceResults = calc_output.material  # MassBalanceResults
 
-        # 各セル(stream, section)の結果を状態変数に反映（0オリジン）
         for stream in range(self.num_streams):
             for section in range(self.num_sections):
                 # マテリアルバランス結果の更新
@@ -262,7 +257,7 @@ class StateVariables:
                 )
                 tower.cell(stream, section).bed_heat_transfer_coef = heat_result.heat_transfer_coefficients.bed_to_bed
 
-        # 壁面温度の更新（0オリジン）
+        # 壁面温度の更新
         heat_wall_results: Dict[int, WallHeatBalanceResult] = calc_output.heat_wall  # Dict[int, WallHeatBalanceResult]
         tower.temp_wall[:] = np.array(
             [heat_wall_results[section].temperature for section in range(self.num_sections)],

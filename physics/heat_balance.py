@@ -81,7 +81,7 @@ def calculate_bed_heat_balance(
     """
     tower = state_manager.towers[tower_num]
     stream_conds = tower_conds.stream_conditions
-    # stream_condsは1オリジンなので+1してアクセス
+    # stream_condsは1始まり
     stream_1indexed = stream + 1
 
     # === 現在温度の取得 ===
@@ -197,7 +197,7 @@ def calculate_bed_heat_balance(
         upstream_heat_flux = -heat_output.heat_flux.downstream
 
     # === 到達温度の計算（Newton法）===
-    # _optimize_bed_temperatureには1オリジンのストリーム番号を渡す
+    # _optimize_bed_temperatureにはストリーム番号(1始まり)を渡す
     args = (
         tower_conds,
         gas_specific_heat,
@@ -270,13 +270,12 @@ def calculate_wall_heat_balance(
     stream_conds = tower_conds.stream_conditions
     num_streams = tower_conds.common.num_streams
     num_sections = tower_conds.common.num_sections
-    # stream_condsは1オリジン、壁面はnum_streams+1
+    # stream_condsは1始まり
     wall_stream_1indexed = num_streams + 1
     
-    # 現在温度（temp_wallは0オリジンの配列）
     temp_now = tower.temp_wall[section]
     
-    # 内側セル温度（最外ストリーム、num_streams-1が0オリジンの最外側）
+    # 内側セル温度（最外ストリーム）
     temp_inside_cell = tower.cell(num_streams - 1, section).temp
     
     # 外側温度（外気）
@@ -405,7 +404,6 @@ def calculate_lid_heat_balance(
     else:
         heat_flux_to_ambient *= tower_conds.bottom.outer_flange_area
 
-    # 正味の熱流入（0オリジンでアクセス）
     num_sections = tower_conds.common.num_sections
     if is_top:
         # stream=1, section=0（最上流）

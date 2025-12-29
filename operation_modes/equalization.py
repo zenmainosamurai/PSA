@@ -199,7 +199,6 @@ def execute_equalization_pressurization(
     # 減圧側の下流流量結果から各ストリームへの流入ガスを取得
     downstream_flow_result = upstream_depressurization_result.downstream_flow_result
     
-    # 外部流入ガスとして設定（0オリジン）
     external_inflow_gas: Dict[int, GasFlow] = {}
     for stream in range(tower_conds.common.num_streams):
         external_inflow_gas[stream] = downstream_flow_result.outlet_flows[stream]
@@ -249,14 +248,14 @@ def _distribute_equalization_inflow(
     tower_conds: TowerConditions,
     inflow_gas: GasFlow,
 ) -> Dict[int, GasFlow]:
-    """均圧流入ガスを各ストリームに分配（0オリジン）"""
+    """均圧流入ガスを各ストリームに分配"""
     stream_conds = tower_conds.stream_conditions
     num_streams = tower_conds.common.num_streams
     
     distributed: Dict[int, GasFlow] = {}
     
     for stream in range(num_streams):
-        # stream_condsは1オリジンなので+1してアクセス
+        # stream_condsは1始まり
         area_frac = stream_conds[stream + 1].area_fraction
         distributed[stream] = GasFlow(
             co2_volume=inflow_gas.co2_volume * area_frac,

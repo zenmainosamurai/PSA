@@ -258,7 +258,6 @@ def calculate_downstream_flow(
     # 平均温度 [K]
     T_K = _calculate_average_temperature(tower, tower_conds) + CELSIUS_TO_KELVIN_OFFSET
     
-    # 最下流セクションからの流出量合計 [L]（0オリジン）
     last_section = tower_conds.common.num_sections - 1
     sum_outflow = sum(
         mass_balance_results.get_result(stream, last_section).outlet_gas.co2_volume
@@ -282,7 +281,6 @@ def calculate_downstream_flow(
     # 次時刻の下流塔圧力 [MPaA]
     final_pressure = downstream_tower_pressure + dP
 
-    # === 各ストリームへの流入量（0オリジン） ===
     sum_outflow_co2 = sum(
         mass_balance_results.get_result(stream, last_section).outlet_gas.co2_volume
         for stream in range(tower_conds.common.num_streams)
@@ -294,7 +292,7 @@ def calculate_downstream_flow(
     
     outlet_flows: Dict[int, GasFlow] = {}
     for stream in range(tower_conds.common.num_streams):
-        # stream_condsは1オリジンなので+1してアクセス
+        # stream_condsは1始まり
         stream_1indexed = stream + 1
         outlet_flows[stream] = GasFlow(
             co2_volume=sum_outflow_co2 * stream_conds[stream_1indexed].area_fraction,
@@ -341,7 +339,7 @@ def calculate_pressure_after_vacuum_desorption(
     # 平均温度 [K]
     T_K = _calculate_average_temperature(tower, tower_conds) + CELSIUS_TO_KELVIN_OFFSET
     
-    # 気相放出後の全物質量 [mol]（0オリジン）
+    # 気相放出後の全物質量 [mol]
     sum_desorp_mw = sum(
         mole_fraction_results.get_result(stream, section).total_moles_after_desorption
         for stream in range(tower_conds.common.num_streams)
@@ -439,7 +437,7 @@ def calculate_pressure_after_batch_adsorption(
 # ============================================================
 
 def _calculate_average_temperature(tower, tower_conds: TowerConditions) -> float:
-    """容器内平均温度を計算 [℃]（内部インデックスは0オリジン）"""
+    """容器内平均温度を計算 [℃]"""
     temps = [
         tower.cell(stream, section).temp
         for stream in range(tower_conds.common.num_streams)
@@ -449,7 +447,7 @@ def _calculate_average_temperature(tower, tower_conds: TowerConditions) -> float
 
 
 def _calculate_average_mole_fractions(tower, tower_conds: TowerConditions):
-    """平均モル分率を計算（内部インデックスは0オリジン）"""
+    """平均モル分率を計算"""
     co2_fractions = [
         tower.cell(stream, section).co2_mole_fraction
         for stream in range(tower_conds.common.num_streams)
@@ -617,7 +615,7 @@ def _calculate_recovery_amounts(
     avg_co2_mf: float,
     avg_n2_mf: float,
 ):
-    """CO2/N2回収量を計算（内部インデックスは0オリジン）"""
+    """CO2/N2回収量を計算"""
     # 吸着量の差分からCO2回収量を計算
     total_desorption_volume = 0.0  # [Ncm3]
     stream_conds = tower_conds.stream_conditions
@@ -626,7 +624,7 @@ def _calculate_recovery_amounts(
         for section in range(tower_conds.common.num_sections):
             current_loading = tower.cell(stream, section).loading
             previous_loading = tower.cell(stream, section).previous_loading
-            # stream_condsは1オリジンなので+1してアクセス
+            # stream_condsは1始まり
             section_adsorbent_mass = (
                 stream_conds[stream + 1].adsorbent_mass
                 / tower_conds.common.num_sections

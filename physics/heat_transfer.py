@@ -140,7 +140,7 @@ def calc_heat_transfer_coef(
     """
     tower = state_manager.towers[tower_num]
     stream_conds = tower_conds.stream_conditions
-    # stream_condsは1オリジンなので変換
+    # stream_condsは1始まり
     stream_1indexed = stream + 1
     T_K = temp_now + CELSIUS_TO_KELVIN_OFFSET
 

@@ -106,10 +106,7 @@ class HeatBalanceResult:
 
 
 class SectionResults:
-    """セクション毎の計算結果を管理するクラス
-    
-    注意: section_id は0オリジン（内部インデックス）
-    """
+    """セクション毎の計算結果を管理するクラス"""
 
     def __init__(self, section_data: Dict[int, Any]):
         self.section_data = section_data
@@ -196,11 +193,7 @@ class HeatBalanceStreamSectionResults(StreamSectionResults):
 
 
 class MassBalanceResults:
-    """マスバランス計算結果の集合
-    
-    注意: stream_id, section_id は0オリジン（内部インデックス）
-    I/O用の1オリジンインデックスとは異なります。
-    """
+    """マスバランス計算結果の集合"""
 
     def __init__(self, material_balance_results_dict: Dict[int, Dict[int, MaterialBalanceResult]] = None):
         self.material_balance_stream_section_results = MaterialBalanceStreamSectionResults(
@@ -217,11 +210,7 @@ class MassBalanceResults:
 
 
 class HeatBalanceResults:
-    """熱バランス計算結果の集合
-    
-    注意: stream_id, section_id は0オリジン（内部インデックス）
-    I/O用の1オリジンインデックスとは異なります。
-    """
+    """熱バランス計算結果の集合"""
 
     def __init__(self, heat_balance_results_dict: Dict[int, Dict[int, HeatBalanceResult]] = None):
         self.heat_balance_stream_section_results = HeatBalanceStreamSectionResults(heat_balance_results_dict)
@@ -271,11 +260,7 @@ class MoleFractionStreamSectionResults(StreamSectionResults):
 
 
 class MoleFractionResults:
-    """モル分率計算結果の集合（脱着時のみ）
-    
-    注意: stream_id, section_id は0オリジン（内部インデックス）
-    I/O用の1オリジンインデックスとは異なります。
-    """
+    """モル分率計算結果の集合（脱着時のみ）"""
 
     def __init__(self, mole_fraction_results_dict: Dict[int, Dict[int, dict]] = None):
         self.mole_fraction_stream_section_results = MoleFractionStreamSectionResults(mole_fraction_results_dict)
