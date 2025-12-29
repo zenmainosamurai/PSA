@@ -5,6 +5,7 @@ from utils import const
 import xlsxwriter
 
 from config.sim_conditions import CommonConditions
+from common.enums import LidPosition
 
 
 def _add_units_to_columns(columns):
@@ -322,12 +323,12 @@ def _save_heat_lid_data_xlsx(output_dir, tower_results):
     for record in tower_results.time_series_data.heat_lid:
         values.append(
             [
-                record["up"].temperature,
-                record["down"].temperature,
+                record[LidPosition.TOP].temperature,
+                record[LidPosition.BOTTOM].temperature,
             ]
         )
 
-    columns = ["temp_reached-up", "temp_reached-down"]
+    columns = ["temp_reached-top", "temp_reached-bottom"]
     file_path = os.path.join(folder_path, "蓋温度.xlsx")
     chart_title = f"蓋温度 {const.UNIT.get('蓋温度', '[℃]')}"
     _create_dataframe_and_save_xlsx(

@@ -67,6 +67,8 @@ from .unit_conversion import (
     convert_pa_to_mpa,
 )
 
+from .enums import LidPosition
+
 __all__ = [
     # 物理定数
     "GAS_CONSTANT",
@@ -120,4 +122,7 @@ __all__ = [
     "convert_kelvin_to_celsius",
     "convert_mpa_to_pa",
     "convert_pa_to_mpa",
+    
+    # Enum
+    "LidPosition",
 ]

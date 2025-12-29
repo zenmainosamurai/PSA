@@ -17,6 +17,7 @@ import numpy as np
 from scipy import optimize
 
 from operation_modes.mode_types import HeatCalculationMode
+from common.enums import LidPosition
 from common.constants import (
     STANDARD_MOLAR_VOLUME,
     MINUTE_TO_SECOND,
@@ -363,7 +364,7 @@ def calculate_wall_heat_balance(
 
 def calculate_lid_heat_balance(
     tower_conds: TowerConditions,
-    position: str,
+    position: LidPosition,
     state_manager: StateVariables,
     tower_num: int,
     heat_output: HeatBalanceResults,
@@ -376,7 +377,7 @@ def calculate_lid_heat_balance(
     
     Args:
         tower_conds: 塔条件
-        position: "up"（上蓋）または "down"（下蓋）
+        position: LidPosition.TOP（上蓋）または LidPosition.BOTTOM（下蓋）
         state_manager: 状態変数管理
         tower_num: 塔番号
         heat_output: 各セルの熱収支結果
@@ -386,9 +387,10 @@ def calculate_lid_heat_balance(
         LidHeatBalanceResult: 蓋の熱収支結果
     """
     tower = state_manager.towers[tower_num]
+    is_top = (position == LidPosition.TOP)
     
     # 現在温度
-    temp_now = tower.lid_temperature if position == "up" else tower.bottom_temperature
+    temp_now = tower.lid_temperature if is_top else tower.bottom_temperature
     
     # 外気への熱流束
     heat_flux_to_ambient = (
@@ -398,14 +400,14 @@ def calculate_lid_heat_balance(
         * MINUTE_TO_SECOND
     )
     
-    if position == "up":
+    if is_top:
         heat_flux_to_ambient *= tower_conds.bottom.outer_flange_area
     else:
         heat_flux_to_ambient *= tower_conds.lid.outer_flange_area
 
     # 正味の熱流入（0オリジンでアクセス）
     num_sections = tower_conds.common.num_sections
-    if position == "up":
+    if is_top:
         # stream=1, section=0（最上流）
         stream2_section1_upstream = heat_output.get_result(1, 0).heat_flux.upstream
         stream1_section1_upstream = heat_output.get_result(0, 0).heat_flux.upstream
@@ -646,7 +648,7 @@ def _optimize_lid_temperature(
     tower_conds: TowerConditions,
     temp_now: float,
     net_heat_input: float,
-    position: str,
+    position: LidPosition,
 ) -> float:
     """
     蓋到達温度のソルバー用関数
@@ -654,7 +656,7 @@ def _optimize_lid_temperature(
     # 蓋が受け取る熱（時間基準）[J]
     H_lid_time = tower_conds.vessel.wall_specific_heat_capacity * (temp_reached - temp_now)
     
-    if position == "up":
+    if position == LidPosition.TOP:
         H_lid_time *= tower_conds.lid.flange_total_weight
     else:
         H_lid_time *= tower_conds.bottom.flange_total_weight

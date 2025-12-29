@@ -10,6 +10,7 @@ import glob
 from utils import const
 
 from config.sim_conditions import CommonConditions
+from common.enums import LidPosition
 
 # matplotlibのフォント関連警告を抑制
 logging.getLogger('matplotlib.font_manager').setLevel(logging.ERROR)
@@ -215,7 +216,7 @@ def plot_csv_outputs(output_dir, df_obs, target_sections, tower_num, timestamp, 
         plt.subplot(num_row, 2, i + 1)
         plt.plot(df[col])
         # カラム名から上蓋/下蓋を判定してタイトルを設定
-        if "up" in col:
+        if "top" in col:
             title = "セクション到達温度 [℃]_上蓋"
         else:
             title = "セクション到達温度 [℃]_下蓋"
@@ -449,12 +450,12 @@ def _save_heat_lid_data(output_dir, tower_results):
     for record in tower_results.time_series_data.heat_lid:
         values.append(
             [
-                record["up"].temperature,
-                record["down"].temperature,
+                record[LidPosition.TOP].temperature,
+                record[LidPosition.BOTTOM].temperature,
             ]
         )
 
-    columns = ["temp_reached-up", "temp_reached-down"]
+    columns = ["temp_reached-top", "temp_reached-bottom"]
     file_path = os.path.join(folder_path, "蓋温度.csv")
     _create_dataframe_and_save(values, columns, tower_results.time_series_data.timestamps, file_path, add_units=True)
 

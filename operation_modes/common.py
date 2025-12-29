@@ -13,6 +13,7 @@ from typing import Dict, Optional
 from dataclasses import dataclass
 
 from operation_modes.mode_types import OperationMode
+from common.enums import LidPosition
 from config.sim_conditions import TowerConditions
 from state import (
     StateVariables,
@@ -225,7 +226,7 @@ def calculate_lid_heat(
     tower_num: int,
     heat_balance_results: HeatBalanceResults,
     wall_heat_results: Dict[int, WallHeatBalanceResult],
-) -> Dict[str, LidHeatBalanceResult]:
+) -> Dict[LidPosition, LidHeatBalanceResult]:
     """
     蓋の熱収支を計算
     
@@ -239,11 +240,11 @@ def calculate_lid_heat(
         wall_heat_results: 壁面の熱収支結果
     
     Returns:
-        Dict[str, LidHeatBalanceResult]: "up" or "down" -> 蓋熱収支結果
+        Dict[LidPosition, LidHeatBalanceResult]: 蓋位置 -> 蓋熱収支結果
     """
-    lid_results: Dict[str, LidHeatBalanceResult] = {}
+    lid_results: Dict[LidPosition, LidHeatBalanceResult] = {}
     
-    for position in ["up", "down"]:
+    for position in LidPosition:
         lid_results[position] = calculate_lid_heat_balance(
             tower_conds=tower_conds,
             position=position,

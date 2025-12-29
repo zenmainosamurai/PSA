@@ -2,6 +2,7 @@ from dataclasses import dataclass
 from typing import Dict
 import numpy as np
 from config.sim_conditions import SimulationConditions
+from common.enums import LidPosition
 from .results import (
     HeatBalanceResults,
     MassBalanceResults,
@@ -269,9 +270,9 @@ class StateVariables:
         )
 
         # 蓋温度の更新
-        heat_lid_results: Dict[str, LidHeatBalanceResult] = calc_output.heat_lid  # Dict[str, LidHeatBalanceResult]
-        tower.lid_temperature = heat_lid_results["up"].temperature
-        tower.bottom_temperature = heat_lid_results["down"].temperature
+        heat_lid_results: Dict[LidPosition, LidHeatBalanceResult] = calc_output.heat_lid
+        tower.lid_temperature = heat_lid_results[LidPosition.TOP].temperature
+        tower.bottom_temperature = heat_lid_results[LidPosition.BOTTOM].temperature
 
         # モル分率の更新
         if mode == "停止":
