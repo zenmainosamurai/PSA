@@ -17,7 +17,7 @@ import numpy as np
 
 from config.sim_conditions import SimulationConditions
 from state.state_variables import StateVariables
-from process.process_executor import execute_mode_list, prepare_batch_adsorption_pressure
+from process.process_executor import execute_mode_list
 
 
 def run_all_mode_tests():
@@ -44,8 +44,8 @@ def run_all_mode_tests():
     for i, mode_list in enumerate(mode_lists):
         print(f"テスト {i+1}/{len(mode_lists)}: {mode_list}")
         state = StateVariables(num_towers, num_streams, num_sections, sim_conds)
-        prepare_batch_adsorption_pressure(state, sim_conds, mode_list)
-        outputs, _ = execute_mode_list(sim_conds, mode_list, state, None)
+        # is_first_step=True で工程初回の初期化処理が実行される
+        outputs, _ = execute_mode_list(sim_conds, mode_list, state, None, is_first_step=True)
         
         # 結果を抽出（数値のみ）
         mode_results = {}
@@ -95,7 +95,7 @@ def run_all_mode_tests():
                 except Exception as e:
                     tower_results[f'heat_balance_{stream}_{section}'] = {'error': str(e)}
             
-            mode_results[tower_num] = tower_results
+            mode_results[str(tower_num)] = tower_results
         
         results[str(mode_list)] = mode_results
     

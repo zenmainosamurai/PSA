@@ -15,7 +15,7 @@ os.chdir("/home/user/webapp")
 from config.sim_conditions import SimulationConditions
 from state.state_variables import StateVariables
 from process import GasAdsorptionBreakthroughSimulator
-from process.process_executor import execute_mode_list, prepare_batch_adsorption_pressure
+from process.process_executor import execute_mode_list
 
 
 def test_simulator_initialization():
@@ -69,10 +69,11 @@ def test_process_executor():
     assert len(outputs) == 3
     print("  ✅ execute_mode_list成功")
     
-    # 圧力平均化
+    # バッチ吸着モード（is_first_step=Trueで圧力平均化が自動実行される）
     mode_list = ['バッチ吸着_上流', 'バッチ吸着_下流', '停止']
-    prepare_batch_adsorption_pressure(state, sim_conds, mode_list)
-    print("  ✅ prepare_batch_adsorption_pressure成功")
+    outputs, residual = execute_mode_list(sim_conds, mode_list, state, None, is_first_step=True)
+    assert len(outputs) == 3
+    print("  ✅ バッチ吸着モード（is_first_step=True）成功")
 
 
 def test_all_modes():
@@ -100,8 +101,8 @@ def test_all_modes():
     
     for mode_list in mode_lists:
         state = StateVariables(num_towers, num_streams, num_sections, sim_conds)
-        prepare_batch_adsorption_pressure(state, sim_conds, mode_list)
-        outputs, _ = execute_mode_list(sim_conds, mode_list, state, None)
+        # is_first_step=True で工程初回の初期化処理が実行される
+        outputs, _ = execute_mode_list(sim_conds, mode_list, state, None, is_first_step=True)
         assert len(outputs) == 3, f"Failed for {mode_list}"
     
     print("  ✅ 全モード成功")

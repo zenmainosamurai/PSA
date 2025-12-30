@@ -62,7 +62,6 @@ from .simulation_results import SimulationResults
 from .process_executor import (
     TowerCalculationOutput,
     execute_mode_list,
-    prepare_batch_adsorption_pressure,
 )
 
 # 終了条件
@@ -91,7 +90,6 @@ __all__ = [
     # 工程実行
     "TowerCalculationOutput",
     "execute_mode_list",
-    "prepare_batch_adsorption_pressure",
     # 終了条件
     "TerminationConditionType",
     "TerminationCondition",

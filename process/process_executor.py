@@ -67,6 +67,7 @@ def execute_mode_list(
     mode_list: List[str],
     state_manager: StateVariables,
     residual_gas_composition: Optional[MassBalanceResults] = None,
+    is_first_step: bool = False,
 ) -> Tuple[Dict[int, TowerCalculationOutput], Optional[MassBalanceResults]]:
     """
     全塔のモードリストを実行
@@ -79,6 +80,7 @@ def execute_mode_list(
         mode_list: 各塔のモードリスト ["流通吸着_単独/上流", "停止", "真空脱着"]
         state_manager: 状態変数管理
         residual_gas_composition: 残留ガス組成（バッチ吸着下流で使用）
+        is_first_step: 工程の初回ステップかどうか（初期化処理の実行に使用）
     
     Returns:
         Tuple[Dict[int, TowerCalculationOutput], Optional[MassBalanceResults]]:
@@ -88,9 +90,14 @@ def execute_mode_list(
     使用例:
         outputs, residual = execute_mode_list(
             sim_conds, ["流通吸着_単独/上流", "流通吸着_下流", "停止"],
-            state_manager
+            state_manager,
+            is_first_step=True,  # 工程の初回のみTrue
         )
     """
+    # 工程初回の初期化処理
+    if is_first_step:
+        _initialize_process(state_manager, sim_conds, mode_list)
+    
     num_towers = sim_conds.num_towers
     outputs: Dict[int, TowerCalculationOutput] = {}
     updated_residual = residual_gas_composition
@@ -415,22 +422,23 @@ def _extract_others(state_manager: StateVariables, tower_num: int) -> dict:
     }
 
 
-def prepare_batch_adsorption_pressure(
+def _initialize_process(
     state_manager: StateVariables,
     sim_conds: SimulationConditions,
     mode_list: List[str],
 ) -> None:
     """
-    バッチ吸着開始時の圧力平均化
+    工程開始時の初期化処理
     
-    バッチ吸着（上流・下流）の工程開始時に、
-    両塔の圧力を空隙体積で重み付け平均して初期化します。
+    各工程の開始時に必要な初期化処理を行います。
+    現在はバッチ吸着の圧力平均化のみ実装。
     
     Args:
         state_manager: 状態変数管理
         sim_conds: シミュレーション条件
         mode_list: モードリスト
     """
+    # バッチ吸着（上流・下流）の圧力平均化
     if "バッチ吸着_上流" in mode_list and "バッチ吸着_下流" in mode_list:
         upstream_tower_num = mode_list.index("バッチ吸着_上流") + 1
         downstream_tower_num = mode_list.index("バッチ吸着_下流") + 1

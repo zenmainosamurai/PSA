@@ -29,7 +29,7 @@ import pandas as pd
 
 from config.sim_conditions import SimulationConditions
 from state import StateVariables
-from process.process_executor import execute_mode_list, prepare_batch_adsorption_pressure
+from process.process_executor import execute_mode_list
 from process.simulation_results import SimulationResults
 import logger as log
 
@@ -170,9 +170,7 @@ class SimulationRunner:
             ProcessResult: 工程実行結果
         """
         elapsed_time = 0.0
-        
-        # 初回限定処理（バッチ吸着の圧力平均化）
-        prepare_batch_adsorption_pressure(self.state_manager, self.sim_conds, mode_list)
+        is_first_step = True
         
         # 逐次計算
         while self._check_termination_condition(termination_cond_str, timestamp, elapsed_time):
@@ -182,7 +180,9 @@ class SimulationRunner:
                 mode_list=mode_list,
                 state_manager=self.state_manager,
                 residual_gas_composition=self.residual_gas_composition,
+                is_first_step=is_first_step,
             )
+            is_first_step = False
             
             # residual_gas_composition更新
             if new_residual is not None:

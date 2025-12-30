@@ -15,7 +15,7 @@ import utils.prop_table
 
 from config.sim_conditions import SimulationConditions
 from state import StateVariables
-from process.process_executor import execute_mode_list, prepare_batch_adsorption_pressure
+from process.process_executor import execute_mode_list
 from process.simulation_results import SimulationResults
 import pandas as pd
 
@@ -77,9 +77,6 @@ def run_full_simulation(cond_id: str) -> dict:
         print(f"\n工程 {process_index}: {mode_list}")
         print(f"  終了条件: {termination_cond_str}")
         
-        # バッチ吸着の圧力準備
-        prepare_batch_adsorption_pressure(state_manager, sim_conds, mode_list)
-        
         # 終了条件の解析
         from process.termination_conditions import should_continue_process
         
@@ -87,12 +84,15 @@ def run_full_simulation(cond_id: str) -> dict:
         elapsed_time = 0.0
         step_count = 0
         max_steps = 10000  # 安全のため上限設定
+        is_first_step = True
         
         while should_continue_process(termination_cond_str, state_manager, timestamp, elapsed_time, num_sections):
             # 1ステップ実行
             outputs, residual_gas_composition = execute_mode_list(
-                sim_conds, mode_list, state_manager, residual_gas_composition
+                sim_conds, mode_list, state_manager, residual_gas_composition,
+                is_first_step=is_first_step,
             )
+            is_first_step = False
             
             elapsed_time += dt
             step_count += 1
