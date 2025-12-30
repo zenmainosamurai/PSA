@@ -331,7 +331,7 @@ class LidHeatBalanceResult:
 
 @dataclass
 class VacuumPumpingResult:
-    """真空排気計算結果"""
+    """真空排気計算結果（モード固有のオーケストレーション結果）"""
 
     pressure_loss: float
     cumulative_co2_recovered: float
@@ -340,6 +340,22 @@ class VacuumPumpingResult:
     volumetric_flow_rate: float
     remaining_moles: float
     final_pressure: float
+
+
+@dataclass
+class VacuumPumpFlowResult:
+    """真空ポンプ流量計算結果（純粋な物理計算結果）"""
+    pressure_loss: float          # 圧力損失 [MPa]
+    volumetric_flow_rate: float   # 体積流量（ノルマル）[m³/min]
+    molar_flow_rate: float        # モル流量 [mol/min]
+
+
+@dataclass
+class EqualizationFlowResult:
+    """均圧配管流量計算結果（純粋な物理計算結果）"""
+    pressure_loss: float          # 圧力損失 [MPa]
+    volumetric_flow_rate: float   # 体積流量（ノルマル）[L/min]
+    pressure_differential: float  # 塔間圧力差 [Pa]
 
 
 @dataclass

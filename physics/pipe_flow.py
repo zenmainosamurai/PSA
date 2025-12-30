@@ -13,8 +13,6 @@
 - calculate_pressure_change_from_moles(): 物質量変化からの圧力変化
 """
 
-from dataclasses import dataclass
-from typing import Tuple
 import numpy as np
 import pandas as pd
 
@@ -26,26 +24,10 @@ from common.constants import (
     MINUTE_TO_SECOND,
     GRAVITY_ACCELERATION,
     M3_TO_L,
-    STANDARD_MOLAR_VOLUME,
 )
 
 from config.sim_conditions import TowerConditions
-
-
-@dataclass
-class VacuumPumpFlowResult:
-    """真空ポンプ流量計算結果"""
-    pressure_loss: float          # 圧力損失 [MPa]
-    volumetric_flow_rate: float   # 体積流量（ノルマル）[m³/min]
-    molar_flow_rate: float        # モル流量 [mol/min]
-
-
-@dataclass
-class EqualizationFlowResult:
-    """均圧配管流量計算結果"""
-    pressure_loss: float          # 圧力損失 [MPa]
-    volumetric_flow_rate: float   # 体積流量（ノルマル）[L/min]
-    pressure_differential: float  # 塔間圧力差 [Pa]
+from state.results import VacuumPumpFlowResult, EqualizationFlowResult
 
 
 def calculate_vacuum_pump_flow(

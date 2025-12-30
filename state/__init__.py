@@ -35,6 +35,8 @@ from .results import (
     MoleFractionResults,
     # Specialized results
     VacuumPumpingResult,
+    VacuumPumpFlowResult,
+    EqualizationFlowResult,
     DepressurizationResult,
     DownstreamFlowResult,
     DesorptionMoleFractionResult,
@@ -67,6 +69,8 @@ __all__ = [
     "MoleFractionResults",
     # Specialized results
     "VacuumPumpingResult",
+    "VacuumPumpFlowResult",
+    "EqualizationFlowResult",
     "DepressurizationResult",
     "DownstreamFlowResult",
     "DesorptionMoleFractionResult",
